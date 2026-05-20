@@ -1,7 +1,9 @@
 #include "gff3.hpp"
 
+#include <deque>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace gffsub {
@@ -90,6 +92,23 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
             }
         }
     }
+
+    for (int i = 0; i < static_cast<int>(data_.records.size()); ++i) {
+        const auto& rec = data_.records[i];
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto parent_it = attrs.find("Parent");
+        if (parent_it == attrs.end()) {
+            continue;
+        }
+
+        for (const auto& parent_id : parent_it->second) {
+            children_by_parent_id_[parent_id].push_back(i);
+            const auto parent_record = id_to_record_.find(parent_id);
+            if (rec.id && parent_record != id_to_record_.end()) {
+                parents_by_child_id_[*rec.id].push_back(parent_record->second);
+            }
+        }
+    }
 }
 
 std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const {
@@ -106,6 +125,61 @@ std::optional<GffRecord> AnnotationIndex::find_gene(std::string_view id) const {
         return std::nullopt;
     }
     return data_.records[it->second.front()];
+}
+
+std::vector<GffRecord> AnnotationIndex::parents_of(std::string_view id) const {
+    std::vector<GffRecord> parents;
+    const auto it = parents_by_child_id_.find(std::string{id});
+    if (it == parents_by_child_id_.end()) {
+        return parents;
+    }
+    parents.reserve(it->second.size());
+    for (const int idx : it->second) {
+        parents.push_back(data_.records[idx]);
+    }
+    return parents;
+}
+
+std::vector<GffRecord> AnnotationIndex::children_of(std::string_view parent_id) const {
+    std::vector<GffRecord> children;
+    const auto it = children_by_parent_id_.find(std::string{parent_id});
+    if (it == children_by_parent_id_.end()) {
+        return children;
+    }
+    children.reserve(it->second.size());
+    for (const int idx : it->second) {
+        children.push_back(data_.records[idx]);
+    }
+    return children;
+}
+
+std::vector<GffRecord> AnnotationIndex::descendants_of(std::string_view parent_id) const {
+    std::vector<GffRecord> descendants;
+    std::deque<std::string> pending{std::string{parent_id}};
+    std::unordered_set<std::string> visited;
+
+    while (!pending.empty()) {
+        const auto current = pending.front();
+        pending.pop_front();
+        if (!visited.insert(current).second) {
+            continue;
+        }
+
+        const auto child_it = children_by_parent_id_.find(current);
+        if (child_it == children_by_parent_id_.end()) {
+            continue;
+        }
+
+        for (const int child_idx : child_it->second) {
+            const auto& child = data_.records[child_idx];
+            descendants.push_back(child);
+            if (child.id) {
+                pending.push_back(*child.id);
+            }
+        }
+    }
+
+    return descendants;
 }
 
 }  // namespace gffsub

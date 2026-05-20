@@ -73,11 +73,16 @@ public:
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     std::optional<GffRecord> find_gene(std::string_view id) const;
+    std::vector<GffRecord> parents_of(std::string_view id) const;
+    std::vector<GffRecord> children_of(std::string_view parent_id) const;
+    std::vector<GffRecord> descendants_of(std::string_view parent_id) const;
 
 private:
     GffData data_;
     std::unordered_map<std::string, int> id_to_record_;
     std::unordered_map<std::string, std::vector<int>> gene_lookup_;
+    std::unordered_map<std::string, std::vector<int>> parents_by_child_id_;
+    std::unordered_map<std::string, std::vector<int>> children_by_parent_id_;
 
     explicit AnnotationIndex(GffData data);
 };
