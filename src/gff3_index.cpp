@@ -84,7 +84,7 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
         }
 
         const auto attrs = parse_attributes(rec.attr_raw);
-        for (const char* key : {"Name", "gene_id", "locus_tag", "Alias"}) {
+        for (const char* key : {"Name", "gene_id", "locus_tag", "Alias", "Dbxref"}) {
             const auto it = attrs.find(key);
             if (it == attrs.end()) {
                 continue;

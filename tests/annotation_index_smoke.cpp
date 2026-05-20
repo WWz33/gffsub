@@ -11,7 +11,7 @@ static bool write_test_annotation(const std::string& path) {
     }
 
     out << "##gff-version 3\n"
-        << "chr1\t.\tgene\t1\t100\t.\t+\t.\tID=gene1;Name=GeneOne;gene_id=G1;locus_tag=Locus1;Alias=Alpha,Beta\n"
+        << "chr1\t.\tgene\t1\t100\t.\t+\t.\tID=gene1;Name=GeneOne;gene_id=G1;locus_tag=Locus1;Alias=Alpha,Beta;Dbxref=GeneID:12345\n"
         << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx1;Parent=gene1\n"
         << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx2;Parent=gene1\n"
         << "chr1\t.\texon\t10\t20\t.\t+\t.\tID=exon_shared;Parent=tx1,tx2\n"
@@ -53,7 +53,7 @@ static int check_self_contained_annotation() {
         return 1;
     }
 
-    for (const std::string query : {"GeneOne", "G1", "Locus1", "Alpha", "Beta"}) {
+    for (const std::string query : {"GeneOne", "G1", "Locus1", "Alpha", "Beta", "GeneID:12345"}) {
         const auto gene = index.find_gene(query);
         if (!gene || gene->id != "gene1") {
             std::cerr << "find_gene failed for " << query << '\n';

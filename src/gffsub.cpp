@@ -195,7 +195,7 @@ static std::string infer_gene_match_key(const AnnotationIndex& index, const std:
     if (rec.gene_id && *rec.gene_id == query) {
         return "gene_id";
     }
-    for (const char* key : {"Name", "locus_tag", "Alias"}) {
+    for (const char* key : {"Name", "locus_tag", "Alias", "Dbxref"}) {
         if (contains_record(index.with_attribute(key, query), rec.line_idx)) {
             return key;
         }
