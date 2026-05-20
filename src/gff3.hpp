@@ -2,13 +2,12 @@
 #define GFF3_HPP
 
 #include <cstdint>
+#include <ostream>
 #include <string>
 #include <vector>
 #include <optional>
 #include <unordered_map>
 #include <string_view>
-#include <thread>
-#include <functional>
 
 namespace gffsub {
 
@@ -67,6 +66,21 @@ public:
 };
 
 int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFormat format);
+
+class AnnotationIndex {
+public:
+    static AnnotationIndex from_gff3(const std::string& path);
+
+    std::optional<GffRecord> find_by_id(std::string_view id) const;
+    std::optional<GffRecord> find_gene(std::string_view id) const;
+
+private:
+    GffData data_;
+    std::unordered_map<std::string, int> id_to_record_;
+    std::unordered_map<std::string, std::vector<int>> gene_lookup_;
+
+    explicit AnnotationIndex(GffData data);
+};
 
 struct Region {
     std::string seqid;

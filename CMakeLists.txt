@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(gffsub
     src/gffsub.cpp
+    src/gff3_index.cpp
     src/gff3_parser.cpp
     src/gff3_filter.cpp
     src/gff3_output.cpp
