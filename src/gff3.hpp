@@ -78,6 +78,7 @@ public:
     std::vector<GffRecord> descendants_of(std::string_view parent_id) const;
     std::vector<GffRecord> overlap(std::string_view seqid, int64_t start, int64_t end) const;
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
+    std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
 
 private:
     GffData data_;

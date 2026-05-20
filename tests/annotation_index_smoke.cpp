@@ -44,6 +44,12 @@ static int check_soybean_annotation(const std::string& path) {
         return 1;
     }
 
+    const auto attr_matches = index.with_attribute("ID", gene_id);
+    if (attr_matches.size() != 1 || attr_matches.front().id != gene->id) {
+        std::cerr << "with_attribute failed for ID=" << gene_id << '\n';
+        return 1;
+    }
+
     const auto nearest = index.nearest_gene("Chr01", 35001, 36000);
     if (!nearest || nearest->id != gene->id) {
         std::cerr << "nearest_gene failed for Chr01:35001-36000\n";

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <getopt.h>
 
@@ -71,6 +72,7 @@ static void query_usage(const char* prog) {
         << "  --id-list FILE          Query one feature ID per line.\n"
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
+        << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
         << "  --include-children      Include descendants of matched IDs.\n"
         << "  -h, --help              Display this help message.\n";
 }
@@ -93,6 +95,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::string id_list_file;
     std::string region_str;
     std::string feature_type;
+    std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
 
     for (int i = 2; i < argc; ++i) {
@@ -126,6 +129,15 @@ static int run_query(int argc, char* argv[], const char* prog) {
             auto value = require_value("--type");
             if (!value) return 1;
             feature_type = *value;
+        } else if (arg == "--attr") {
+            auto value = require_value("--attr");
+            if (!value) return 1;
+            const auto equal_pos = value->find('=');
+            if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value->size()) {
+                std::cerr << "Error: --attr expects KEY=VALUE\n";
+                return 1;
+            }
+            attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
         } else if (arg == "--include-children") {
             include_children = true;
         } else if (arg == "-h" || arg == "--help") {
@@ -190,6 +202,12 @@ static int run_query(int argc, char* argv[], const char* prog) {
             return 1;
         }
         for (const auto& rec : index.overlap(region->seqid, region->start, region->end)) {
+            add_match(rec);
+        }
+    }
+
+    for (const auto& [key, value] : attr_filters) {
+        for (const auto& rec : index.with_attribute(key, value)) {
             add_match(rec);
         }
     }

@@ -218,4 +218,22 @@ std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, i
     return nearest;
 }
 
+std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std::string_view value) const {
+    std::vector<GffRecord> matches;
+    for (const auto& rec : data_.records) {
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto it = attrs.find(std::string{key});
+        if (it == attrs.end()) {
+            continue;
+        }
+        for (const auto& attr_value : it->second) {
+            if (attr_value == value) {
+                matches.push_back(rec);
+                break;
+            }
+        }
+    }
+    return matches;
+}
+
 }  // namespace gffsub
