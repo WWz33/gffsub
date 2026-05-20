@@ -38,6 +38,18 @@ static int check_soybean_annotation(const std::string& path) {
         return 1;
     }
 
+    const auto overlapping = index.overlap("Chr01", 1, 35000);
+    if (overlapping.size() != 8 || overlapping.front().id != gene->id) {
+        std::cerr << "overlap failed for Chr01:1-35000\n";
+        return 1;
+    }
+
+    const auto nearest = index.nearest_gene("Chr01", 35001, 36000);
+    if (!nearest || nearest->id != gene->id) {
+        std::cerr << "nearest_gene failed for Chr01:35001-36000\n";
+        return 1;
+    }
+
     return 0;
 }
 

@@ -1,6 +1,7 @@
 #include "gff3.hpp"
 
 #include <deque>
+#include <limits>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -180,6 +181,41 @@ std::vector<GffRecord> AnnotationIndex::descendants_of(std::string_view parent_i
     }
 
     return descendants;
+}
+
+std::vector<GffRecord> AnnotationIndex::overlap(std::string_view seqid, int64_t start, int64_t end) const {
+    std::vector<GffRecord> matches;
+    for (const auto& rec : data_.records) {
+        if (rec.seqid == seqid && rec.end >= start && rec.start <= end) {
+            matches.push_back(rec);
+        }
+    }
+    return matches;
+}
+
+std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, int64_t start, int64_t end) const {
+    std::optional<GffRecord> nearest;
+    int64_t nearest_distance = std::numeric_limits<int64_t>::max();
+
+    for (const auto& rec : data_.records) {
+        if (rec.type != "gene" || rec.seqid != seqid) {
+            continue;
+        }
+
+        int64_t distance = 0;
+        if (end < rec.start) {
+            distance = rec.start - end;
+        } else if (start > rec.end) {
+            distance = start - rec.end;
+        }
+
+        if (distance < nearest_distance) {
+            nearest_distance = distance;
+            nearest = rec;
+        }
+    }
+
+    return nearest;
 }
 
 }  // namespace gffsub
