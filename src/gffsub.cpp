@@ -1,7 +1,12 @@
 #include "gff3.hpp"
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <fstream>
+#include <optional>
 #include <string>
+#include <unordered_set>
+#include <vector>
 #include <getopt.h>
 
 using namespace gffsub;
@@ -57,7 +62,151 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -t gtf3 -o out.gtf\n";
 }
 
+static void query_usage(const char* prog) {
+    std::cerr << "Usage: " << prog << " query <input.gff3> [options]\n"
+        << "\n"
+        << "Query Options:\n"
+        << "  --id ID                 Query a feature by ID.\n"
+        << "  --name NAME             Query a gene by Name/Alias/gene_id/locus_tag/ID.\n"
+        << "  --id-list FILE          Query one feature ID per line.\n"
+        << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
+        << "  --type TYPE             Restrict query output by feature type.\n"
+        << "  --include-children      Include descendants of matched IDs.\n"
+        << "  -h, --help              Display this help message.\n";
+}
+
+static void append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord& rec) {
+    if (seen.insert(rec.line_idx).second) {
+        out.append(rec);
+    }
+}
+
+static int run_query(int argc, char* argv[], const char* prog) {
+    if (argc < 2) {
+        query_usage(prog);
+        return 1;
+    }
+
+    const std::string input_file = argv[1];
+    std::vector<std::string> ids;
+    std::string name;
+    std::string id_list_file;
+    std::string region_str;
+    std::string feature_type;
+    bool include_children = false;
+
+    for (int i = 2; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto require_value = [&](const char* option) -> std::optional<std::string> {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << option << " requires a value\n";
+                return std::nullopt;
+            }
+            ++i;
+            return std::string{argv[i]};
+        };
+
+        if (arg == "--id") {
+            auto value = require_value("--id");
+            if (!value) return 1;
+            ids.push_back(*value);
+        } else if (arg == "--name") {
+            auto value = require_value("--name");
+            if (!value) return 1;
+            name = *value;
+        } else if (arg == "--id-list") {
+            auto value = require_value("--id-list");
+            if (!value) return 1;
+            id_list_file = *value;
+        } else if (arg == "--region") {
+            auto value = require_value("--region");
+            if (!value) return 1;
+            region_str = *value;
+        } else if (arg == "--type") {
+            auto value = require_value("--type");
+            if (!value) return 1;
+            feature_type = *value;
+        } else if (arg == "--include-children") {
+            include_children = true;
+        } else if (arg == "-h" || arg == "--help") {
+            query_usage(prog);
+            return 0;
+        } else {
+            std::cerr << "Error: unknown query option " << arg << '\n';
+            query_usage(prog);
+            return 1;
+        }
+    }
+
+    if (!id_list_file.empty()) {
+        std::ifstream in{id_list_file};
+        if (!in.is_open()) {
+            std::cerr << "Error: cannot open " << id_list_file << '\n';
+            return 1;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+            if (!line.empty()) {
+                ids.push_back(line);
+            }
+        }
+    }
+
+    gffsub::AnnotationIndex index = gffsub::AnnotationIndex::from_gff3(input_file);
+    GffData result;
+    std::unordered_set<int> seen;
+
+    auto add_match = [&](const GffRecord& rec) {
+        if (feature_type.empty() || rec.type == feature_type) {
+            append_unique(result, seen, rec);
+        }
+        if (include_children && rec.id) {
+            for (const auto& child : index.descendants_of(*rec.id)) {
+                if (feature_type.empty() || child.type == feature_type) {
+                    append_unique(result, seen, child);
+                }
+            }
+        }
+    };
+
+    for (const auto& id : ids) {
+        const auto rec = index.find_by_id(id);
+        if (rec) {
+            add_match(*rec);
+        }
+    }
+
+    if (!name.empty()) {
+        const auto rec = index.find_gene(name);
+        if (rec) {
+            add_match(*rec);
+        }
+    }
+
+    if (!region_str.empty()) {
+        const auto region = parse_region(region_str);
+        if (!region) {
+            std::cerr << "Error: invalid region format " << region_str << '\n';
+            return 1;
+        }
+        for (const auto& rec : index.overlap(region->seqid, region->start, region->end)) {
+            add_match(rec);
+        }
+    }
+
+    std::sort(result.records.begin(), result.records.end(),
+              [](const GffRecord& lhs, const GffRecord& rhs) {
+                  return lhs.line_idx < rhs.line_idx;
+              });
+    print_gff3(std::cout, result);
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
+    if (argc > 1 && std::string(argv[1]) == "query") {
+        return run_query(argc - 1, argv + 1, argv[0]);
+    }
+
     std::string region_str;
     std::string bed_file;
     std::string feature;
