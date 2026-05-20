@@ -133,6 +133,18 @@ static std::string record_id(const GffRecord& rec) {
     return "";
 }
 
+static void add_feature_counts(SummaryRow& row, const std::vector<GffRecord>& records) {
+    for (const auto& rec : records) {
+        if (rec.type == "mRNA" || rec.type == "transcript") {
+            ++row.transcript_count;
+        } else if (rec.type == "exon") {
+            ++row.exon_count;
+        } else if (rec.type == "CDS") {
+            row.cds_length += rec.end - rec.start + 1;
+        }
+    }
+}
+
 static SummaryRow make_summary_row(const AnnotationIndex& index,
                                    const std::string& query_id,
                                    const std::string& matched_by,
@@ -152,30 +164,11 @@ static SummaryRow make_summary_row(const AnnotationIndex& index,
     if (rec.id) {
         const auto children = index.children_of(*rec.id);
         row.child_count = children.size();
-        for (const auto& child : children) {
-            if (child.type == "mRNA" || child.type == "transcript") {
-                ++row.transcript_count;
-            } else if (child.type == "exon") {
-                ++row.exon_count;
-            } else if (child.type == "CDS") {
-                row.cds_length += child.end - child.start + 1;
-            }
-        }
-
         const auto model = index.gene_model(*rec.id);
         if (model) {
-            row.transcript_count = 0;
-            row.exon_count = 0;
-            row.cds_length = 0;
-            for (const auto& model_rec : model->records) {
-                if (model_rec.type == "mRNA" || model_rec.type == "transcript") {
-                    ++row.transcript_count;
-                } else if (model_rec.type == "exon") {
-                    ++row.exon_count;
-                } else if (model_rec.type == "CDS") {
-                    row.cds_length += model_rec.end - model_rec.start + 1;
-                }
-            }
+            add_feature_counts(row, model->records);
+        } else {
+            add_feature_counts(row, children);
         }
     }
 
