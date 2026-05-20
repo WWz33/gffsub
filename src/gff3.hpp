@@ -102,7 +102,15 @@ struct Region {
     int64_t end;
 };
 
+struct BedRegion {
+    std::string seqid;
+    int64_t start;
+    int64_t end;
+};
+
 std::optional<Region> parse_region(std::string_view region_str);
+BedRegion to_bed_region(const GffRecord& rec);
+Region from_bed_region(const BedRegion& region);
 
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);

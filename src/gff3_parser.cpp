@@ -144,6 +144,14 @@ std::optional<Region> parse_region(std::string_view region_str) {
     return Region{seqid, start, end};
 }
 
+BedRegion to_bed_region(const GffRecord& rec) {
+    return BedRegion{rec.seqid, rec.start - 1, rec.end};
+}
+
+Region from_bed_region(const BedRegion& region) {
+    return Region{region.seqid, region.start + 1, region.end};
+}
+
 void filter_by_region(GffData& data, const Region& region) {
     for (auto& rec : data) {
         if (rec.seqid != region.seqid || rec.end < region.start || rec.start > region.end) {

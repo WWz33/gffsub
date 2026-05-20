@@ -35,6 +35,18 @@ static int check_self_contained_annotation() {
         return 1;
     }
 
+    const auto bed_region = gffsub::to_bed_region(*by_id);
+    if (bed_region.seqid != "chr1" || bed_region.start != 0 || bed_region.end != 100) {
+        std::cerr << "to_bed_region failed for gene1\n";
+        return 1;
+    }
+
+    const auto gff_region = gffsub::from_bed_region(bed_region);
+    if (gff_region.seqid != "chr1" || gff_region.start != 1 || gff_region.end != 100) {
+        std::cerr << "from_bed_region failed for gene1\n";
+        return 1;
+    }
+
     for (const std::string query : {"GeneOne", "G1", "Locus1", "Alpha", "Beta"}) {
         const auto gene = index.find_gene(query);
         if (!gene || gene->id != "gene1") {
