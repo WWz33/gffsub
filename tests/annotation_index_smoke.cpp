@@ -79,6 +79,16 @@ static int check_self_contained_annotation() {
         return 1;
     }
 
+    const auto model = index.gene_model("exon_shared");
+    if (!model || model->gene.id != "gene1" || model->records.size() != 5) {
+        std::cerr << "gene_model failed for exon_shared\n";
+        return 1;
+    }
+    if (model->records.front().id != "gene1" || model->records.back().id != "cds1") {
+        std::cerr << "gene_model record order failed\n";
+        return 1;
+    }
+
     return 0;
 }
 
@@ -134,6 +144,12 @@ static int check_soybean_annotation(const std::string& path) {
         return 1;
     }
 
+    const auto model = index.gene_model("SoyL04_01G000000.m1");
+    if (!model || model->gene.id != gene->id || model->records.size() != 8) {
+        std::cerr << "gene_model failed for SoyL04_01G000000.m1\n";
+        return 1;
+    }
+
     return 0;
 }
 
@@ -143,13 +159,15 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    if (argc == 2 && check_soybean_annotation(argv[1]) != 0) {
-        return 1;
-    }
-
-    const int self_contained_status = check_self_contained_annotation();
-    if (self_contained_status != 0) {
-        return self_contained_status;
+    if (argc == 2) {
+        if (check_soybean_annotation(argv[1]) != 0) {
+            return 1;
+        }
+    } else {
+        const int self_contained_status = check_self_contained_annotation();
+        if (self_contained_status != 0) {
+            return self_contained_status;
+        }
     }
 
     std::cout << "annotation_index_smoke OK\n";

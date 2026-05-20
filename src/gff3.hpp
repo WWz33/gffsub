@@ -32,6 +32,11 @@ struct GffRecord {
     bool kept;
 };
 
+struct GeneModel {
+    GffRecord gene;
+    std::vector<GffRecord> records;
+};
+
 class GffData {
 public:
     std::vector<GffRecord> records;
@@ -79,6 +84,7 @@ public:
     std::vector<GffRecord> overlap(std::string_view seqid, int64_t start, int64_t end) const;
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
+    std::optional<GeneModel> gene_model(std::string_view id) const;
 
 private:
     GffData data_;

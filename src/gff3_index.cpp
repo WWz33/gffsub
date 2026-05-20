@@ -1,6 +1,7 @@
 #include "gff3.hpp"
 
 #include <deque>
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
@@ -234,6 +235,45 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
         }
     }
     return matches;
+}
+
+std::optional<GeneModel> AnnotationIndex::gene_model(std::string_view id) const {
+    std::optional<GffRecord> gene = find_gene(id);
+    if (!gene) {
+        auto rec = find_by_id(id);
+        while (rec && rec->type != "gene" && rec->id) {
+            const auto parents = parents_of(*rec->id);
+            if (parents.empty()) {
+                rec = std::nullopt;
+            } else {
+                rec = parents.front();
+            }
+        }
+        if (rec && rec->type == "gene") {
+            gene = rec;
+        }
+    }
+
+    if (!gene || !gene->id) {
+        return std::nullopt;
+    }
+
+    GeneModel model{*gene, {}};
+    model.records.push_back(*gene);
+
+    std::unordered_set<int> seen{gene->line_idx};
+    for (const auto& rec : descendants_of(*gene->id)) {
+        if (seen.insert(rec.line_idx).second) {
+            model.records.push_back(rec);
+        }
+    }
+
+    std::sort(model.records.begin(), model.records.end(),
+              [](const GffRecord& lhs, const GffRecord& rhs) {
+                  return lhs.line_idx < rhs.line_idx;
+              });
+
+    return model;
 }
 
 }  // namespace gffsub
