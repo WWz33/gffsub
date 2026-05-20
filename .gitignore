@@ -23,3 +23,6 @@ Thumbs.db
 # Test output
 test.gff
 *.output
+
+# Local agent workflow state
+.ccg/
