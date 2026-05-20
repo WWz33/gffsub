@@ -6,6 +6,7 @@
 #include <sstream>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -88,6 +89,16 @@ static void window_usage(const char* prog) {
         << "  --downstream N          Bases to add downstream of the target (default: 0).\n"
         << "  --strand-aware          Interpret upstream/downstream by feature strand.\n"
         << "  -h, --help              Display this help message.\n";
+}
+
+static void qc_usage(const char* prog) {
+    std::cerr << "Usage: " << prog << " qc <input.gff3>\n"
+        << "\n"
+        << "QC checks:\n"
+        << "  duplicate_id      Repeated ID attributes.\n"
+        << "  invalid_range     start greater than end.\n"
+        << "  missing_parent    Parent points to an absent ID.\n"
+        << "  child_outside_parent  Child coordinates outside parent coordinates.\n";
 }
 
 struct SummaryRow {
@@ -216,6 +227,57 @@ static std::string json_escape(const std::string& value) {
         }
     }
     return out.str();
+}
+
+static std::vector<std::string> attribute_values(const std::string& attrs, const std::string& key) {
+    std::vector<std::string> values;
+    size_t pos = 0;
+    while (pos < attrs.size()) {
+        const size_t key_end = attrs.find('=', pos);
+        if (key_end == std::string::npos) {
+            break;
+        }
+
+        const std::string found_key = attrs.substr(pos, key_end - pos);
+        size_t value_end = attrs.find(';', key_end + 1);
+        if (value_end == std::string::npos) {
+            value_end = attrs.size();
+        }
+
+        if (found_key == key) {
+            size_t value_start = key_end + 1;
+            while (value_start <= value_end) {
+                size_t part_end = attrs.find(',', value_start);
+                if (part_end == std::string::npos || part_end > value_end) {
+                    part_end = value_end;
+                }
+                if (part_end > value_start) {
+                    values.push_back(attrs.substr(value_start, part_end - value_start));
+                }
+                if (part_end == value_end) {
+                    break;
+                }
+                value_start = part_end + 1;
+            }
+            break;
+        }
+
+        pos = (value_end < attrs.size()) ? value_end + 1 : attrs.size();
+    }
+    return values;
+}
+
+static void print_qc_row(std::ostream& out,
+                         const char* severity,
+                         const char* code,
+                         int line_idx,
+                         const std::string& id,
+                         const std::string& message) {
+    out << severity << '\t'
+        << code << '\t'
+        << line_idx << '\t'
+        << id << '\t'
+        << message << '\n';
 }
 
 static void print_summary_tsv(std::ostream& out, const std::vector<SummaryRow>& rows) {
@@ -518,12 +580,71 @@ static int run_window(int argc, char* argv[], const char* prog) {
     return 0;
 }
 
+static int run_qc(int argc, char* argv[], const char* prog) {
+    if (argc != 2) {
+        qc_usage(prog);
+        return 1;
+    }
+
+    GffData data;
+    IdIndex idx;
+    const std::string input_file = argv[1];
+    if (parse_file(input_file, data, idx, InputFormat::GFF3) != 0) {
+        std::cerr << "Error: cannot parse " << input_file << '\n';
+        return 1;
+    }
+
+    std::unordered_map<std::string, const GffRecord*> by_id;
+    std::unordered_map<std::string, int> id_counts;
+    for (const auto& rec : data.records) {
+        if (rec.id) {
+            ++id_counts[*rec.id];
+            by_id.emplace(*rec.id, &rec);
+        }
+    }
+
+    std::cout << "severity\tcode\tline_idx\tid\tmessage\n";
+
+    for (const auto& [id, count] : id_counts) {
+        if (count > 1) {
+            print_qc_row(std::cout, "error", "duplicate_id", -1, id, "ID appears more than once");
+        }
+    }
+
+    for (const auto& rec : data.records) {
+        const std::string id = record_id(rec);
+        if (rec.start > rec.end) {
+            print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
+        }
+
+        for (const auto& parent_id : attribute_values(rec.attr_raw, "Parent")) {
+            const auto parent_it = by_id.find(parent_id);
+            if (parent_it == by_id.end()) {
+                print_qc_row(std::cout, "error", "missing_parent", rec.line_idx, id,
+                             "Parent " + parent_id + " was not found");
+                continue;
+            }
+
+            const auto& parent = *parent_it->second;
+            if (rec.seqid != parent.seqid || rec.start < parent.start || rec.end > parent.end) {
+                print_qc_row(std::cout, "warning", "child_outside_parent", rec.line_idx, id,
+                             "child is outside Parent " + parent_id);
+            }
+        }
+    }
+
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::string(argv[1]) == "query") {
         return run_query(argc - 1, argv + 1, argv[0]);
     }
     if (argc > 1 && std::string(argv[1]) == "window") {
         return run_window(argc - 1, argv + 1, argv[0]);
+    }
+    if (argc > 1 && std::string(argv[1]) == "qc") {
+        return run_qc(argc - 1, argv + 1, argv[0]);
     }
 
     std::string region_str;
