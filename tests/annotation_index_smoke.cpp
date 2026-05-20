@@ -4,6 +4,84 @@
 #include <iostream>
 #include <string>
 
+static bool write_test_annotation(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) {
+        return false;
+    }
+
+    out << "##gff-version 3\n"
+        << "chr1\t.\tgene\t1\t100\t.\t+\t.\tID=gene1;Name=GeneOne;gene_id=G1;locus_tag=Locus1;Alias=Alpha,Beta\n"
+        << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx1;Parent=gene1\n"
+        << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx2;Parent=gene1\n"
+        << "chr1\t.\texon\t10\t20\t.\t+\t.\tID=exon_shared;Parent=tx1,tx2\n"
+        << "chr1\t.\tCDS\t30\t50\t.\t+\t0\tID=cds1;Parent=tx1\n"
+        << "chr1\t.\tgene\t200\t300\t.\t-\t.\tID=gene2;Name=GeneTwo\n";
+    return true;
+}
+
+static int check_self_contained_annotation() {
+    const std::string path{"annotation_index_smoke.gff3"};
+    if (!write_test_annotation(path)) {
+        std::cerr << "cannot write self-contained test annotation\n";
+        return 1;
+    }
+
+    const auto index = gffsub::AnnotationIndex::from_gff3(path);
+
+    const auto by_id = index.find_by_id("gene1");
+    if (!by_id || by_id->type != "gene" || by_id->seqid != "chr1") {
+        std::cerr << "find_by_id failed for gene1\n";
+        return 1;
+    }
+
+    for (const std::string query : {"GeneOne", "G1", "Locus1", "Alpha", "Beta"}) {
+        const auto gene = index.find_gene(query);
+        if (!gene || gene->id != "gene1") {
+            std::cerr << "find_gene failed for " << query << '\n';
+            return 1;
+        }
+    }
+
+    const auto children = index.children_of("gene1");
+    if (children.size() != 2) {
+        std::cerr << "children_of failed for gene1\n";
+        return 1;
+    }
+
+    const auto parents = index.parents_of("exon_shared");
+    if (parents.size() != 2) {
+        std::cerr << "multi-parent parents_of failed\n";
+        return 1;
+    }
+
+    const auto descendants = index.descendants_of("gene1");
+    if (descendants.size() != 5) {
+        std::cerr << "descendants_of failed for gene1\n";
+        return 1;
+    }
+
+    const auto overlapping = index.overlap("chr1", 15, 35);
+    if (overlapping.size() != 5) {
+        std::cerr << "overlap failed for chr1:15-35\n";
+        return 1;
+    }
+
+    const auto attr_matches = index.with_attribute("Alias", "Beta");
+    if (attr_matches.size() != 1 || attr_matches.front().id != "gene1") {
+        std::cerr << "with_attribute failed for Alias=Beta\n";
+        return 1;
+    }
+
+    const auto nearest = index.nearest_gene("chr1", 120, 150);
+    if (!nearest || nearest->id != "gene1") {
+        std::cerr << "nearest_gene failed for chr1:120-150\n";
+        return 1;
+    }
+
+    return 0;
+}
+
 static int check_soybean_annotation(const std::string& path) {
     const std::string gene_id{"SoyL04_01G000000"};
     const auto index = gffsub::AnnotationIndex::from_gff3(path);
@@ -59,49 +137,19 @@ static int check_soybean_annotation(const std::string& path) {
     return 0;
 }
 
-static int check_multi_parent_graph() {
-    const std::string path{"/tmp/gffsub_annotation_index_multiparent.gff3"};
-    std::ofstream out{path};
-    out << "chr1\t.\tgene\t1\t100\t.\t+\t.\tID=gene1;Name=GeneOne\n"
-        << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx1;Parent=gene1\n"
-        << "chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=tx2;Parent=gene1\n"
-        << "chr1\t.\texon\t10\t20\t.\t+\t.\tID=exon_shared;Parent=tx1,tx2\n";
-    out.close();
-
-    const auto index = gffsub::AnnotationIndex::from_gff3(path);
-    const auto gene = index.find_gene("GeneOne");
-    if (!gene || gene->id != "gene1") {
-        std::cerr << "find_gene failed for Name=GeneOne\n";
-        return 1;
-    }
-
-    const auto parents = index.parents_of("exon_shared");
-    if (parents.size() != 2) {
-        std::cerr << "multi-parent parents_of failed\n";
-        return 1;
-    }
-
-    const auto tx1_children = index.children_of("tx1");
-    const auto tx2_children = index.children_of("tx2");
-    if (tx1_children.size() != 1 || tx2_children.size() != 1) {
-        std::cerr << "multi-parent children_of failed\n";
-        return 1;
-    }
-
-    return 0;
-}
-
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "usage: annotation_index_smoke <annotation.gff3>\n";
+    if (argc > 2) {
+        std::cerr << "usage: annotation_index_smoke [annotation.gff3]\n";
         return 2;
     }
 
-    if (check_soybean_annotation(argv[1]) != 0) {
+    if (argc == 2 && check_soybean_annotation(argv[1]) != 0) {
         return 1;
     }
-    if (check_multi_parent_graph() != 0) {
-        return 1;
+
+    const int self_contained_status = check_self_contained_annotation();
+    if (self_contained_status != 0) {
+        return self_contained_status;
     }
 
     std::cout << "annotation_index_smoke OK\n";
