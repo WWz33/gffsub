@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -74,13 +75,185 @@ static void query_usage(const char* prog) {
         << "  --type TYPE             Restrict query output by feature type.\n"
         << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
         << "  --include-children      Include descendants of matched IDs.\n"
+        << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  -h, --help              Display this help message.\n";
 }
 
-static void append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord& rec) {
-    if (seen.insert(rec.line_idx).second) {
-        out.append(rec);
+struct SummaryRow {
+    std::string query_id;
+    std::string matched_id;
+    std::string matched_by;
+    std::string seqid;
+    int64_t start = 0;
+    int64_t end = 0;
+    char strand = '.';
+    std::string type;
+    std::string parent_id;
+    size_t child_count = 0;
+    size_t transcript_count = 0;
+    size_t exon_count = 0;
+    int64_t cds_length = 0;
+    std::string status;
+};
+
+static bool append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord& rec) {
+    if (!seen.insert(rec.line_idx).second) {
+        return false;
     }
+    out.append(rec);
+    return true;
+}
+
+static std::string record_id(const GffRecord& rec) {
+    if (rec.id) return *rec.id;
+    if (rec.gene_id) return *rec.gene_id;
+    if (rec.transcript_id) return *rec.transcript_id;
+    return "";
+}
+
+static SummaryRow make_summary_row(const AnnotationIndex& index,
+                                   const std::string& query_id,
+                                   const std::string& matched_by,
+                                   const GffRecord& rec) {
+    SummaryRow row;
+    row.query_id = query_id;
+    row.matched_id = record_id(rec);
+    row.matched_by = matched_by;
+    row.seqid = rec.seqid;
+    row.start = rec.start;
+    row.end = rec.end;
+    row.strand = rec.strand;
+    row.type = rec.type;
+    row.parent_id = rec.parent_id.value_or("");
+    row.status = "found";
+
+    if (rec.id) {
+        const auto children = index.children_of(*rec.id);
+        row.child_count = children.size();
+        for (const auto& child : children) {
+            if (child.type == "mRNA" || child.type == "transcript") {
+                ++row.transcript_count;
+            } else if (child.type == "exon") {
+                ++row.exon_count;
+            } else if (child.type == "CDS") {
+                row.cds_length += child.end - child.start + 1;
+            }
+        }
+
+        const auto model = index.gene_model(*rec.id);
+        if (model) {
+            row.transcript_count = 0;
+            row.exon_count = 0;
+            row.cds_length = 0;
+            for (const auto& model_rec : model->records) {
+                if (model_rec.type == "mRNA" || model_rec.type == "transcript") {
+                    ++row.transcript_count;
+                } else if (model_rec.type == "exon") {
+                    ++row.exon_count;
+                } else if (model_rec.type == "CDS") {
+                    row.cds_length += model_rec.end - model_rec.start + 1;
+                }
+            }
+        }
+    }
+
+    return row;
+}
+
+static SummaryRow make_not_found_row(const std::string& query_id, const std::string& matched_by) {
+    SummaryRow row;
+    row.query_id = query_id;
+    row.matched_by = matched_by;
+    row.status = "not_found";
+    return row;
+}
+
+static bool contains_record(const std::vector<GffRecord>& records, int line_idx) {
+    for (const auto& rec : records) {
+        if (rec.line_idx == line_idx) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static std::string infer_gene_match_key(const AnnotationIndex& index, const std::string& query, const GffRecord& rec) {
+    if (rec.id && *rec.id == query) {
+        return "ID";
+    }
+    if (rec.gene_id && *rec.gene_id == query) {
+        return "gene_id";
+    }
+    for (const char* key : {"Name", "locus_tag", "Alias"}) {
+        if (contains_record(index.with_attribute(key, query), rec.line_idx)) {
+            return key;
+        }
+    }
+    return "name";
+}
+
+static std::string json_escape(const std::string& value) {
+    std::ostringstream out;
+    for (const char ch : value) {
+        switch (ch) {
+            case '\\': out << "\\\\"; break;
+            case '"': out << "\\\""; break;
+            case '\n': out << "\\n"; break;
+            case '\r': out << "\\r"; break;
+            case '\t': out << "\\t"; break;
+            default: out << ch; break;
+        }
+    }
+    return out.str();
+}
+
+static void print_summary_tsv(std::ostream& out, const std::vector<SummaryRow>& rows) {
+    out << "query_id\tmatched_id\tmatched_by\tseqid\tstart\tend\tstrand\ttype\tparent_id\t"
+        << "child_count\ttranscript_count\texon_count\tcds_length\tstatus\n";
+    for (const auto& row : rows) {
+        out << row.query_id << '\t'
+            << row.matched_id << '\t'
+            << row.matched_by << '\t'
+            << row.seqid << '\t'
+            << row.start << '\t'
+            << row.end << '\t'
+            << row.strand << '\t'
+            << row.type << '\t'
+            << row.parent_id << '\t'
+            << row.child_count << '\t'
+            << row.transcript_count << '\t'
+            << row.exon_count << '\t'
+            << row.cds_length << '\t'
+            << row.status << '\n';
+    }
+}
+
+static void print_summary_json(std::ostream& out, const std::vector<SummaryRow>& rows) {
+    out << "[\n";
+    for (size_t i = 0; i < rows.size(); ++i) {
+        const auto& row = rows[i];
+        out << "  {"
+            << "\"query_id\":\"" << json_escape(row.query_id) << "\","
+            << "\"matched_id\":\"" << json_escape(row.matched_id) << "\","
+            << "\"matched_by\":\"" << json_escape(row.matched_by) << "\","
+            << "\"seqid\":\"" << json_escape(row.seqid) << "\","
+            << "\"start\":" << row.start << ','
+            << "\"end\":" << row.end << ','
+            << "\"strand\":\"" << row.strand << "\","
+            << "\"type\":\"" << json_escape(row.type) << "\","
+            << "\"parent_id\":\"" << json_escape(row.parent_id) << "\","
+            << "\"child_count\":" << row.child_count << ','
+            << "\"transcript_count\":" << row.transcript_count << ','
+            << "\"exon_count\":" << row.exon_count << ','
+            << "\"cds_length\":" << row.cds_length << ','
+            << "\"status\":\"" << row.status << "\""
+            << "}";
+        if (i + 1 < rows.size()) {
+            out << ',';
+        }
+        out << '\n';
+    }
+    out << "]\n";
 }
 
 static int run_query(int argc, char* argv[], const char* prog) {
@@ -95,6 +268,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::string id_list_file;
     std::string region_str;
     std::string feature_type;
+    std::string summary_format;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
 
@@ -138,6 +312,14 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
+        } else if (arg == "--summary-format") {
+            auto value = require_value("--summary-format");
+            if (!value) return 1;
+            summary_format = *value;
+            if (summary_format != "tsv" && summary_format != "json") {
+                std::cerr << "Error: --summary-format expects tsv or json\n";
+                return 1;
+            }
         } else if (arg == "--include-children") {
             include_children = true;
         } else if (arg == "-h" || arg == "--help") {
@@ -167,15 +349,26 @@ static int run_query(int argc, char* argv[], const char* prog) {
     gffsub::AnnotationIndex index = gffsub::AnnotationIndex::from_gff3(input_file);
     GffData result;
     std::unordered_set<int> seen;
+    std::vector<SummaryRow> summary_rows;
 
-    auto add_match = [&](const GffRecord& rec) {
+    auto add_summary = [&](const std::string& query_id, const std::string& matched_by, const GffRecord& rec) {
+        if (!summary_format.empty()) {
+            summary_rows.push_back(make_summary_row(index, query_id, matched_by, rec));
+        }
+    };
+
+    auto add_match = [&](const GffRecord& rec, const std::string& query_id, const std::string& matched_by) {
         if (feature_type.empty() || rec.type == feature_type) {
-            append_unique(result, seen, rec);
+            if (append_unique(result, seen, rec)) {
+                add_summary(query_id, matched_by, rec);
+            }
         }
         if (include_children && rec.id) {
             for (const auto& child : index.descendants_of(*rec.id)) {
                 if (feature_type.empty() || child.type == feature_type) {
-                    append_unique(result, seen, child);
+                    if (append_unique(result, seen, child)) {
+                        add_summary(query_id, "child", child);
+                    }
                 }
             }
         }
@@ -184,14 +377,18 @@ static int run_query(int argc, char* argv[], const char* prog) {
     for (const auto& id : ids) {
         const auto rec = index.find_by_id(id);
         if (rec) {
-            add_match(*rec);
+            add_match(*rec, id, "ID");
+        } else if (!summary_format.empty()) {
+            summary_rows.push_back(make_not_found_row(id, "ID"));
         }
     }
 
     if (!name.empty()) {
         const auto rec = index.find_gene(name);
         if (rec) {
-            add_match(*rec);
+            add_match(*rec, name, infer_gene_match_key(index, name, *rec));
+        } else if (!summary_format.empty()) {
+            summary_rows.push_back(make_not_found_row(name, "name"));
         }
     }
 
@@ -202,13 +399,18 @@ static int run_query(int argc, char* argv[], const char* prog) {
             return 1;
         }
         for (const auto& rec : index.overlap(region->seqid, region->start, region->end)) {
-            add_match(rec);
+            add_match(rec, region_str, "region");
         }
     }
 
     for (const auto& [key, value] : attr_filters) {
+        bool matched = false;
         for (const auto& rec : index.with_attribute(key, value)) {
-            add_match(rec);
+            matched = true;
+            add_match(rec, key + "=" + value, key);
+        }
+        if (!matched && !summary_format.empty()) {
+            summary_rows.push_back(make_not_found_row(key + "=" + value, key));
         }
     }
 
@@ -216,7 +418,13 @@ static int run_query(int argc, char* argv[], const char* prog) {
               [](const GffRecord& lhs, const GffRecord& rhs) {
                   return lhs.line_idx < rhs.line_idx;
               });
-    print_gff3(std::cout, result);
+    if (summary_format == "tsv") {
+        print_summary_tsv(std::cout, summary_rows);
+    } else if (summary_format == "json") {
+        print_summary_json(std::cout, summary_rows);
+    } else {
+        print_gff3(std::cout, result);
+    }
     return 0;
 }
 
