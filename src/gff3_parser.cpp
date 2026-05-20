@@ -152,6 +152,21 @@ Region from_bed_region(const BedRegion& region) {
     return Region{region.seqid, region.start + 1, region.end};
 }
 
+Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream, bool strand_aware) {
+    int64_t left_extension = upstream;
+    int64_t right_extension = downstream;
+    if (strand_aware && rec.strand == '-') {
+        left_extension = downstream;
+        right_extension = upstream;
+    }
+
+    int64_t start = rec.start - left_extension;
+    if (start < 1) {
+        start = 1;
+    }
+    return Region{rec.seqid, start, rec.end + right_extension};
+}
+
 void filter_by_region(GffData& data, const Region& region) {
     for (auto& rec : data) {
         if (rec.seqid != region.seqid || rec.end < region.start || rec.start > region.end) {

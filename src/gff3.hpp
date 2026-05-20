@@ -111,6 +111,7 @@ struct BedRegion {
 std::optional<Region> parse_region(std::string_view region_str);
 BedRegion to_bed_region(const GffRecord& rec);
 Region from_bed_region(const BedRegion& region);
+Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream, bool strand_aware);
 
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);

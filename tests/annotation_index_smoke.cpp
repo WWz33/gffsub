@@ -47,6 +47,12 @@ static int check_self_contained_annotation() {
         return 1;
     }
 
+    const auto plus_window = gffsub::window_region(*by_id, 10, 20, true);
+    if (plus_window.seqid != "chr1" || plus_window.start != 1 || plus_window.end != 120) {
+        std::cerr << "window_region failed for plus-strand gene1\n";
+        return 1;
+    }
+
     for (const std::string query : {"GeneOne", "G1", "Locus1", "Alpha", "Beta"}) {
         const auto gene = index.find_gene(query);
         if (!gene || gene->id != "gene1") {
@@ -98,6 +104,17 @@ static int check_self_contained_annotation() {
     }
     if (model->records.front().id != "gene1" || model->records.back().id != "cds1") {
         std::cerr << "gene_model record order failed\n";
+        return 1;
+    }
+
+    const auto minus_gene = index.find_by_id("gene2");
+    if (!minus_gene) {
+        std::cerr << "find_by_id failed for gene2\n";
+        return 1;
+    }
+    const auto minus_window = gffsub::window_region(*minus_gene, 10, 20, true);
+    if (minus_window.seqid != "chr1" || minus_window.start != 180 || minus_window.end != 310) {
+        std::cerr << "window_region failed for minus-strand gene2\n";
         return 1;
     }
 

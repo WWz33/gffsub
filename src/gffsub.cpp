@@ -79,6 +79,17 @@ static void query_usage(const char* prog) {
         << "  -h, --help              Display this help message.\n";
 }
 
+static void window_usage(const char* prog) {
+    std::cerr << "Usage: " << prog << " window <input.gff3> [options]\n"
+        << "\n"
+        << "Window Options:\n"
+        << "  --id ID                 Target feature ID or gene lookup key.\n"
+        << "  --upstream N            Bases to add upstream of the target (default: 0).\n"
+        << "  --downstream N          Bases to add downstream of the target (default: 0).\n"
+        << "  --strand-aware          Interpret upstream/downstream by feature strand.\n"
+        << "  -h, --help              Display this help message.\n";
+}
+
 struct SummaryRow {
     std::string query_id;
     std::string matched_id;
@@ -428,9 +439,91 @@ static int run_query(int argc, char* argv[], const char* prog) {
     return 0;
 }
 
+static int run_window(int argc, char* argv[], const char* prog) {
+    if (argc < 2) {
+        window_usage(prog);
+        return 1;
+    }
+
+    const std::string input_file = argv[1];
+    std::string id;
+    int64_t upstream = 0;
+    int64_t downstream = 0;
+    bool strand_aware = false;
+
+    for (int i = 2; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto require_value = [&](const char* option) -> std::optional<std::string> {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << option << " requires a value\n";
+                return std::nullopt;
+            }
+            ++i;
+            return std::string{argv[i]};
+        };
+
+        if (arg == "--id") {
+            auto value = require_value("--id");
+            if (!value) return 1;
+            id = *value;
+        } else if (arg == "--upstream") {
+            auto value = require_value("--upstream");
+            if (!value) return 1;
+            upstream = std::stoll(*value);
+            if (upstream < 0) {
+                std::cerr << "Error: --upstream must be non-negative\n";
+                return 1;
+            }
+        } else if (arg == "--downstream") {
+            auto value = require_value("--downstream");
+            if (!value) return 1;
+            downstream = std::stoll(*value);
+            if (downstream < 0) {
+                std::cerr << "Error: --downstream must be non-negative\n";
+                return 1;
+            }
+        } else if (arg == "--strand-aware") {
+            strand_aware = true;
+        } else if (arg == "-h" || arg == "--help") {
+            window_usage(prog);
+            return 0;
+        } else {
+            std::cerr << "Error: unknown window option " << arg << '\n';
+            window_usage(prog);
+            return 1;
+        }
+    }
+
+    if (id.empty()) {
+        std::cerr << "Error: window requires --id\n";
+        return 1;
+    }
+
+    const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
+    auto target = index.find_by_id(id);
+    if (!target) {
+        target = index.find_gene(id);
+    }
+    if (!target) {
+        std::cerr << "Error: cannot find " << id << '\n';
+        return 1;
+    }
+
+    const auto region = window_region(*target, upstream, downstream, strand_aware);
+    GffData result;
+    for (const auto& rec : index.overlap(region.seqid, region.start, region.end)) {
+        result.append(rec);
+    }
+    print_gff3(std::cout, result);
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::string(argv[1]) == "query") {
         return run_query(argc - 1, argv + 1, argv[0]);
+    }
+    if (argc > 1 && std::string(argv[1]) == "window") {
+        return run_window(argc - 1, argv + 1, argv[0]);
     }
 
     std::string region_str;
