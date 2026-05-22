@@ -33,6 +33,10 @@ static void usage(const char* prog) {
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --attr KEY=VALUE\n"
         << "  --include-children\n"
         << "      Include descendants of records matched by --id, --id-list, --name, or --attr.\n"
+        << "  --attrs KEYS\n"
+        << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
+        << "  --summary-format FMT\n"
+        << "      Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -78,6 +82,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
         << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -750,6 +755,8 @@ int main(int argc, char* argv[]) {
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
+    std::vector<std::string> selected_attrs;
+    std::string summary_format;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -758,12 +765,14 @@ int main(int argc, char* argv[]) {
     std::string output_format = "gff3";
     std::string output_file;
 
-    enum { OPT_ID = 1000, OPT_ID_LIST, OPT_NAME, OPT_ATTR };
+    enum { OPT_ID = 1000, OPT_ID_LIST, OPT_NAME, OPT_ATTR, OPT_ATTRS, OPT_SUMMARY_FORMAT };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
         {"attr",          required_argument, nullptr, OPT_ATTR},
+        {"attrs",         required_argument, nullptr, OPT_ATTRS},
+        {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
@@ -793,6 +802,22 @@ int main(int argc, char* argv[]) {
                 attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
                 break;
             }
+            case OPT_ATTRS: {
+                const auto keys = split_attr_keys(optarg);
+                if (keys.empty()) {
+                    std::cerr << "Error: --attrs expects a comma-separated list of keys\n";
+                    return 1;
+                }
+                selected_attrs.insert(selected_attrs.end(), keys.begin(), keys.end());
+                break;
+            }
+            case OPT_SUMMARY_FORMAT:
+                summary_format = optarg;
+                if (summary_format != "tsv" && summary_format != "json") {
+                    std::cerr << "Error: --summary-format expects tsv or json\n";
+                    return 1;
+                }
+                break;
             case 'C': include_children = true; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
@@ -836,6 +861,52 @@ int main(int argc, char* argv[]) {
     }
 
     std::string input_file = argv[optind];
+
+    if (!summary_format.empty() || !selected_attrs.empty()) {
+        std::vector<std::string> query_args{"query", input_file};
+        for (const auto& id : ids) {
+            query_args.push_back("--id");
+            query_args.push_back(id);
+        }
+        if (!id_list_file.empty()) {
+            query_args.push_back("--id-list");
+            query_args.push_back(id_list_file);
+        }
+        if (!name.empty()) {
+            query_args.push_back("--name");
+            query_args.push_back(name);
+        }
+        if (!region_str.empty()) {
+            query_args.push_back("--region");
+            query_args.push_back(region_str);
+        }
+        if (!feature.empty()) {
+            query_args.push_back("--type");
+            query_args.push_back(feature);
+        }
+        for (const auto& [key, value] : attr_filters) {
+            query_args.push_back("--attr");
+            query_args.push_back(key + "=" + value);
+        }
+        if (include_children) {
+            query_args.push_back("--include-children");
+        }
+        if (!summary_format.empty()) {
+            query_args.push_back("--summary-format");
+            query_args.push_back(summary_format);
+        }
+        if (!selected_attrs.empty()) {
+            query_args.push_back("--attrs");
+            query_args.push_back(join_values(selected_attrs));
+        }
+
+        std::vector<char*> query_argv;
+        query_argv.reserve(query_args.size());
+        for (auto& arg : query_args) {
+            query_argv.push_back(arg.data());
+        }
+        return run_query(static_cast<int>(query_argv.size()), query_argv.data(), argv[0]);
+    }
 
     if (!id_list_file.empty()) {
         std::ifstream in{id_list_file};

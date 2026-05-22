@@ -19,8 +19,8 @@
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt --include-children` |
-| Produce a pipeline-friendly summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
-| Extract selected attribute values | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
+| Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
+| Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
 | Check annotation graph problems | `gffsub qc annotation.gff3` |
@@ -67,10 +67,10 @@ gffsub annotation.gff3 --id GeneA --include-children
 gffsub annotation.gff3 --region chr1:1-100000
 
 # Query and summarize
-gffsub query annotation.gff3 --id GeneA --summary-format tsv
+gffsub annotation.gff3 --id GeneA --summary-format tsv
 
 # Query and extract selected attributes
-gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent
+gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent
 
 # Extract an upstream/downstream window
 gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500
@@ -145,8 +145,8 @@ Use `query` when the question starts from an identifier, name, attribute, or reg
 For batch pipelines, ask for summaries instead of raw GFF3:
 
 ```bash
-./gffsub query annotation.gff3 --id-list genes.txt --summary-format tsv
-./gffsub query annotation.gff3 --id GeneA --summary-format json
+./gffsub annotation.gff3 --id-list genes.txt --summary-format tsv
+./gffsub annotation.gff3 --id GeneA --summary-format json
 ```
 
 Summary fields include query ID, matched ID, matched field, coordinates, strand, feature type, parent ID, child count, transcript count, exon count, CDS length, and status.
@@ -204,6 +204,8 @@ gffsub <input.gff3> [options]
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
 | `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
+| `--attrs` | `KEY1,KEY2,...` | Print selected attributes as extra TSV/JSON fields. This uses the same summary output as `query`. |
+| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
