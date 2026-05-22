@@ -15,7 +15,7 @@
 | 提取某个基因组区间内的 feature | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | 用 BED 区间作为输入 | `gffsub annotation.gff3 -b regions.bed -f exon` |
 | 按精确 ID 提取一个 feature | `gffsub annotation.gff3 --id GeneA` |
-| 按 name/attribute 找一个基因或 feature | `gffsub query annotation.gff3 --name GeneA` |
+| 按 name 找一个基因或 feature | `gffsub annotation.gff3 --name GeneA` |
 | 批量查询 ID，并带上子 feature | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
 | 输出适合 pipeline 读取的 summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
 | 提取指定属性值 | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
@@ -50,7 +50,7 @@ gffsub annotation.gff3 -L
 gffsub annotation.gff3 --id GeneA
 
 # 查询一个名称或基因查找键
-gffsub query annotation.gff3 --name ABC1
+gffsub annotation.gff3 --name ABC1
 
 # 批量查询 ID
 gffsub query annotation.gff3 --id-list genes.txt
@@ -125,7 +125,7 @@ ctest --test-dir build --output-on-failure
 ./gffsub annotation.gff3 --id Glyma.01G000100
 
 # 按 ID、Name、gene_id、locus_tag、Alias 或完整 Dbxref 值查基因
-./gffsub query annotation.gff3 --name ABC1
+./gffsub annotation.gff3 --name ABC1
 
 # 属性选择器
 ./gffsub query annotation.gff3 --attr biotype=protein_coding
@@ -192,6 +192,7 @@ gffsub <input.gff3> [options]
 |------|----|------|
 | `<input.gff3>` | 文件 | 输入 GFF3/GTF 风格注释文件。 |
 | `--id` | ID | 保留精确 feature `ID`。该参数可以重复使用。默认 GFF3 输出等价于 `gffsub query <input.gff3> --id ID`。 |
+| `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。默认 GFF3 输出等价于 `gffsub query <input.gff3> --name NAME`。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
 | `-b`, `--bed` | 文件 | 保留与 BED 区间重叠的 feature；BED 按 0-based 半开区间读取。 |
 | `-f`, `--feature` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |

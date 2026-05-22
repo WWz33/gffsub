@@ -22,6 +22,9 @@ static void usage(const char* prog) {
         << "  --id ID\n"
         << "      Extract a feature by exact GFF3 ID. May be repeated.\n"
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --id ID\n"
+        << "  --name NAME\n"
+        << "      Extract a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
+        << "      Default GFF3 output matches: " << prog << " query <input.gff3> --name NAME\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -65,6 +68,7 @@ static void usage(const char* prog) {
         << "\n"
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
+        << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
@@ -731,6 +735,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<std::string> ids;
+    std::string name;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -739,9 +744,10 @@ int main(int argc, char* argv[]) {
     std::string output_format = "gff3";
     std::string output_file;
 
-    enum { OPT_ID = 1000 };
+    enum { OPT_ID = 1000, OPT_NAME };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
+        {"name",          required_argument, nullptr, OPT_NAME},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
         {"feature",       required_argument, nullptr, 'f'},
@@ -757,6 +763,7 @@ int main(int argc, char* argv[]) {
     while ((opt = getopt_long(argc, argv, "r:b:f:L@:t:o:h", long_options, nullptr)) != -1) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
+            case OPT_NAME: name = optarg; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -809,11 +816,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!ids.empty()) {
+    if (!ids.empty() || !name.empty()) {
         const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
         std::unordered_set<int> selected_lines;
         for (const auto& id : ids) {
             const auto rec = index.find_by_id(id);
+            if (rec) {
+                selected_lines.insert(rec->line_idx);
+            }
+        }
+        if (!name.empty()) {
+            const auto rec = index.find_gene(name);
             if (rec) {
                 selected_lines.insert(rec->line_idx);
             }
