@@ -71,6 +71,7 @@ public:
 };
 
 int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFormat format);
+std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
 
 class AnnotationIndex {
 public:

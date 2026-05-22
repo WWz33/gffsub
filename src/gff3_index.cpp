@@ -10,7 +10,7 @@
 
 namespace gffsub {
 
-static std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs) {
+std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs) {
     std::unordered_map<std::string, std::vector<std::string>> parsed;
     size_t pos = 0;
     while (pos < attrs.size()) {

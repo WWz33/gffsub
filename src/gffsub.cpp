@@ -1,5 +1,6 @@
 #include "gff3.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <iostream>
 #include <fstream>
@@ -75,6 +76,7 @@ static void query_usage(const char* prog) {
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
         << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
+        << "  --attrs KEYS            Output selected attributes as extra TSV/JSON fields.\n"
         << "  --include-children      Include descendants of matched IDs.\n"
         << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  -h, --help              Display this help message.\n";
@@ -116,6 +118,7 @@ struct SummaryRow {
     size_t exon_count = 0;
     int64_t cds_length = 0;
     std::string status;
+    std::vector<std::string> attrs;
 };
 
 static bool append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord& rec) {
@@ -222,40 +225,61 @@ static std::string json_escape(const std::string& value) {
     return out.str();
 }
 
-static std::vector<std::string> attribute_values(const std::string& attrs, const std::string& key) {
-    std::vector<std::string> values;
+static std::string trim_copy(std::string_view value) {
+    size_t start = 0;
+    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
+        ++start;
+    }
+
+    size_t end = value.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+        --end;
+    }
+
+    return std::string{value.substr(start, end - start)};
+}
+
+static std::vector<std::string> split_attr_keys(std::string_view keys) {
+    std::vector<std::string> result;
     size_t pos = 0;
-    while (pos < attrs.size()) {
-        const size_t key_end = attrs.find('=', pos);
-        if (key_end == std::string::npos) {
+    while (pos <= keys.size()) {
+        const size_t comma = keys.find(',', pos);
+        const size_t end = (comma == std::string_view::npos) ? keys.size() : comma;
+        const auto key = trim_copy(keys.substr(pos, end - pos));
+        if (!key.empty()) {
+            result.push_back(key);
+        }
+        if (comma == std::string_view::npos) {
             break;
         }
+        pos = comma + 1;
+    }
+    return result;
+}
 
-        const std::string found_key = attrs.substr(pos, key_end - pos);
-        size_t value_end = attrs.find(';', key_end + 1);
-        if (value_end == std::string::npos) {
-            value_end = attrs.size();
+static std::string join_values(const std::vector<std::string>& values) {
+    std::ostringstream out;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) {
+            out << ',';
         }
+        out << values[i];
+    }
+    return out.str();
+}
 
-        if (found_key == key) {
-            size_t value_start = key_end + 1;
-            while (value_start <= value_end) {
-                size_t part_end = attrs.find(',', value_start);
-                if (part_end == std::string::npos || part_end > value_end) {
-                    part_end = value_end;
-                }
-                if (part_end > value_start) {
-                    values.push_back(attrs.substr(value_start, part_end - value_start));
-                }
-                if (part_end == value_end) {
-                    break;
-                }
-                value_start = part_end + 1;
-            }
-            break;
+static std::vector<std::string> extract_selected_attrs(const std::string& attrs,
+                                                       const std::vector<std::string>& keys) {
+    const auto parsed = parse_attributes(attrs);
+    std::vector<std::string> values;
+    values.reserve(keys.size());
+    for (const auto& key : keys) {
+        const auto it = parsed.find(key);
+        if (it == parsed.end()) {
+            values.emplace_back();
+        } else {
+            values.push_back(join_values(it->second));
         }
-
-        pos = (value_end < attrs.size()) ? value_end + 1 : attrs.size();
     }
     return values;
 }
@@ -273,9 +297,15 @@ static void print_qc_row(std::ostream& out,
         << message << '\n';
 }
 
-static void print_summary_tsv(std::ostream& out, const std::vector<SummaryRow>& rows) {
+static void print_summary_tsv(std::ostream& out,
+                              const std::vector<SummaryRow>& rows,
+                              const std::vector<std::string>& selected_attrs) {
     out << "query_id\tmatched_id\tmatched_by\tseqid\tstart\tend\tstrand\ttype\tparent_id\t"
-        << "child_count\ttranscript_count\texon_count\tcds_length\tstatus\n";
+        << "child_count\ttranscript_count\texon_count\tcds_length\tstatus";
+    for (const auto& key : selected_attrs) {
+        out << '\t' << key;
+    }
+    out << '\n';
     for (const auto& row : rows) {
         out << row.query_id << '\t'
             << row.matched_id << '\t'
@@ -290,11 +320,20 @@ static void print_summary_tsv(std::ostream& out, const std::vector<SummaryRow>& 
             << row.transcript_count << '\t'
             << row.exon_count << '\t'
             << row.cds_length << '\t'
-            << row.status << '\n';
+            << row.status;
+        for (size_t i = 0; i < selected_attrs.size(); ++i) {
+            out << '\t';
+            if (i < row.attrs.size()) {
+                out << row.attrs[i];
+            }
+        }
+        out << '\n';
     }
 }
 
-static void print_summary_json(std::ostream& out, const std::vector<SummaryRow>& rows) {
+static void print_summary_json(std::ostream& out,
+                               const std::vector<SummaryRow>& rows,
+                               const std::vector<std::string>& selected_attrs) {
     out << "[\n";
     for (size_t i = 0; i < rows.size(); ++i) {
         const auto& row = rows[i];
@@ -312,8 +351,22 @@ static void print_summary_json(std::ostream& out, const std::vector<SummaryRow>&
             << "\"transcript_count\":" << row.transcript_count << ','
             << "\"exon_count\":" << row.exon_count << ','
             << "\"cds_length\":" << row.cds_length << ','
-            << "\"status\":\"" << row.status << "\""
-            << "}";
+            << "\"status\":\"" << row.status << "\"";
+        if (!selected_attrs.empty()) {
+            out << ",\"attrs\":{";
+            for (size_t j = 0; j < selected_attrs.size(); ++j) {
+                out << "\"" << json_escape(selected_attrs[j]) << "\":\"";
+                if (j < row.attrs.size()) {
+                    out << json_escape(row.attrs[j]);
+                }
+                out << "\"";
+                if (j + 1 < selected_attrs.size()) {
+                    out << ',';
+                }
+            }
+            out << "}";
+        }
+        out << "}";
         if (i + 1 < rows.size()) {
             out << ',';
         }
@@ -323,6 +376,11 @@ static void print_summary_json(std::ostream& out, const std::vector<SummaryRow>&
 }
 
 static int run_query(int argc, char* argv[], const char* prog) {
+    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        query_usage(prog);
+        return 0;
+    }
+
     if (argc < 2) {
         query_usage(prog);
         return 1;
@@ -335,6 +393,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::string region_str;
     std::string feature_type;
     std::string summary_format;
+    std::vector<std::string> selected_attrs;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
 
@@ -378,6 +437,15 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
+        } else if (arg == "--attrs") {
+            auto value = require_value("--attrs");
+            if (!value) return 1;
+            const auto keys = split_attr_keys(*value);
+            if (keys.empty()) {
+                std::cerr << "Error: --attrs expects a comma-separated list of keys\n";
+                return 1;
+            }
+            selected_attrs.insert(selected_attrs.end(), keys.begin(), keys.end());
         } else if (arg == "--summary-format") {
             auto value = require_value("--summary-format");
             if (!value) return 1;
@@ -416,10 +484,15 @@ static int run_query(int argc, char* argv[], const char* prog) {
     GffData result;
     std::unordered_set<int> seen;
     std::vector<SummaryRow> summary_rows;
+    const bool emit_summary = !summary_format.empty() || !selected_attrs.empty();
 
     auto add_summary = [&](const std::string& query_id, const std::string& matched_by, const GffRecord& rec) {
-        if (!summary_format.empty()) {
-            summary_rows.push_back(make_summary_row(index, query_id, matched_by, rec));
+        if (emit_summary) {
+            auto row = make_summary_row(index, query_id, matched_by, rec);
+            if (!selected_attrs.empty()) {
+                row.attrs = extract_selected_attrs(rec.attr_raw, selected_attrs);
+            }
+            summary_rows.push_back(std::move(row));
         }
     };
 
@@ -444,8 +517,10 @@ static int run_query(int argc, char* argv[], const char* prog) {
         const auto rec = index.find_by_id(id);
         if (rec) {
             add_match(*rec, id, "ID");
-        } else if (!summary_format.empty()) {
-            summary_rows.push_back(make_not_found_row(id, "ID"));
+        } else if (emit_summary) {
+            auto row = make_not_found_row(id, "ID");
+            row.attrs.assign(selected_attrs.size(), "");
+            summary_rows.push_back(std::move(row));
         }
     }
 
@@ -453,8 +528,10 @@ static int run_query(int argc, char* argv[], const char* prog) {
         const auto rec = index.find_gene(name);
         if (rec) {
             add_match(*rec, name, infer_gene_match_key(index, name, *rec));
-        } else if (!summary_format.empty()) {
-            summary_rows.push_back(make_not_found_row(name, "name"));
+        } else if (emit_summary) {
+            auto row = make_not_found_row(name, "name");
+            row.attrs.assign(selected_attrs.size(), "");
+            summary_rows.push_back(std::move(row));
         }
     }
 
@@ -475,8 +552,10 @@ static int run_query(int argc, char* argv[], const char* prog) {
             matched = true;
             add_match(rec, key + "=" + value, key);
         }
-        if (!matched && !summary_format.empty()) {
-            summary_rows.push_back(make_not_found_row(key + "=" + value, key));
+        if (!matched && emit_summary) {
+            auto row = make_not_found_row(key + "=" + value, key);
+            row.attrs.assign(selected_attrs.size(), "");
+            summary_rows.push_back(std::move(row));
         }
     }
 
@@ -484,10 +563,10 @@ static int run_query(int argc, char* argv[], const char* prog) {
               [](const GffRecord& lhs, const GffRecord& rhs) {
                   return lhs.line_idx < rhs.line_idx;
               });
-    if (summary_format == "tsv") {
-        print_summary_tsv(std::cout, summary_rows);
-    } else if (summary_format == "json") {
-        print_summary_json(std::cout, summary_rows);
+    if (summary_format == "json") {
+        print_summary_json(std::cout, summary_rows, selected_attrs);
+    } else if (emit_summary) {
+        print_summary_tsv(std::cout, summary_rows, selected_attrs);
     } else {
         print_gff3(std::cout, result);
     }
@@ -610,15 +689,20 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
         }
 
-        for (const auto& parent_id : attribute_values(rec.attr_raw, "Parent")) {
-            const auto parent_it = by_id.find(parent_id);
-            if (parent_it == by_id.end()) {
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto parent_it = attrs.find("Parent");
+        if (parent_it == attrs.end()) {
+            continue;
+        }
+        for (const auto& parent_id : parent_it->second) {
+            const auto parent_record_it = by_id.find(parent_id);
+            if (parent_record_it == by_id.end()) {
                 print_qc_row(std::cout, "error", "missing_parent", rec.line_idx, id,
                              "Parent " + parent_id + " was not found");
                 continue;
             }
 
-            const auto& parent = *parent_it->second;
+            const auto& parent = *parent_record_it->second;
             if (rec.seqid != parent.seqid || rec.start < parent.start || rec.end > parent.end) {
                 print_qc_row(std::cout, "warning", "child_outside_parent", rec.line_idx, id,
                              "child is outside Parent " + parent_id);

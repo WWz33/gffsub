@@ -17,6 +17,7 @@
 | 按 ID/name/attribute 找一个基因或 feature | `gffsub query annotation.gff3 --id GeneA` |
 | 批量查询 ID，并带上子 feature | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
 | 输出适合 pipeline 读取的 summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
+| 提取指定属性值 | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | 提取基因上下游背景区域 | `gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | 每个基因只保留最长转录本 | `gffsub annotation.gff3 --longest` |
 | 检查注释 graph 问题 | `gffsub qc annotation.gff3` |
@@ -58,6 +59,9 @@ gffsub query annotation.gff3 --region chr1:1-100000
 
 # 查询并输出 summary
 gffsub query annotation.gff3 --id GeneA --summary-format tsv
+
+# 查询并提取指定属性
+gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent
 
 # 提取上下游窗口
 gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500
@@ -212,11 +216,12 @@ gffsub query <input.gff3> [options]
 | `--region` | `CHR:START-END` | 查询与 1-based 闭合区间重叠的 feature。 |
 | `--type` | 类型 | 将查询输出限制为一个 feature 类型。 |
 | `--attr` | `KEY=VALUE` | 按精确属性值查询。该参数可以重复使用。 |
+| `--attrs` | `KEY1,KEY2,...` | 将指定属性值追加为额外 TSV/JSON 字段。 |
 | `--include-children` | 标志 | 包含匹配记录的后代，例如 transcript、exon、CDS 和 UTR feature。 |
 | `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。 |
 | `-h`, `--help` | 标志 | 显示 query 模式帮助。 |
 
-使用 `--summary-format` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。
+使用 `--summary-format` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。如果使用 `--attrs`，这些属性键会追加为额外 TSV 列，或在 JSON 中输出为 `attrs` 对象。不加 `--summary-format` 时，`--attrs` 默认输出 TSV。
 
 ### Window 模式
 

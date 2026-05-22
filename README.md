@@ -17,6 +17,7 @@
 | Find one gene or feature by ID/name/attribute | `gffsub query annotation.gff3 --id GeneA` |
 | Query many IDs and include their children | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
 | Produce a pipeline-friendly summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
+| Extract selected attribute values | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
 | Check annotation graph problems | `gffsub qc annotation.gff3` |
@@ -58,6 +59,9 @@ gffsub query annotation.gff3 --region chr1:1-100000
 
 # Query and summarize
 gffsub query annotation.gff3 --id GeneA --summary-format tsv
+
+# Query and extract selected attributes
+gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent
 
 # Extract an upstream/downstream window
 gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500
@@ -212,11 +216,12 @@ gffsub query <input.gff3> [options]
 | `--region` | `CHR:START-END` | Query features overlapping a 1-based inclusive region. |
 | `--type` | type | Restrict query output to one feature type. |
 | `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. |
+| `--attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. |
 | `-h`, `--help` | flag | Show help for query mode. |
 
-When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`.
+When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary-format`, `--attrs` prints TSV.
 
 ### Window Mode
 
