@@ -8,6 +8,7 @@ add_executable(gffsub
     src/gffsub.cpp
     src/annotation_index.cpp
     src/gff3_parser.cpp
+    src/region.cpp
     src/isoform_filter.cpp
     src/annotation_output.cpp
 )
@@ -27,6 +28,7 @@ if(BUILD_TESTING)
         tests/annotation_index_smoke.cpp
         src/annotation_index.cpp
         src/gff3_parser.cpp
+        src/region.cpp
     )
 
     target_include_directories(annotation_index_smoke PRIVATE

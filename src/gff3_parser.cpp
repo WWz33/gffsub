@@ -128,45 +128,6 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
     return 0;
 }
 
-std::optional<Region> parse_region(std::string_view region_str) {
-    size_t colon = region_str.find(':');
-    if (colon == std::string_view::npos) return std::nullopt;
-
-    std::string seqid(region_str.substr(0, colon));
-    auto range_part = region_str.substr(colon + 1);
-
-    size_t dash = range_part.find('-');
-    if (dash == std::string_view::npos) return std::nullopt;
-
-    int64_t start = std::stoll(std::string(range_part.substr(0, dash)));
-    int64_t end = std::stoll(std::string(range_part.substr(dash + 1)));
-
-    return Region{seqid, start, end};
-}
-
-BedRegion to_bed_region(const GffRecord& rec) {
-    return BedRegion{rec.seqid, rec.start - 1, rec.end};
-}
-
-Region from_bed_region(const BedRegion& region) {
-    return Region{region.seqid, region.start + 1, region.end};
-}
-
-Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream, bool strand_aware) {
-    int64_t left_extension = upstream;
-    int64_t right_extension = downstream;
-    if (strand_aware && rec.strand == '-') {
-        left_extension = downstream;
-        right_extension = upstream;
-    }
-
-    int64_t start = rec.start - left_extension;
-    if (start < 1) {
-        start = 1;
-    }
-    return Region{rec.seqid, start, rec.end + right_extension};
-}
-
 void filter_by_region(GffData& data, const Region& region) {
     for (auto& rec : data) {
         if (rec.seqid != region.seqid || rec.end < region.start || rec.start > region.end) {
