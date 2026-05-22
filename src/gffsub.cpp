@@ -31,6 +31,8 @@ static void usage(const char* prog) {
         << "  --attr KEY=VALUE\n"
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --attr KEY=VALUE\n"
+        << "  --include-children\n"
+        << "      Include descendants of records matched by --id, --id-list, --name, or --attr.\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -75,6 +77,7 @@ static void usage(const char* prog) {
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -746,6 +749,7 @@ int main(int argc, char* argv[]) {
     std::string id_list_file;
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
+    bool include_children = false;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -760,6 +764,7 @@ int main(int argc, char* argv[]) {
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
         {"attr",          required_argument, nullptr, OPT_ATTR},
+        {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
         {"feature",       required_argument, nullptr, 'f'},
@@ -788,6 +793,7 @@ int main(int argc, char* argv[]) {
                 attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
                 break;
             }
+            case 'C': include_children = true; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -857,21 +863,28 @@ int main(int argc, char* argv[]) {
     if (!ids.empty() || !name.empty() || !attr_filters.empty()) {
         const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
         std::unordered_set<int> selected_lines;
+        auto add_selected = [&](const GffRecord& rec) {
+            if (selected_lines.insert(rec.line_idx).second && include_children && rec.id) {
+                for (const auto& child : index.descendants_of(*rec.id)) {
+                    selected_lines.insert(child.line_idx);
+                }
+            }
+        };
         for (const auto& id : ids) {
             const auto rec = index.find_by_id(id);
             if (rec) {
-                selected_lines.insert(rec->line_idx);
+                add_selected(*rec);
             }
         }
         if (!name.empty()) {
             const auto rec = index.find_gene(name);
             if (rec) {
-                selected_lines.insert(rec->line_idx);
+                add_selected(*rec);
             }
         }
         for (const auto& [key, value] : attr_filters) {
             for (const auto& rec : index.with_attribute(key, value)) {
-                selected_lines.insert(rec.line_idx);
+                add_selected(rec);
             }
         }
         for (auto& rec : data.records) {

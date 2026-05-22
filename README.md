@@ -18,7 +18,7 @@
 | Extract many exact IDs | `gffsub annotation.gff3 --id-list genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
-| Query many IDs and include their children | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
+| Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt --include-children` |
 | Produce a pipeline-friendly summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
 | Extract selected attribute values | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
@@ -59,6 +59,9 @@ gffsub annotation.gff3 --attr biotype=protein_coding
 
 # Extract a batch of IDs
 gffsub annotation.gff3 --id-list genes.txt
+
+# Extract an ID and its descendants
+gffsub annotation.gff3 --id GeneA --include-children
 
 # Query a region
 gffsub query annotation.gff3 --region chr1:1-100000
@@ -136,7 +139,7 @@ Use `query` when the question starts from an identifier, name, attribute, or reg
 ./gffsub annotation.gff3 --attr biotype=protein_coding
 
 # Include descendants such as transcript, exon, CDS, and UTR records
-./gffsub query annotation.gff3 --id Glyma.01G000100 --include-children
+./gffsub annotation.gff3 --id Glyma.01G000100 --include-children
 ```
 
 For batch pipelines, ask for summaries instead of raw GFF3:
@@ -200,6 +203,7 @@ gffsub <input.gff3> [options]
 | `--id-list` | file | Read one exact feature ID per non-empty line. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id-list FILE`. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
+| `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
