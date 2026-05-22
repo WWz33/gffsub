@@ -67,9 +67,25 @@ gtf3_output.cpp       # GTF3 writer
 compat_output.cpp     # optional legacy GTF2/BED output helpers, if still supported
 ```
 
+## Public CLI Philosophy
+
+The public CLI should follow the `bcftools`-style `gffsub <file> [selectors] [modifiers] [output]`
+shape where possible. Concepts such as ID lookup, attribute selection, region selection, and
+upstream/downstream windows are common GFF annotation semantics, not user-facing module names.
+
+Internal source modules may use names such as `region`, `query`, `summary`, or `annotation_filter`
+to keep the code auditable. Those names do not automatically justify public subcommands.
+
+Public subcommands should be kept only when the output contract is genuinely different from
+record subsetting. `qc` may remain a candidate because it emits diagnostic rows, not annotation
+records. `query` and `window` should be treated as compatibility or transition surfaces until
+top-level selectors cover the same semantics.
+
 ## Query And Summary Extraction Policy
 
-`query` and `summary` are first-class concepts, but they can remain inside `gffsub.cpp` while command logic is small. Extract them only when the CLI file starts hiding domain behavior.
+`query` and `summary` are first-class internal concepts, but they can remain inside `gffsub.cpp`
+while public CLI naming is still being normalized. Do not extract them into new source modules
+until the user-facing selector model is settled.
 
 Suggested threshold for extraction:
 
@@ -142,13 +158,23 @@ src/
    - Update `CMakeLists.txt`, `Makefile`, and includes in the same commit.
    - Run the smoke test after every rename.
 
-3. **Split only after names are stable**
+3. **Finish naming before more splits**
+   - Do not split new CLI helper modules while public command semantics are still being normalized.
+   - Keep `query`, `window`, and summary helpers in `gffsub.cpp` until top-level selectors are settled.
+   - Prefer compatibility aliases over behavior changes when introducing clearer names.
+
+4. **Split internal boundaries only after names are stable**
    - `region.cpp` now owns `parse_region()`, BED/GFF conversion, and `window_region()`.
    - `annotation_filter.cpp` now owns `filter_by_region()`, `filter_by_regions_from_file()`, and `filter_by_feature()`.
    - `attributes.cpp` now owns shared strict GFF3 attribute parsing.
    - Keep GTF quoted attribute parsing separate from strict GFF3 attributes, and only keep it if compatibility requires it.
 
-4. **Delay public API renames**
+5. **Clean public CLI surfaces last**
+   - Make top-level selectors the canonical user-facing path for common GFF operations.
+   - Keep or remove subcommands based on output contract, not internal source module names.
+   - Before removing a public subcommand, provide an equivalent top-level command and test output equivalence.
+
+6. **Delay public API renames**
    - Avoid renaming `GffRecord`, `GffData`, or `from_gff3()` until file/module naming has settled.
    - If public API names change, provide a clear migration note.
 
