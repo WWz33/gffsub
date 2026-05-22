@@ -126,7 +126,7 @@ Coordinate rules are explicit:
 
 ## Scenario: Find Genes And Gene Models
 
-Use `query` when the question starts from an identifier, name, attribute, or region.
+Use the top-level selector form when the question starts from an identifier, name, attribute, or region.
 
 ```bash
 # Exact feature ID
@@ -153,7 +153,7 @@ Summary fields include query ID, matched ID, matched field, coordinates, strand,
 
 ## Scenario: Extract Upstream Or Downstream Windows
 
-Use `window` when you want a local annotation context around a gene or feature.
+Use the top-level window options when you want a local annotation context around a gene or feature.
 
 ```bash
 # Genomic expansion: left/right on the reference sequence
@@ -188,9 +188,9 @@ Current checks report duplicate IDs, invalid ranges, missing parents, and child 
 
 ## CLI Parameters
 
-`gffsub` has four command surfaces: the classic subset mode, `query`, `window`, and `qc`.
+`gffsub` is top-level first: common GFF3 work starts as `gffsub <input.gff3> [options]`. The `query`, `window`, and `qc` subcommands remain as compatible advanced entry points and share the same output semantics.
 
-### Classic Subset Mode
+### Top-Level Mode
 
 ```bash
 gffsub <input.gff3> [options]
@@ -217,15 +217,17 @@ gffsub <input.gff3> [options]
 | `-@`, `--threads` | integer | Set worker threads for `--longest`; values above 256 are capped. Set this explicitly when reproducibility of resource use matters. |
 | `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | Select output format. `gtf` is accepted as `gtf2`. Default output is `gff3`. |
 | `-o`, `--output` | file | Write output to a file instead of stdout. |
-| `-h`, `--help` | flag | Show help for classic subset mode. |
+| `-h`, `--help` | flag | Show help for top-level mode. |
 
 Options can be combined. For example, `-r chr1:1-100000 -f gene -t bed` first filters by region, then feature type, then prints BED coordinates.
 
-### Query Mode
+### Query Compatibility Mode
 
 ```bash
 gffsub query <input.gff3> [options]
 ```
+
+Most default GFF3 and summary workflows can be written without the `query` subcommand. This compatibility mode is kept for existing scripts and explicit query-style command lines.
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
@@ -243,11 +245,13 @@ gffsub query <input.gff3> [options]
 
 When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary-format`, `--attrs` prints TSV.
 
-### Window Mode
+### Window Compatibility Mode
 
 ```bash
 gffsub window <input.gff3> --id ID [options]
 ```
+
+The same workflow can be written at top level with `gffsub <input.gff3> --id ID --upstream N --downstream N`.
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
@@ -260,13 +264,13 @@ gffsub window <input.gff3> --id ID [options]
 
 The output is GFF3 records overlapping the expanded window.
 
-### QC Mode
+### QC Compatibility Mode
 
 ```bash
 gffsub qc <input.gff3>
 ```
 
-`qc` takes only the input file. It writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `duplicate_id`, `invalid_range`, `missing_parent`, and `child_outside_parent`.
+The same workflow can be written at top level with `gffsub <input.gff3> --qc`. QC writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `duplicate_id`, `invalid_range`, `missing_parent`, and `child_outside_parent`.
 
 ## Output Formats
 

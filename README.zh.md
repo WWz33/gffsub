@@ -126,7 +126,7 @@ ctest --test-dir build --output-on-failure
 
 ## 场景：查找基因和 Gene Model
 
-当问题从标识符、名称、属性或区间开始时，使用 `query`。
+当问题从标识符、名称、属性或区间开始时，优先使用顶层 selector 写法。
 
 ```bash
 # 精确 feature ID
@@ -153,7 +153,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 
 ## 场景：提取上下游窗口
 
-当你需要某个基因或 feature 周围的局部注释背景时，使用 `window`。
+当你需要某个基因或 feature 周围的局部注释背景时，优先使用顶层 window 参数。
 
 ```bash
 # Genomic expansion：按参考序列左右扩展
@@ -188,9 +188,9 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 
 ## CLI 参数
 
-`gffsub` 有四个命令入口：经典子集模式、`query`、`window` 和 `qc`。
+`gffsub` 以顶层入口为主：常用 GFF3 工作流从 `gffsub <input.gff3> [options]` 开始。`query`、`window` 和 `qc` 子命令作为兼容和进阶入口保留，并共享同一套输出语义。
 
-### 经典子集模式
+### 顶层模式
 
 ```bash
 gffsub <input.gff3> [options]
@@ -217,15 +217,17 @@ gffsub <input.gff3> [options]
 | `-@`, `--threads` | 整数 | 设置 `--longest` 使用的线程数；超过 256 会被限制为 256。需要固定资源使用时建议显式设置。 |
 | `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 会按 `gtf2` 处理。默认输出 `gff3`。 |
 | `-o`, `--output` | 文件 | 写入文件，而不是 stdout。 |
-| `-h`, `--help` | 标志 | 显示经典子集模式帮助。 |
+| `-h`, `--help` | 标志 | 显示顶层模式帮助。 |
 
 参数可以组合。例如 `-r chr1:1-100000 -f gene -t bed` 会先按区间过滤，再按 feature 类型过滤，最后输出 BED 坐标。
 
-### Query 模式
+### Query 兼容模式
 
 ```bash
 gffsub query <input.gff3> [options]
 ```
+
+大多数默认 GFF3 和 summary 工作流都可以不写 `query` 子命令。该兼容模式保留给已有脚本和显式 query 风格命令行。
 
 | 参数 | 值 | 含义 |
 |------|----|------|
@@ -243,11 +245,13 @@ gffsub query <input.gff3> [options]
 
 使用 `--summary-format` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。如果使用 `--attrs`，这些属性键会追加为额外 TSV 列，或在 JSON 中输出为 `attrs` 对象。不加 `--summary-format` 时，`--attrs` 默认输出 TSV。
 
-### Window 模式
+### Window 兼容模式
 
 ```bash
 gffsub window <input.gff3> --id ID [options]
 ```
+
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --id ID --upstream N --downstream N`。
 
 | 参数 | 值 | 含义 |
 |------|----|------|
@@ -260,13 +264,13 @@ gffsub window <input.gff3> --id ID [options]
 
 输出为与扩展窗口重叠的 GFF3 记录。
 
-### QC 模式
+### QC 兼容模式
 
 ```bash
 gffsub qc <input.gff3>
 ```
 
-`qc` 只接受输入文件。它输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_range`、`missing_parent` 和 `child_outside_parent`。
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_range`、`missing_parent` 和 `child_outside_parent`。
 
 ## 输出格式
 
