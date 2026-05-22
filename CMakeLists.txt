@@ -9,7 +9,7 @@ add_executable(gffsub
     src/annotation_index.cpp
     src/gff3_parser.cpp
     src/isoform_filter.cpp
-    src/gff3_output.cpp
+    src/annotation_output.cpp
 )
 
 target_include_directories(gffsub PRIVATE
