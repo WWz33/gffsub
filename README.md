@@ -14,7 +14,8 @@
 |-------------|----------|
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
-| Find one gene or feature by ID/name/attribute | `gffsub query annotation.gff3 --id GeneA` |
+| Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
+| Find a gene or feature by name/attribute | `gffsub query annotation.gff3 --name GeneA` |
 | Query many IDs and include their children | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
 | Produce a pipeline-friendly summary | `gffsub query annotation.gff3 --id GeneA --summary-format tsv` |
 | Extract selected attribute values | `gffsub query annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
@@ -45,8 +46,8 @@ gffsub annotation.gff3 -r chr1:1-100000 -o subset.gff3
 # Longest transcript per gene
 gffsub annotation.gff3 -L
 
-# Query one ID
-gffsub query annotation.gff3 --id GeneA
+# Extract one exact ID
+gffsub annotation.gff3 --id GeneA
 
 # Query one name or gene lookup key
 gffsub query annotation.gff3 --name ABC1
@@ -121,7 +122,7 @@ Use `query` when the question starts from an identifier, name, attribute, or reg
 
 ```bash
 # Exact feature ID
-./gffsub query annotation.gff3 --id Glyma.01G000100
+./gffsub annotation.gff3 --id Glyma.01G000100
 
 # Gene lookup by ID, Name, gene_id, locus_tag, Alias, or full Dbxref value
 ./gffsub query annotation.gff3 --name ABC1
@@ -190,6 +191,7 @@ gffsub <input.gff3> [options]
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
 | `<input.gff3>` | file | Input GFF3/GTF-style annotation file. |
+| `--id` | ID | Keep the exact feature `ID`. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id ID`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
