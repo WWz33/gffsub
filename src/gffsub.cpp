@@ -838,8 +838,8 @@ int main(int argc, char* argv[]) {
 
     switch (fmt) {
         case OutputFormat::GFF3: print_gff3(*out, data); break;
-        case OutputFormat::GTF2:
-        case OutputFormat::GTF3: print_gtf(*out, data, fmt); break;
+        case OutputFormat::GTF2: print_gtf(*out, data, fmt); break;
+        case OutputFormat::GTF3: print_gtf3(*out, data); break;
         case OutputFormat::BED:  print_bed(*out, data); break;
     }
 

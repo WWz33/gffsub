@@ -47,7 +47,7 @@ If a compatibility flavor starts requiring substantial independent behavior, rev
 
 ## GTF3 Output Policy
 
-GTF3 is a core output flavor, not a core input semantics layer. The current `print_gtf()` API is a compatibility entry point that dispatches by `OutputFormat`. Future naming should prefer explicit GTF3 ownership when the rules diverge, for example `print_gtf3()` or a dedicated `gtf3_output.cpp`.
+GTF3 is a core output flavor, not a core input semantics layer. The explicit `print_gtf3()` API owns the core GTF3 output path, while `print_gtf()` remains a compatibility dispatch entry point for callers that still pass `OutputFormat`.
 
 GTF2 support, if kept, should remain a legacy branch inside output compatibility code unless the project explicitly expands scope.
 
@@ -127,7 +127,8 @@ Suggested threshold for extraction:
 | `filter_by_region()` / `filter_by_feature()` | Aligned | Filter names are clear; they should live in a filter module. |
 | `filter_longest_isoform()` | Aligned | Explicit API for longest transcript isoform selection. |
 | `filter_longest()` | Compatibility | Legacy wrapper kept to avoid breaking existing C++ callers. |
-| `print_gff3()` / `print_gtf()` / `print_bed()` | Partially aligned | `print_gff3()` is explicit. `print_gtf()` is a compatibility dispatch entry point; prefer explicit `print_gtf3()` if GTF3 logic grows. |
+| `print_gff3()` / `print_gtf3()` / `print_bed()` | Aligned | Core output helpers are explicit for GFF3, GTF3, and BED compatibility output. |
+| `print_gtf()` | Compatibility | Legacy dispatch entry point kept for GTF2/GTF3 compatibility callers. |
 
 ## Recommended Target Layout
 

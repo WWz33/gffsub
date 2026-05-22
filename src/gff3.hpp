@@ -42,6 +42,7 @@ void filter_longest_isoform(GffData& data, IdIndex& idx, std::string_view featur
 void filter_longest(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
 
 void print_gff3(std::ostream& out, const GffData& data);
+void print_gtf3(std::ostream& out, const GffData& data);
 void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);
 void print_bed(std::ostream& out, const GffData& data);
 
