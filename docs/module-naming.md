@@ -179,6 +179,29 @@ src/
    - Avoid renaming `GffRecord`, `GffData`, or `from_gff3()` until file/module naming has settled.
    - If public API names change, provide a clear migration note.
 
+## Naming Checkpoint
+
+The first naming pass is considered complete for internal modules:
+
+- `annotation.hpp` owns the public annotation model and `AnnotationIndex`.
+- `attributes.cpp` owns strict GFF3 `tag=value` attribute helpers.
+- `gff3_parser.cpp` owns file and line parsing.
+- `region.cpp` owns region strings, coordinate conversion, and window regions.
+- `annotation_filter.cpp` owns keep/drop filters.
+- `isoform_filter.cpp` owns longest isoform selection.
+- `annotation_index.cpp` owns graph/query data structures.
+- `annotation_output.cpp` owns output helpers while GFF3/GTF3 output remains shared.
+
+The remaining non-aligned names are intentionally deferred:
+
+- `GffRecord` and `GffData` remain stable public API names for now.
+- `InputFormat::{GTF,BED}` and `OutputFormat::{GTF2,BED}` remain compatibility enum values.
+- `query` and `window` remain transition CLI surfaces until top-level selectors cover the same semantics.
+- `print_gtf()` and `filter_longest()` remain compatibility wrappers for existing C++ callers.
+
+Do not start further source boundary splits until this checkpoint is still accurate after the next CLI
+normalization pass.
+
 ## Decisions For Future Work
 
 - Treat `GxF` as an AGAT reference term, not as the default project module prefix.
