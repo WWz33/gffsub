@@ -37,6 +37,8 @@ static void usage(const char* prog) {
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "  --summary-format FMT\n"
         << "      Output query summary instead of GFF3. Choices: tsv, json.\n"
+        << "  --upstream N, --downstream N, --strand-aware\n"
+        << "      Extract a window around --id. Output matches the window command.\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -83,6 +85,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
         << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -757,6 +760,9 @@ int main(int argc, char* argv[]) {
     bool include_children = false;
     std::vector<std::string> selected_attrs;
     std::string summary_format;
+    std::string upstream_arg;
+    std::string downstream_arg;
+    bool strand_aware = false;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -765,7 +771,17 @@ int main(int argc, char* argv[]) {
     std::string output_format = "gff3";
     std::string output_file;
 
-    enum { OPT_ID = 1000, OPT_ID_LIST, OPT_NAME, OPT_ATTR, OPT_ATTRS, OPT_SUMMARY_FORMAT };
+    enum {
+        OPT_ID = 1000,
+        OPT_ID_LIST,
+        OPT_NAME,
+        OPT_ATTR,
+        OPT_ATTRS,
+        OPT_SUMMARY_FORMAT,
+        OPT_UPSTREAM,
+        OPT_DOWNSTREAM,
+        OPT_STRAND_AWARE
+    };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
@@ -773,6 +789,9 @@ int main(int argc, char* argv[]) {
         {"attr",          required_argument, nullptr, OPT_ATTR},
         {"attrs",         required_argument, nullptr, OPT_ATTRS},
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
+        {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
+        {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
+        {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
@@ -819,6 +838,9 @@ int main(int argc, char* argv[]) {
                 }
                 break;
             case 'C': include_children = true; break;
+            case OPT_UPSTREAM: upstream_arg = optarg; break;
+            case OPT_DOWNSTREAM: downstream_arg = optarg; break;
+            case OPT_STRAND_AWARE: strand_aware = true; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -861,6 +883,43 @@ int main(int argc, char* argv[]) {
     }
 
     std::string input_file = argv[optind];
+
+    if (!upstream_arg.empty() || !downstream_arg.empty() || strand_aware) {
+        if (ids.empty()) {
+            std::cerr << "Error: window shortcut requires --id\n";
+            return 1;
+        }
+        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
+            !selected_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
+            !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
+            std::cerr << "Error: window shortcut only supports --id, --upstream, --downstream, and --strand-aware\n";
+            return 1;
+        }
+
+        std::vector<std::string> window_args{"window", input_file};
+        for (const auto& id : ids) {
+            window_args.push_back("--id");
+            window_args.push_back(id);
+        }
+        if (!upstream_arg.empty()) {
+            window_args.push_back("--upstream");
+            window_args.push_back(upstream_arg);
+        }
+        if (!downstream_arg.empty()) {
+            window_args.push_back("--downstream");
+            window_args.push_back(downstream_arg);
+        }
+        if (strand_aware) {
+            window_args.push_back("--strand-aware");
+        }
+
+        std::vector<char*> window_argv;
+        window_argv.reserve(window_args.size());
+        for (auto& arg : window_args) {
+            window_argv.push_back(arg.data());
+        }
+        return run_window(static_cast<int>(window_argv.size()), window_argv.data(), argv[0]);
+    }
 
     if (!summary_format.empty() || !selected_attrs.empty()) {
         std::vector<std::string> query_args{"query", input_file};

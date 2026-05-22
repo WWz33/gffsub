@@ -21,7 +21,7 @@
 | Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt --include-children` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
-| Extract upstream/downstream context | `gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
+| Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
 | Check annotation graph problems | `gffsub qc annotation.gff3` |
 
@@ -73,7 +73,7 @@ gffsub annotation.gff3 --id GeneA --summary-format tsv
 gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent
 
 # Extract an upstream/downstream window
-gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
 
 # QC table
 gffsub qc annotation.gff3
@@ -157,10 +157,10 @@ Use `window` when you want a local annotation context around a gene or feature.
 
 ```bash
 # Genomic expansion: left/right on the reference sequence
-./gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
 
 # Biological upstream/downstream: strand-aware
-./gffsub window annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware
+./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware
 ```
 
 Without `--strand-aware`, upstream means lower genomic coordinates and downstream means higher genomic coordinates. With `--strand-aware`, the interpretation follows the feature strand.
@@ -206,6 +206,9 @@ gffsub <input.gff3> [options]
 | `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
 | `--attrs` | `KEY1,KEY2,...` | Print selected attributes as extra TSV/JSON fields. This uses the same summary output as `query`. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`. |
+| `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. Output is equivalent to `gffsub window <input.gff3> --id ID --upstream N`. |
+| `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. Output is equivalent to the `window` command. |
+| `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
