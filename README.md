@@ -15,6 +15,7 @@
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
 | Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
+| Extract many exact IDs | `gffsub annotation.gff3 --id-list genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
 | Query many IDs and include their children | `gffsub query annotation.gff3 --id-list genes.txt --include-children` |
@@ -56,8 +57,8 @@ gffsub annotation.gff3 --name ABC1
 # Extract exact attribute matches
 gffsub annotation.gff3 --attr biotype=protein_coding
 
-# Query a batch of IDs
-gffsub query annotation.gff3 --id-list genes.txt
+# Extract a batch of IDs
+gffsub annotation.gff3 --id-list genes.txt
 
 # Query a region
 gffsub query annotation.gff3 --region chr1:1-100000
@@ -196,6 +197,7 @@ gffsub <input.gff3> [options]
 |-----------|-------|---------|
 | `<input.gff3>` | file | Input GFF3/GTF-style annotation file. |
 | `--id` | ID | Keep the exact feature `ID`. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id ID`. |
+| `--id-list` | file | Read one exact feature ID per non-empty line. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id-list FILE`. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |

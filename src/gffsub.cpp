@@ -22,6 +22,9 @@ static void usage(const char* prog) {
         << "  --id ID\n"
         << "      Extract a feature by exact GFF3 ID. May be repeated.\n"
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --id ID\n"
+        << "  --id-list FILE\n"
+        << "      Extract exact feature IDs listed one per non-empty line.\n"
+        << "      Default GFF3 output matches: " << prog << " query <input.gff3> --id-list FILE\n"
         << "  --name NAME\n"
         << "      Extract a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --name NAME\n"
@@ -71,6 +74,7 @@ static void usage(const char* prog) {
         << "\n"
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
+        << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -739,6 +743,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<std::string> ids;
+    std::string id_list_file;
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     std::string region_str;
@@ -749,9 +754,10 @@ int main(int argc, char* argv[]) {
     std::string output_format = "gff3";
     std::string output_file;
 
-    enum { OPT_ID = 1000, OPT_NAME, OPT_ATTR };
+    enum { OPT_ID = 1000, OPT_ID_LIST, OPT_NAME, OPT_ATTR };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
+        {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
         {"attr",          required_argument, nullptr, OPT_ATTR},
         {"region",        required_argument, nullptr, 'r'},
@@ -769,6 +775,7 @@ int main(int argc, char* argv[]) {
     while ((opt = getopt_long(argc, argv, "r:b:f:L@:t:o:h", long_options, nullptr)) != -1) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
+            case OPT_ID_LIST: id_list_file = optarg; break;
             case OPT_NAME: name = optarg; break;
             case OPT_ATTR: {
                 const std::string value{optarg};
@@ -822,6 +829,20 @@ int main(int argc, char* argv[]) {
     }
 
     std::string input_file = argv[optind];
+
+    if (!id_list_file.empty()) {
+        std::ifstream in{id_list_file};
+        if (!in.is_open()) {
+            std::cerr << "Error: cannot open " << id_list_file << '\n';
+            return 1;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+            if (!line.empty()) {
+                ids.push_back(line);
+            }
+        }
+    }
 
     GffData data;
     IdIndex idx;
