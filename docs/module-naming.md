@@ -81,7 +81,8 @@ Suggested threshold for extraction:
 
 | Current name | Status | Issue | Preferred direction |
 |--------------|--------|-------|---------------------|
-| `src/gff3.hpp` | Partially aligned | Public API includes GFF3, GTF3/BED output helpers, regions, filters, output, and `AnnotationIndex`. | Keep until split; later prefer `annotation.hpp` plus focused format headers. |
+| `src/annotation.hpp` | Aligned | Public annotation data model and `AnnotationIndex` API. | Keep as the annotation-facing public API surface. |
+| `src/gff3.hpp` | Acceptable for now | Compatibility umbrella header for existing users plus strict GFF3 helpers and format utilities. | Keep including `annotation.hpp`; split narrower format headers only when public API migration is planned. |
 | `src/attributes.cpp` | Aligned | Owns strict GFF3 `tag=value` attribute projection helper. | Keep GTF quoted attribute parsing separate from this module. |
 | `src/gff3_parser.cpp` | Aligned | Owns file and line parsing for strict GFF3 input plus compatibility GTF/BED parsing paths. | Keep parser-only behavior here. |
 | `src/region.cpp` | Aligned | Owns region strings, GFF/BED coordinate conversion, and strand-aware windows. | Keep coordinate and window helpers here. |

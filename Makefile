@@ -4,7 +4,7 @@ PREFIX ?= /usr/local
 
 TARGET = gffsub
 SRCS = src/gffsub.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/region.cpp src/annotation_filter.cpp src/isoform_filter.cpp src/annotation_output.cpp
-HDRS = src/gff3.hpp
+HDRS = src/gff3.hpp src/annotation.hpp
 
 .PHONY: all clean test install uninstall
 
