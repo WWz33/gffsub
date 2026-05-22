@@ -103,12 +103,13 @@ Suggested threshold for extraction:
 | `GffData` | Partially aligned | Same issue as `GffRecord`; acceptable until public API naming is revised. |
 | `InputFormat::{GFF3,GTF,BED}` | Partially aligned | `GFF3` is core. `GTF` and `BED` are compatibility names under the compatibility policy. |
 | `OutputFormat::{GFF3,GTF2,GTF3,BED}` | Partially aligned | `GFF3` and `GTF3` are core. `GTF2` and `BED` are compatibility output flavors under the compatibility policy. |
-| `parse_attributes()` | Mostly aligned | Function should become the shared strict GFF3 attribute parser or move under an attribute module. GTF quoted attributes need distinct handling. |
+| `parse_attributes()` | Aligned | Shared strict GFF3 attribute helper now lives in `attributes.cpp`. GTF quoted attributes stay separate. |
 | `parse_region()` | Aligned | Region naming is format-neutral. |
 | `to_bed_region()` / `from_bed_region()` | Aligned | Names correctly describe coordinate conversion. |
 | `window_region()` | Aligned | Name fits region/window semantics. |
 | `filter_by_region()` / `filter_by_feature()` | Aligned | Filter names are clear; they should live in a filter module. |
-| `filter_longest()` | Needs specificity | Rename later to `filter_longest_isoform()` if API churn is acceptable. |
+| `filter_longest_isoform()` | Aligned | Explicit API for longest transcript isoform selection. |
+| `filter_longest()` | Compatibility | Legacy wrapper kept to avoid breaking existing C++ callers. |
 | `print_gff3()` / `print_gtf()` / `print_bed()` | Partially aligned | `print_gff3()` is explicit. `print_gtf()` is a compatibility dispatch entry point; prefer explicit `print_gtf3()` if GTF3 logic grows. |
 
 ## Recommended Target Layout

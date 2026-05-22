@@ -819,7 +819,7 @@ int main(int argc, char* argv[]) {
 
     // Apply feature filters
     if (do_longest) {
-        filter_longest(data, idx, feature, num_threads);
+        filter_longest_isoform(data, idx, feature, num_threads);
     } else if (!feature.empty()) {
         filter_by_feature(data, feature);
     }

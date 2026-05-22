@@ -117,6 +117,7 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
 void filter_by_feature(GffData& data, std::string_view feature_type);
+void filter_longest_isoform(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
 void filter_longest(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
 
 void print_gff3(std::ostream& out, const GffData& data);
