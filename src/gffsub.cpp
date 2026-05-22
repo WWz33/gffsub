@@ -39,6 +39,8 @@ static void usage(const char* prog) {
         << "      Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --upstream N, --downstream N, --strand-aware\n"
         << "      Extract a window around --id. Output matches the window command.\n"
+        << "  --qc\n"
+        << "      Run annotation QC. Output matches the qc command.\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -86,6 +88,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
         << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
+        << "  " << prog << " annotation.gff3 --qc\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -763,6 +766,7 @@ int main(int argc, char* argv[]) {
     std::string upstream_arg;
     std::string downstream_arg;
     bool strand_aware = false;
+    bool do_qc = false;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -780,7 +784,8 @@ int main(int argc, char* argv[]) {
         OPT_SUMMARY_FORMAT,
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
-        OPT_STRAND_AWARE
+        OPT_STRAND_AWARE,
+        OPT_QC
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
@@ -792,6 +797,7 @@ int main(int argc, char* argv[]) {
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
         {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
+        {"qc",            no_argument,       nullptr, OPT_QC},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
@@ -841,6 +847,7 @@ int main(int argc, char* argv[]) {
             case OPT_UPSTREAM: upstream_arg = optarg; break;
             case OPT_DOWNSTREAM: downstream_arg = optarg; break;
             case OPT_STRAND_AWARE: strand_aware = true; break;
+            case OPT_QC: do_qc = true; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -883,6 +890,24 @@ int main(int argc, char* argv[]) {
     }
 
     std::string input_file = argv[optind];
+
+    if (do_qc) {
+        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
+            !selected_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
+            strand_aware || !region_str.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
+            output_format != "gff3" || !output_file.empty()) {
+            std::cerr << "Error: --qc only supports the input file\n";
+            return 1;
+        }
+
+        std::vector<std::string> qc_args{"qc", input_file};
+        std::vector<char*> qc_argv;
+        qc_argv.reserve(qc_args.size());
+        for (auto& arg : qc_args) {
+            qc_argv.push_back(arg.data());
+        }
+        return run_qc(static_cast<int>(qc_argv.size()), qc_argv.data(), argv[0]);
+    }
 
     if (!upstream_arg.empty() || !downstream_arg.empty() || strand_aware) {
         if (ids.empty()) {

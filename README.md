@@ -23,7 +23,7 @@
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
-| Check annotation graph problems | `gffsub qc annotation.gff3` |
+| Check annotation graph problems | `gffsub annotation.gff3 --qc` |
 
 ## Command Shortcuts
 
@@ -76,7 +76,7 @@ gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent
 gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
 
 # QC table
-gffsub qc annotation.gff3
+gffsub annotation.gff3 --qc
 ```
 
 ## Install
@@ -178,10 +178,10 @@ The longest isoform logic follows the existing AGAT-style rule in this project: 
 
 ## Scenario: Check Annotation Quality
 
-Run `qc` before feeding annotations into a graph-aware workflow.
+Run `--qc` before feeding annotations into a graph-aware workflow.
 
 ```bash
-./gffsub qc annotation.gff3
+./gffsub annotation.gff3 --qc
 ```
 
 Current checks report duplicate IDs, invalid ranges, missing parents, and child features outside parent coordinates. Output is TSV so it can be filtered with standard command-line tools.
@@ -209,6 +209,7 @@ gffsub <input.gff3> [options]
 | `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. Output is equivalent to `gffsub window <input.gff3> --id ID --upstream N`. |
 | `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. Output is equivalent to the `window` command. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
+| `--qc` | flag | Run annotation QC. Output is equivalent to `gffsub qc <input.gff3>`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |

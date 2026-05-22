@@ -23,7 +23,7 @@
 | 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
 | 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | 每个基因只保留最长转录本 | `gffsub annotation.gff3 --longest` |
-| 检查注释 graph 问题 | `gffsub qc annotation.gff3` |
+| 检查注释 graph 问题 | `gffsub annotation.gff3 --qc` |
 
 ## 简化命令速查
 
@@ -76,7 +76,7 @@ gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent
 gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
 
 # 输出 QC 表
-gffsub qc annotation.gff3
+gffsub annotation.gff3 --qc
 ```
 
 ## 安装
@@ -178,10 +178,10 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 
 ## 场景：检查注释质量
 
-在把注释送入 graph-aware 工作流前，可以先运行 `qc`。
+在把注释送入 graph-aware 工作流前，可以先运行 `--qc`。
 
 ```bash
-./gffsub qc annotation.gff3
+./gffsub annotation.gff3 --qc
 ```
 
 当前检查会报告重复 ID、非法坐标范围、Parent 缺失，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
@@ -209,6 +209,7 @@ gffsub <input.gff3> [options]
 | `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。输出等价于 `gffsub window <input.gff3> --id ID --upstream N`。 |
 | `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。输出等价于 `window` 命令。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |
+| `--qc` | 标志 | 运行注释 QC。输出等价于 `gffsub qc <input.gff3>`。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
 | `-b`, `--bed` | 文件 | 保留与 BED 区间重叠的 feature；BED 按 0-based 半开区间读取。 |
 | `-f`, `--feature`, `--type` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
