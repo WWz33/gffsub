@@ -8,7 +8,7 @@ add_executable(gffsub
     src/gffsub.cpp
     src/annotation_index.cpp
     src/gff3_parser.cpp
-    src/gff3_filter.cpp
+    src/isoform_filter.cpp
     src/gff3_output.cpp
 )
 

@@ -84,7 +84,7 @@ Suggested threshold for extraction:
 | `src/gff3.hpp` | Partially aligned | Public API includes GFF3, GTF3/BED output helpers, regions, filters, output, and `AnnotationIndex`. | Keep until split; later prefer `annotation.hpp` plus focused format headers. |
 | `src/gff3_parser.cpp` | Partially aligned | GFF3 parsing name is acceptable for the core input, but the file also contains region parsing, BED region loading, coordinate windows, and filters. | Keep `gff3_parser.cpp` only for GFF3 record parsing; move regions and filters out. |
 | `src/annotation_index.cpp` | Aligned | Implements `AnnotationIndex`, feature graph, lookup, attributes, overlap, nearest gene, and gene model logic. | Keep as the graph/query core; move strict GFF3 attribute parsing out if it grows. |
-| `src/gff3_filter.cpp` | Partially aligned | File name says generic filter, but implementation is longest isoform selection. | Rename to `isoform_filter.cpp`. |
+| `src/isoform_filter.cpp` | Aligned | Implements longest isoform selection. | Keep for transcript selection rules; add representative isoform logic here only if it gets a distinct rule. |
 | `src/gff3_output.cpp` | Not aligned | Writes GFF3, GTF2, GTF3, and BED, but the project focus is GFF3 and GTF3. | Rename only if one module remains clear; otherwise split according to the output split rule above. |
 | `src/gffsub.cpp` | Acceptable for now | CLI entry point also contains query, summary, window, and QC command bodies. | Keep initially; extract `query_command.cpp` or `summary_output.cpp` only when thresholds above are met. |
 | `tests/annotation_index_smoke.cpp` | Aligned | Test name matches API under test. | Keep. |
