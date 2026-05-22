@@ -204,8 +204,8 @@ gffsub <input.gff3> [options]
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
 | `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
-| `--attrs` | `KEY1,KEY2,...` | Print selected attributes as extra TSV/JSON fields. This uses the same summary output as `query`. |
-| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`. |
+| `--attrs` | `KEY1,KEY2,...` | Print selected attributes as extra TSV/JSON fields. This uses the same summary output as `query`; combine only with query-style selectors. |
+| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`; combine only with query-style selectors. |
 | `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. Output is equivalent to `gffsub window <input.gff3> --id ID --upstream N`. |
 | `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. Output is equivalent to the `window` command. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |

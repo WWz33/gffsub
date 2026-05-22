@@ -204,8 +204,8 @@ gffsub <input.gff3> [options]
 | `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。默认 GFF3 输出等价于 `gffsub query <input.gff3> --name NAME`。 |
 | `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。默认 GFF3 输出等价于 `gffsub query <input.gff3> --attr KEY=VALUE`。 |
 | `--include-children` | 标志 | 包含由 `--id`、`--id-list`、`--name` 或 `--attr` 匹配记录的后代。 |
-| `--attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出。该输出复用 `query` 的 summary 语义。 |
-| `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。该输出复用 `query` 的 summary 语义。 |
+| `--attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出。该输出复用 `query` 的 summary 语义；只与 query-style selector 组合。 |
+| `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。该输出复用 `query` 的 summary 语义；只与 query-style selector 组合。 |
 | `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。输出等价于 `gffsub window <input.gff3> --id ID --upstream N`。 |
 | `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。输出等价于 `window` 命令。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |

@@ -772,6 +772,7 @@ int main(int argc, char* argv[]) {
     std::string feature;
     bool do_longest = false;
     size_t num_threads = 6;
+    bool threads_set = false;
     std::string output_format = "gff3";
     std::string output_file;
 
@@ -853,6 +854,7 @@ int main(int argc, char* argv[]) {
             case 'f': feature = optarg; break;
             case 'L': do_longest = true; break;
             case '@': {
+                threads_set = true;
                 size_t t = std::stoul(optarg);
                 if (t == 0) t = 1;
                 if (t > 256) t = 256; // cap to prevent over-subscription
@@ -947,6 +949,12 @@ int main(int argc, char* argv[]) {
     }
 
     if (!summary_format.empty() || !selected_attrs.empty()) {
+        if (!bed_file.empty() || do_longest || threads_set || output_format != "gff3" || !output_file.empty()) {
+            std::cerr << "Error: --summary-format/--attrs only supports query-style selectors; "
+                      << "do not combine with --bed, --longest, --threads, --output-format, or --output\n";
+            return 1;
+        }
+
         std::vector<std::string> query_args{"query", input_file};
         for (const auto& id : ids) {
             query_args.push_back("--id");
