@@ -9,6 +9,7 @@ add_executable(gffsub
     src/annotation_index.cpp
     src/gff3_parser.cpp
     src/region.cpp
+    src/annotation_filter.cpp
     src/isoform_filter.cpp
     src/annotation_output.cpp
 )

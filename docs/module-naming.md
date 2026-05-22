@@ -82,8 +82,9 @@ Suggested threshold for extraction:
 | Current name | Status | Issue | Preferred direction |
 |--------------|--------|-------|---------------------|
 | `src/gff3.hpp` | Partially aligned | Public API includes GFF3, GTF3/BED output helpers, regions, filters, output, and `AnnotationIndex`. | Keep until split; later prefer `annotation.hpp` plus focused format headers. |
-| `src/gff3_parser.cpp` | Partially aligned | GFF3 parsing name is acceptable for the core input, but the file still contains BED region loading and filters. | Keep `gff3_parser.cpp` only for GFF3 record parsing; move filters out. |
+| `src/gff3_parser.cpp` | Aligned | Owns file and line parsing for strict GFF3 input plus compatibility GTF/BED parsing paths. | Keep parser-only behavior here. |
 | `src/region.cpp` | Aligned | Owns region strings, GFF/BED coordinate conversion, and strand-aware windows. | Keep coordinate and window helpers here. |
+| `src/annotation_filter.cpp` | Aligned | Owns keep/drop filters by region, region file, and feature type. | Keep selection filters here. |
 | `src/annotation_index.cpp` | Aligned | Implements `AnnotationIndex`, feature graph, lookup, attributes, overlap, nearest gene, and gene model logic. | Keep as the graph/query core; move strict GFF3 attribute parsing out if it grows. |
 | `src/isoform_filter.cpp` | Aligned | Implements longest isoform selection. | Keep for transcript selection rules; add representative isoform logic here only if it gets a distinct rule. |
 | `src/annotation_output.cpp` | Acceptable for now | Writes GFF3, GTF2, GTF3, and BED from annotation records while GFF3 and GTF3 output still share most implementation. | Keep as one module until the output split rule above is triggered. |
