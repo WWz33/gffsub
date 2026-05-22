@@ -25,6 +25,9 @@ static void usage(const char* prog) {
         << "  --name NAME\n"
         << "      Extract a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --name NAME\n"
+        << "  --attr KEY=VALUE\n"
+        << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
+        << "      Default GFF3 output matches: " << prog << " query <input.gff3> --attr KEY=VALUE\n"
         << "\n"
         << "Input/Region Options:\n"
         << "  -r, --region CHR:START-END\n"
@@ -69,6 +72,7 @@ static void usage(const char* prog) {
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
+        << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
@@ -736,6 +740,7 @@ int main(int argc, char* argv[]) {
 
     std::vector<std::string> ids;
     std::string name;
+    std::vector<std::pair<std::string, std::string>> attr_filters;
     std::string region_str;
     std::string bed_file;
     std::string feature;
@@ -744,10 +749,11 @@ int main(int argc, char* argv[]) {
     std::string output_format = "gff3";
     std::string output_file;
 
-    enum { OPT_ID = 1000, OPT_NAME };
+    enum { OPT_ID = 1000, OPT_NAME, OPT_ATTR };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
         {"name",          required_argument, nullptr, OPT_NAME},
+        {"attr",          required_argument, nullptr, OPT_ATTR},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
         {"feature",       required_argument, nullptr, 'f'},
@@ -764,6 +770,16 @@ int main(int argc, char* argv[]) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
             case OPT_NAME: name = optarg; break;
+            case OPT_ATTR: {
+                const std::string value{optarg};
+                const auto equal_pos = value.find('=');
+                if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value.size()) {
+                    std::cerr << "Error: --attr expects KEY=VALUE\n";
+                    return 1;
+                }
+                attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
+                break;
+            }
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -816,7 +832,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!ids.empty() || !name.empty()) {
+    if (!ids.empty() || !name.empty() || !attr_filters.empty()) {
         const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
         std::unordered_set<int> selected_lines;
         for (const auto& id : ids) {
@@ -829,6 +845,11 @@ int main(int argc, char* argv[]) {
             const auto rec = index.find_gene(name);
             if (rec) {
                 selected_lines.insert(rec->line_idx);
+            }
+        }
+        for (const auto& [key, value] : attr_filters) {
+            for (const auto& rec : index.with_attribute(key, value)) {
+                selected_lines.insert(rec.line_idx);
             }
         }
         for (auto& rec : data.records) {
