@@ -29,6 +29,54 @@ Compatibility terms:
 - `gtf2` may remain as a legacy output option if the CLI keeps supporting it, but new naming should not center it.
 - Avoid broad `gxf_*` names unless a module genuinely owns shared flavor-neutral formatting code for GFF3 and GTF3.
 
+## Compatibility Policy
+
+Compatibility flavors are allowed, but they do not define new module boundaries.
+
+| Surface | Policy | Naming impact |
+|---------|--------|---------------|
+| `InputFormat::GFF3` | Core input semantics. | May drive parser and attribute module names. |
+| `InputFormat::GTF` | Compatibility shim only. | Do not create broad `gtf_parser` modules unless GTF input becomes a core scope decision. |
+| `InputFormat::BED` | Compatibility for region-style input. | Keep BED naming local to region conversion or I/O helpers. |
+| `OutputFormat::GFF3` | Core output flavor. | May drive explicit GFF3 output helpers. |
+| `OutputFormat::GTF3` | Core output flavor. | May drive explicit GTF3 output helpers. |
+| `OutputFormat::GTF2` | Legacy compatibility output. | Do not use as a module prefix. |
+| `OutputFormat::BED` | Compatibility output. | Do not use as a module prefix. |
+
+If a compatibility flavor starts requiring substantial independent behavior, revisit project scope before adding new modules.
+
+## GTF3 Output Policy
+
+GTF3 is a core output flavor, not a core input semantics layer. The current `print_gtf()` API is a compatibility entry point that dispatches by `OutputFormat`. Future naming should prefer explicit GTF3 ownership when the rules diverge, for example `print_gtf3()` or a dedicated `gtf3_output.cpp`.
+
+GTF2 support, if kept, should remain a legacy branch inside output compatibility code unless the project explicitly expands scope.
+
+## Output Split Rule
+
+Use a single output module only while GFF3 and GTF3 output share most implementation. Split output modules when any of these become true:
+
+- GFF3 and GTF3 need different attribute builders beyond small flavor branches.
+- GTF3 feature-type filtering or transcript naming grows beyond local output logic.
+- Compatibility output such as GTF2 or BED starts obscuring GFF3/GTF3 core behavior.
+
+Preferred split, if needed:
+
+```text
+gff3_output.cpp       # strict GFF3 writer
+gtf3_output.cpp       # GTF3 writer
+compat_output.cpp     # optional legacy GTF2/BED output helpers, if still supported
+```
+
+## Query And Summary Extraction Policy
+
+`query` and `summary` are first-class concepts, but they can remain inside `gffsub.cpp` while command logic is small. Extract them only when the CLI file starts hiding domain behavior.
+
+Suggested threshold for extraction:
+
+- Add `query_command.cpp` when query option parsing, matching, and result assembly are no longer easy to audit together.
+- Add `summary_output.cpp` when TSV/JSON summary formatting or `--attrs` projection grows beyond simple row printing.
+- Keep `gffsub.cpp` as the command dispatcher and top-level option parser.
+
 ## Current Naming Audit
 
 | Current name | Status | Issue | Preferred direction |
@@ -37,8 +85,8 @@ Compatibility terms:
 | `src/gff3_parser.cpp` | Partially aligned | GFF3 parsing name is acceptable for the core input, but the file also contains region parsing, BED region loading, coordinate windows, and filters. | Keep `gff3_parser.cpp` only for GFF3 record parsing; move regions and filters out. |
 | `src/gff3_index.cpp` | Not aligned | Implements `AnnotationIndex`, feature graph, lookup, attributes, overlap, nearest gene, and gene model logic. | Rename graph/query core to `annotation_index.cpp`; move strict GFF3 attribute parsing out if it grows. |
 | `src/gff3_filter.cpp` | Partially aligned | File name says generic filter, but implementation is longest isoform selection. | Rename to `isoform_filter.cpp`. |
-| `src/gff3_output.cpp` | Not aligned | Writes GFF3, GTF2, GTF3, and BED, but the project focus is GFF3 and GTF3. | Rename to `annotation_output.cpp` or split into `gff3_output.cpp` plus `gtf3_output.cpp` if output rules diverge. |
-| `src/gffsub.cpp` | Acceptable for now | CLI entry point also contains query, summary, window, and QC command bodies. | Keep initially; later split command implementations after naming is stable. |
+| `src/gff3_output.cpp` | Not aligned | Writes GFF3, GTF2, GTF3, and BED, but the project focus is GFF3 and GTF3. | Rename only if one module remains clear; otherwise split according to the output split rule above. |
+| `src/gffsub.cpp` | Acceptable for now | CLI entry point also contains query, summary, window, and QC command bodies. | Keep initially; extract `query_command.cpp` or `summary_output.cpp` only when thresholds above are met. |
 | `tests/annotation_index_smoke.cpp` | Aligned | Test name matches API under test. | Keep. |
 | `CMakeLists.txt` / `Makefile` source lists | Mechanically tied to old names | They will need updates during file renames. | Update only in the same commits as source file renames. |
 
@@ -50,15 +98,15 @@ Compatibility terms:
 | `AnnotationIndex::from_gff3()` | Aligned | Keep. The project focuses on GFF3 input semantics. |
 | `GffRecord` | Acceptable | It represents parsed GFF3 annotation records. Consider `AnnotationRecord` only if public API naming is broadened later. |
 | `GffData` | Partially aligned | Same issue as `GffRecord`; acceptable until public API naming is revised. |
-| `InputFormat::{GFF3,GTF,BED}` | Partially aligned | `GFF3` is core. `GTF` and `BED` are compatibility names unless the project scope changes. |
-| `OutputFormat::{GFF3,GTF2,GTF3,BED}` | Partially aligned | `GFF3` and `GTF3` are core. `GTF2` and `BED` are compatibility output flavors. |
+| `InputFormat::{GFF3,GTF,BED}` | Partially aligned | `GFF3` is core. `GTF` and `BED` are compatibility names under the compatibility policy. |
+| `OutputFormat::{GFF3,GTF2,GTF3,BED}` | Partially aligned | `GFF3` and `GTF3` are core. `GTF2` and `BED` are compatibility output flavors under the compatibility policy. |
 | `parse_attributes()` | Mostly aligned | Function should become the shared strict GFF3 attribute parser or move under an attribute module. GTF quoted attributes need distinct handling. |
 | `parse_region()` | Aligned | Region naming is format-neutral. |
 | `to_bed_region()` / `from_bed_region()` | Aligned | Names correctly describe coordinate conversion. |
 | `window_region()` | Aligned | Name fits region/window semantics. |
 | `filter_by_region()` / `filter_by_feature()` | Aligned | Filter names are clear; they should live in a filter module. |
 | `filter_longest()` | Needs specificity | Rename later to `filter_longest_isoform()` if API churn is acceptable. |
-| `print_gff3()` / `print_gtf()` / `print_bed()` | Partially aligned | `print_gff3()` and GTF3 output are core. `print_gtf()` may need a more explicit `print_gtf3()` path if GTF2 becomes legacy-only. |
+| `print_gff3()` / `print_gtf()` / `print_bed()` | Partially aligned | `print_gff3()` is explicit. `print_gtf()` is a compatibility dispatch entry point; prefer explicit `print_gtf3()` if GTF3 logic grows. |
 
 ## Recommended Target Layout
 
