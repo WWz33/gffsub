@@ -63,8 +63,8 @@ gffsub annotation.gff3 --id-list genes.txt
 # 提取 ID 及其后代 feature
 gffsub annotation.gff3 --id GeneA --include-children
 
-# 查询一个区间
-gffsub query annotation.gff3 --region chr1:1-100000
+# 提取一个区间
+gffsub annotation.gff3 --region chr1:1-100000
 
 # 查询并输出 summary
 gffsub query annotation.gff3 --id GeneA --summary-format tsv

@@ -63,8 +63,8 @@ gffsub annotation.gff3 --id-list genes.txt
 # Extract an ID and its descendants
 gffsub annotation.gff3 --id GeneA --include-children
 
-# Query a region
-gffsub query annotation.gff3 --region chr1:1-100000
+# Extract a region
+gffsub annotation.gff3 --region chr1:1-100000
 
 # Query and summarize
 gffsub query annotation.gff3 --id GeneA --summary-format tsv
