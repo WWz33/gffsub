@@ -82,10 +82,11 @@ Suggested threshold for extraction:
 | Current name | Status | Issue | Preferred direction |
 |--------------|--------|-------|---------------------|
 | `src/gff3.hpp` | Partially aligned | Public API includes GFF3, GTF3/BED output helpers, regions, filters, output, and `AnnotationIndex`. | Keep until split; later prefer `annotation.hpp` plus focused format headers. |
+| `src/attributes.cpp` | Aligned | Owns strict GFF3 `tag=value` attribute projection helper. | Keep GTF quoted attribute parsing separate from this module. |
 | `src/gff3_parser.cpp` | Aligned | Owns file and line parsing for strict GFF3 input plus compatibility GTF/BED parsing paths. | Keep parser-only behavior here. |
 | `src/region.cpp` | Aligned | Owns region strings, GFF/BED coordinate conversion, and strand-aware windows. | Keep coordinate and window helpers here. |
 | `src/annotation_filter.cpp` | Aligned | Owns keep/drop filters by region, region file, and feature type. | Keep selection filters here. |
-| `src/annotation_index.cpp` | Aligned | Implements `AnnotationIndex`, feature graph, lookup, attributes, overlap, nearest gene, and gene model logic. | Keep as the graph/query core; move strict GFF3 attribute parsing out if it grows. |
+| `src/annotation_index.cpp` | Aligned | Implements `AnnotationIndex`, feature graph, lookup, overlap, nearest gene, and gene model logic. | Keep as the graph/query core. |
 | `src/isoform_filter.cpp` | Aligned | Implements longest isoform selection. | Keep for transcript selection rules; add representative isoform logic here only if it gets a distinct rule. |
 | `src/annotation_output.cpp` | Acceptable for now | Writes GFF3, GTF2, GTF3, and BED from annotation records while GFF3 and GTF3 output still share most implementation. | Keep as one module until the output split rule above is triggered. |
 | `src/gffsub.cpp` | Acceptable for now | CLI entry point also contains query, summary, window, and QC command bodies. | Keep initially; extract `query_command.cpp` or `summary_output.cpp` only when thresholds above are met. |
@@ -140,9 +141,9 @@ src/
    - Run the smoke test after every rename.
 
 3. **Split only after names are stable**
-   - Move `parse_region()`, BED/GFF conversion, and `window_region()` into `region.cpp`.
-   - Move `filter_by_region()` and `filter_by_feature()` into `annotation_filter.cpp`.
-   - Move shared GFF3 attribute parsing into `attributes.cpp`.
+   - `region.cpp` now owns `parse_region()`, BED/GFF conversion, and `window_region()`.
+   - `annotation_filter.cpp` now owns `filter_by_region()`, `filter_by_regions_from_file()`, and `filter_by_feature()`.
+   - `attributes.cpp` now owns shared strict GFF3 attribute parsing.
    - Keep GTF quoted attribute parsing separate from strict GFF3 attributes, and only keep it if compatibility requires it.
 
 4. **Delay public API renames**

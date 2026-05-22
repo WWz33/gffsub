@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(gffsub
     src/gffsub.cpp
+    src/attributes.cpp
     src/annotation_index.cpp
     src/gff3_parser.cpp
     src/region.cpp
@@ -27,6 +28,7 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(annotation_index_smoke
         tests/annotation_index_smoke.cpp
+        src/attributes.cpp
         src/annotation_index.cpp
         src/gff3_parser.cpp
         src/region.cpp
