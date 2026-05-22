@@ -202,7 +202,7 @@ gffsub <input.gff3> [options]
 | `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。默认 GFF3 输出等价于 `gffsub query <input.gff3> --attr KEY=VALUE`。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
 | `-b`, `--bed` | 文件 | 保留与 BED 区间重叠的 feature；BED 按 0-based 半开区间读取。 |
-| `-f`, `--feature` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
+| `-f`, `--feature`, `--type` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
 | `-L`, `--longest` | 标志 | 每个基因只保留最长转录本；存在 CDS isoform 时按 CDS 长度比较，否则按 exon 长度比较。 |
 | `-@`, `--threads` | 整数 | 设置 `--longest` 使用的线程数；超过 256 会被限制为 256。需要固定资源使用时建议显式设置。 |
 | `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 会按 `gtf2` 处理。默认输出 `gff3`。 |

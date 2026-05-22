@@ -44,7 +44,7 @@ static void usage(const char* prog) {
         << "      converted to 1-based for internal processing.\n"
         << "\n"
         << "Feature Filter Options:\n"
-        << "  -f, --feature TYPE\n"
+        << "  -f, --feature TYPE, --type TYPE\n"
         << "      Filter features by type (3rd column in GFF/GTF).\n"
         << "      Examples: gene, mRNA, exon, CDS, transcript\n"
         << "\n"
@@ -763,6 +763,7 @@ int main(int argc, char* argv[]) {
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
         {"feature",       required_argument, nullptr, 'f'},
+        {"type",          required_argument, nullptr, 'f'},
         {"longest",       no_argument,       nullptr, 'L'},
         {"threads",       required_argument, nullptr, '@'},
         {"output-format", required_argument, nullptr, 't'},

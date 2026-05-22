@@ -202,7 +202,7 @@ gffsub <input.gff3> [options]
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
-| `-f`, `--feature` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
+| `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
 | `-L`, `--longest` | flag | Keep the longest transcript isoform per gene. CDS length is used when CDS isoforms exist; otherwise exon length is used. |
 | `-@`, `--threads` | integer | Set worker threads for `--longest`; values above 256 are capped. Set this explicitly when reproducibility of resource use matters. |
 | `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | Select output format. `gtf` is accepted as `gtf2`. Default output is `gff3`. |
