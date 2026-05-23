@@ -12,8 +12,14 @@ std::optional<Region> parse_region(std::string_view region_str) {
     size_t dash = range_part.find('-');
     if (dash == std::string_view::npos) return std::nullopt;
 
-    int64_t start = std::stoll(std::string(range_part.substr(0, dash)));
-    int64_t end = std::stoll(std::string(range_part.substr(dash + 1)));
+    int64_t start = 0;
+    int64_t end = 0;
+    try {
+        start = std::stoll(std::string(range_part.substr(0, dash)));
+        end = std::stoll(std::string(range_part.substr(dash + 1)));
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
 
     return Region{seqid, start, end};
 }
