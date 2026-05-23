@@ -627,6 +627,19 @@ static int run_window(int argc, char* argv[], const char* prog) {
             ++i;
             return std::string{argv[i]};
         };
+        auto parse_non_negative = [&](const char* option, const std::string& text, int64_t& value) -> bool {
+            try {
+                value = std::stoll(text);
+            } catch (const std::exception&) {
+                std::cerr << "Error: " << option << " must be a non-negative integer\n";
+                return false;
+            }
+            if (value < 0) {
+                std::cerr << "Error: " << option << " must be non-negative\n";
+                return false;
+            }
+            return true;
+        };
 
         if (arg == "--id") {
             auto value = require_value("--id");
@@ -639,17 +652,13 @@ static int run_window(int argc, char* argv[], const char* prog) {
         } else if (arg == "--upstream") {
             auto value = require_value("--upstream");
             if (!value) return 1;
-            upstream = std::stoll(*value);
-            if (upstream < 0) {
-                std::cerr << "Error: --upstream must be non-negative\n";
+            if (!parse_non_negative("--upstream", *value, upstream)) {
                 return 1;
             }
         } else if (arg == "--downstream") {
             auto value = require_value("--downstream");
             if (!value) return 1;
-            downstream = std::stoll(*value);
-            if (downstream < 0) {
-                std::cerr << "Error: --downstream must be non-negative\n";
+            if (!parse_non_negative("--downstream", *value, downstream)) {
                 return 1;
             }
         } else if (arg == "--strand-aware") {
