@@ -868,7 +868,13 @@ int main(int argc, char* argv[]) {
             case 'L': do_longest = true; break;
             case '@': {
                 threads_set = true;
-                size_t t = std::stoul(optarg);
+                size_t t = 0;
+                try {
+                    t = std::stoul(optarg);
+                } catch (const std::exception&) {
+                    std::cerr << "Error: --threads must be a non-negative integer\n";
+                    return 1;
+                }
                 if (t == 0) t = 1;
                 if (t > 256) t = 256; // cap to prevent over-subscription
                 num_threads = t;
