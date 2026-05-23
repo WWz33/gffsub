@@ -39,9 +39,13 @@ static std::vector<Region> load_regions(const std::string& filename, bool is_bed
             if (cols.size() < 3) continue;
 
             Region r;
-            r.seqid = cols[0];
-            r.start = std::stoll(cols[1]) + 1;
-            r.end = std::stoll(cols[2]);
+            try {
+                r.seqid = cols[0];
+                r.start = std::stoll(cols[1]) + 1;
+                r.end = std::stoll(cols[2]);
+            } catch (const std::exception&) {
+                continue;
+            }
             regions.push_back(r);
         }
     }
