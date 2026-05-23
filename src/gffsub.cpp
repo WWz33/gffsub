@@ -912,8 +912,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (!upstream_arg.empty() || !downstream_arg.empty() || strand_aware) {
-        if (ids.empty()) {
-            std::cerr << "Error: window shortcut requires --id\n";
+        if (ids.size() != 1) {
+            std::cerr << "Error: window shortcut requires exactly one --id\n";
             return 1;
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
