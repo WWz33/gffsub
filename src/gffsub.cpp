@@ -631,6 +631,10 @@ static int run_window(int argc, char* argv[], const char* prog) {
         if (arg == "--id") {
             auto value = require_value("--id");
             if (!value) return 1;
+            if (!id.empty()) {
+                std::cerr << "Error: window requires exactly one --id\n";
+                return 1;
+            }
             id = *value;
         } else if (arg == "--upstream") {
             auto value = require_value("--upstream");
