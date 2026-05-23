@@ -74,46 +74,54 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
             auto cols = split_line(line, '\t');
             if (cols.size() < 9) continue;
 
-            rec.seqid = cols[0];
-            rec.source = cols[1];
-            rec.type = cols[2];
-            rec.start = std::stoll(cols[3]);
-            rec.end = std::stoll(cols[4]);
-            rec.score = (cols[5] == ".") ? std::nullopt : std::optional(std::stod(cols[5]));
-            rec.strand = cols[6].empty() ? '.' : cols[6][0];
-            rec.phase = cols[7].empty() ? '.' : cols[7][0];
-            rec.attr_raw = cols[8];
+            try {
+                rec.seqid = cols[0];
+                rec.source = cols[1];
+                rec.type = cols[2];
+                rec.start = std::stoll(cols[3]);
+                rec.end = std::stoll(cols[4]);
+                rec.score = (cols[5] == ".") ? std::nullopt : std::optional(std::stod(cols[5]));
+                rec.strand = cols[6].empty() ? '.' : cols[6][0];
+                rec.phase = cols[7].empty() ? '.' : cols[7][0];
+                rec.attr_raw = cols[8];
 
-            rec.id = extract_attr_value(cols[8], "ID");
-            rec.parent_id = extract_attr_value(cols[8], "Parent");
-            rec.gene_id = extract_attr_value(cols[8], "gene_id");
-            rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
+                rec.id = extract_attr_value(cols[8], "ID");
+                rec.parent_id = extract_attr_value(cols[8], "Parent");
+                rec.gene_id = extract_attr_value(cols[8], "gene_id");
+                rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
 
-            if (format == InputFormat::GTF) {
-                if (!rec.gene_id) {
-                    rec.gene_id = extract_quoted_value(cols[8], "gene_id");
+                if (format == InputFormat::GTF) {
+                    if (!rec.gene_id) {
+                        rec.gene_id = extract_quoted_value(cols[8], "gene_id");
+                    }
+                    if (!rec.transcript_id) {
+                        rec.transcript_id = extract_quoted_value(cols[8], "transcript_id");
+                    }
                 }
-                if (!rec.transcript_id) {
-                    rec.transcript_id = extract_quoted_value(cols[8], "transcript_id");
-                }
+            } catch (const std::exception&) {
+                return -1;
             }
         } else if (format == InputFormat::BED) {
             auto cols = split_line(line, '\t');
             if (cols.size() < 3) continue;
 
-            rec.seqid = cols[0];
-            rec.start = std::stoll(cols[1]) + 1;
-            rec.end = std::stoll(cols[2]);
-            rec.source = "gffsub";
-            rec.type = "region";
-            rec.score = cols.size() > 4 ? std::optional(std::stod(cols[4])) : std::nullopt;
-            rec.strand = cols.size() > 5 ? (cols[5][0]) : '.';
-            rec.phase = '.';
-            rec.id = cols.size() > 3 ? std::optional(cols[3]) : std::nullopt;
-            rec.parent_id = std::nullopt;
-            rec.gene_id = std::nullopt;
-            rec.transcript_id = std::nullopt;
-            rec.attr_raw = rec.id ? "ID=" + *rec.id : "";
+            try {
+                rec.seqid = cols[0];
+                rec.start = std::stoll(cols[1]) + 1;
+                rec.end = std::stoll(cols[2]);
+                rec.source = "gffsub";
+                rec.type = "region";
+                rec.score = cols.size() > 4 ? std::optional(std::stod(cols[4])) : std::nullopt;
+                rec.strand = cols.size() > 5 ? (cols[5][0]) : '.';
+                rec.phase = '.';
+                rec.id = cols.size() > 3 ? std::optional(cols[3]) : std::nullopt;
+                rec.parent_id = std::nullopt;
+                rec.gene_id = std::nullopt;
+                rec.transcript_id = std::nullopt;
+                rec.attr_raw = rec.id ? "ID=" + *rec.id : "";
+            } catch (const std::exception&) {
+                return -1;
+            }
         }
 
         if (rec.id) {
