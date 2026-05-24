@@ -18,6 +18,19 @@ static bool write_test_annotation(const std::string& path) {
     return true;
 }
 
+static bool write_qc_annotation(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) {
+        return false;
+    }
+
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
+        << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
+        << "chr1\tsrc\tmRNA\t500\t600\t.\t+\t.\tID=orphan_tx;Parent=missing_gene\n";
+    return true;
+}
+
 static std::string read_file(const std::string& path) {
     std::ifstream in{path};
     std::ostringstream buffer;
@@ -67,6 +80,7 @@ static int compare_files(const std::string& lhs_path, const std::string& rhs_pat
 
 static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
+    std::remove("cli_selector_qc.gff3");
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
     std::remove("selector_name.gff3");
@@ -81,6 +95,8 @@ static void cleanup_outputs() {
     std::remove("selector_children.gff3");
     std::remove("selector_window_top.gff3");
     std::remove("selector_window_command.gff3");
+    std::remove("selector_qc_top.tsv");
+    std::remove("selector_qc_command.tsv");
 }
 
 int main(int argc, char* argv[]) {
@@ -167,6 +183,19 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_top.gff3") != 0 ||
         run_command(exe + " window " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_command.gff3") != 0 ||
         compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0) {
+        return 1;
+    }
+
+    const std::string qc_gff{"cli_selector_qc.gff3"};
+    if (!write_qc_annotation(qc_gff)) {
+        std::cerr << "cannot write QC test annotation\n";
+        return 1;
+    }
+    if (run_command(exe + " " + qc_gff + " --qc > selector_qc_top.tsv") != 0 ||
+        run_command(exe + " qc " + qc_gff + " > selector_qc_command.tsv") != 0 ||
+        compare_files("selector_qc_top.tsv", "selector_qc_command.tsv") != 0 ||
+        require_contains("selector_qc_top.tsv", "duplicate_id") != 0 ||
+        require_contains("selector_qc_top.tsv", "missing_parent") != 0) {
         return 1;
     }
 
