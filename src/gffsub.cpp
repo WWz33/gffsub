@@ -985,7 +985,7 @@ int main(int argc, char* argv[]) {
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
     const bool can_dispatch_summary_to_query = bed_file.empty() && !do_longest && !threads_set &&
                                                output_format == "gff3" && output_file.empty();
-    const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty() && feature.empty();
+    const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
