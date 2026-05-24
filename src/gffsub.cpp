@@ -110,7 +110,7 @@ static void query_usage(const char* prog) {
         << "\n"
         << "Query Options:\n"
         << "  --id ID                 Query a feature by ID.\n"
-        << "  --name NAME             Query a gene by Name/Alias/gene_id/locus_tag/ID.\n"
+        << "  --name NAME             Query a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
         << "  --id-list FILE          Query one feature ID per line.\n"
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
