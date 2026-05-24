@@ -235,18 +235,18 @@ gffsub <input.gff3> [options]
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
 | `<input.gff3>` | file | Input GFF3/GTF-style annotation file. |
-| `--id` | ID | Keep the exact feature `ID`. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id ID`. |
-| `--id-list` | file | Read one exact feature ID per non-empty line. Default GFF3 output is equivalent to `gffsub query <input.gff3> --id-list FILE`. |
-| `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
-| `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
+| `--id` | ID | Keep the exact feature `ID`. This option can be repeated. This is the top-level selector for exact-ID extraction. |
+| `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. |
+| `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
+| `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. |
 | `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
-| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. This uses the same summary output as `query`; combine only with query-style selectors. |
+| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--output-attrs`. |
-| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`; combine only with query-style selectors. |
-| `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. Output is equivalent to `gffsub window <input.gff3> --id ID --upstream N`. |
-| `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. Output is equivalent to the `window` command. |
+| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. |
+| `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. |
+| `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
-| `--qc` | flag | Run annotation QC. Output is equivalent to `gffsub qc <input.gff3>`. |
+| `--qc` | flag | Run annotation QC. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |

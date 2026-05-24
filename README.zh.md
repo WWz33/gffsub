@@ -210,18 +210,18 @@ gffsub <input.gff3> [options]
 | 参数 | 值 | 含义 |
 |------|----|------|
 | `<input.gff3>` | 文件 | 输入 GFF3/GTF 风格注释文件。 |
-| `--id` | ID | 保留精确 feature `ID`。该参数可以重复使用。默认 GFF3 输出等价于 `gffsub query <input.gff3> --id ID`。 |
-| `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。默认 GFF3 输出等价于 `gffsub query <input.gff3> --id-list FILE`。 |
-| `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。默认 GFF3 输出等价于 `gffsub query <input.gff3> --name NAME`。 |
-| `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。默认 GFF3 输出等价于 `gffsub query <input.gff3> --attr KEY=VALUE`。 |
+| `--id` | ID | 保留精确 feature `ID`。该参数可以重复使用。这是精确 ID 提取的顶层 selector。 |
+| `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。这是批量精确 ID 提取的顶层 selector。 |
+| `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。这是常见基因命名键的顶层 selector。 |
+| `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。 |
 | `--include-children` | 标志 | 包含由 `--id`、`--id-list`、`--name` 或 `--attr` 匹配记录的后代。 |
-| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出。该输出复用 `query` 的 summary 语义；只与 query-style selector 组合。 |
+| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
 | `--attrs` | `KEY1,KEY2,...` | `--output-attrs` 的兼容别名，已不推荐使用。 |
-| `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。该输出复用 `query` 的 summary 语义；只与 query-style selector 组合。 |
-| `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。输出等价于 `gffsub window <input.gff3> --id ID --upstream N`。 |
-| `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。输出等价于 `window` 命令。 |
+| `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。 |
+| `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。 |
+| `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |
-| `--qc` | 标志 | 运行注释 QC。输出等价于 `gffsub qc <input.gff3>`。 |
+| `--qc` | 标志 | 运行注释 QC。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
 | `-b`, `--bed` | 文件 | 保留与 BED 区间重叠的 feature；BED 按 0-based 半开区间读取。 |
 | `-f`, `--feature`, `--type` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
