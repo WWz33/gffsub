@@ -313,6 +313,15 @@ static std::string join_values(const std::vector<std::string>& values) {
     return out.str();
 }
 
+static std::vector<char*> argv_from(std::vector<std::string>& args) {
+    std::vector<char*> argv;
+    argv.reserve(args.size());
+    for (auto& arg : args) {
+        argv.push_back(arg.data());
+    }
+    return argv;
+}
+
 static std::vector<std::string> extract_output_attrs(const std::string& attrs,
                                                      const std::vector<std::string>& keys) {
     const auto parsed = parse_attributes(attrs);
@@ -937,11 +946,7 @@ int main(int argc, char* argv[]) {
         }
 
         std::vector<std::string> qc_args{"qc", input_file};
-        std::vector<char*> qc_argv;
-        qc_argv.reserve(qc_args.size());
-        for (auto& arg : qc_args) {
-            qc_argv.push_back(arg.data());
-        }
+        auto qc_argv = argv_from(qc_args);
         return run_qc(static_cast<int>(qc_argv.size()), qc_argv.data(), argv[0]);
     }
 
@@ -974,11 +979,7 @@ int main(int argc, char* argv[]) {
             window_args.push_back("--strand-aware");
         }
 
-        std::vector<char*> window_argv;
-        window_argv.reserve(window_args.size());
-        for (auto& arg : window_args) {
-            window_argv.push_back(arg.data());
-        }
+        auto window_argv = argv_from(window_args);
         return run_window(static_cast<int>(window_argv.size()), window_argv.data(), argv[0]);
     }
 
@@ -1034,11 +1035,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back(join_values(output_attrs));
         }
 
-        std::vector<char*> query_argv;
-        query_argv.reserve(query_args.size());
-        for (auto& arg : query_args) {
-            query_argv.push_back(arg.data());
-        }
+        auto query_argv = argv_from(query_args);
         return run_query(static_cast<int>(query_argv.size()), query_argv.data(), argv[0]);
     }
 
