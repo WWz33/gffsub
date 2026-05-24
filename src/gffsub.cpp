@@ -932,9 +932,9 @@ static std::optional<std::string> feature_type_syntax_error(std::string_view typ
     }
     if (type.rfind("SO:", 0) == 0) {
         const auto accession = type.substr(3);
-        if (accession.empty() ||
+        if (accession.size() != 7 ||
             !std::all_of(accession.begin(), accession.end(), [](const unsigned char c) { return std::isdigit(c); })) {
-            return "Sequence Ontology accession must be SO: followed by digits";
+            return "Sequence Ontology accession must be SO: followed by seven digits";
         }
     }
     return std::nullopt;
