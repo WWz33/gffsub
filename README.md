@@ -15,10 +15,10 @@
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
 | Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
-| Extract many exact IDs | `gffsub annotation.gff3 --id-list genes.txt` |
+| Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
-| Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt -C` |
+| Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
@@ -58,7 +58,7 @@ gffsub annotation.gff3 --name ABC1
 gffsub annotation.gff3 --attr biotype=protein_coding
 
 # Extract a batch of IDs
-gffsub annotation.gff3 --id-list genes.txt
+gffsub annotation.gff3 --ids genes.txt
 
 # Extract an ID and its descendants
 gffsub annotation.gff3 --id GeneA -C
@@ -145,7 +145,7 @@ Use the top-level selector form when the question starts from an identifier, nam
 For batch pipelines, ask for summaries instead of raw GFF3:
 
 ```bash
-./gffsub annotation.gff3 --id-list genes.txt --summary tsv
+./gffsub annotation.gff3 --ids genes.txt --summary tsv
 ./gffsub annotation.gff3 --id GeneA --summary json
 ```
 
@@ -173,7 +173,7 @@ Non-region selectors use these column-9 keys:
 | Task | Command | Keys used |
 |------|---------|-----------|
 | Exact feature lookup | `--id gene0001` | `ID` |
-| Batch exact feature lookup | `--id-list genes.txt` | `ID` values, one per line |
+| Batch exact feature lookup | `--ids genes.txt` | `ID` values, one per line |
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
 | Any exact attribute filter | `--attr Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
 | Include matched descendants | `-C`, `--include-children` | child records linked by `Parent` |
@@ -236,10 +236,10 @@ gffsub <input.gff3> [options]
 |-----------|-------|---------|
 | `<input.gff3>` | file | Input GFF3/GTF-style annotation file. |
 | `--id` | ID | Keep the exact feature `ID`. This option can be repeated. This is the top-level selector for exact-ID extraction. |
-| `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. |
+| `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. `--id-list` is a verbose alias. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. |
-| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
+| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--attr`. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -271,7 +271,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `<input.gff3>` | file | Input annotation file. |
 | `--id` | ID | Query an exact feature `ID`. This option can be repeated. |
 | `--name` | key | Gene lookup by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. |
-| `--id-list` | file | Read one exact feature ID per non-empty line. |
+| `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. `--id-list` is a verbose alias. |
 | `--region` | `CHR:START-END` | Query features overlapping a 1-based inclusive region. |
 | `--type` | type | Restrict query output to one feature type. |
 | `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. |

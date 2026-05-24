@@ -22,7 +22,7 @@ static void usage(const char* prog) {
         << "  --id ID\n"
         << "      Extract a feature by exact GFF3 ID. May be repeated.\n"
         << "      Top-level selector for exact-ID extraction.\n"
-        << "  --id-list FILE\n"
+        << "  --ids FILE, --id-list FILE\n"
         << "      Extract exact feature IDs listed one per non-empty line.\n"
         << "      Top-level selector for batch exact-ID extraction.\n"
         << "  --name NAME\n"
@@ -32,7 +32,7 @@ static void usage(const char* prog) {
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Top-level selector for exact column-9 KEY=VALUE matches.\n"
         << "  -C, --include-children\n"
-        << "      Include descendants of records matched by --id, --id-list, --name, or --attr.\n"
+        << "      Include descendants of records matched by --id, --ids, --name, or --attr.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
@@ -90,7 +90,7 @@ static void usage(const char* prog) {
         << "\n"
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
-        << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
+        << "  " << prog << " annotation.gff3 --ids genes.txt\n"
         << "  " << prog << " annotation.gff3 --id GeneA -C\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary tsv\n"
         << "  " << prog << " annotation.gff3 --id GeneA --out-attrs ID,Name,Parent\n"
@@ -113,7 +113,8 @@ static void query_usage(const char* prog) {
         << "Query Options:\n"
         << "  --id ID                 Query a feature by ID.\n"
         << "  --name NAME             Query a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
-        << "  --id-list FILE          Query one feature ID per line.\n"
+        << "  --ids FILE              Query one feature ID per line.\n"
+        << "  --id-list FILE          Verbose alias for --ids.\n"
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
         << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
@@ -477,8 +478,8 @@ static int run_query(int argc, char* argv[], const char* prog) {
             auto value = require_value("--name");
             if (!value) return 1;
             name = *value;
-        } else if (arg == "--id-list") {
-            auto value = require_value("--id-list");
+        } else if (arg == "--ids" || arg == "--id-list") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
             id_list_file = *value;
         } else if (arg == "--region") {
@@ -842,6 +843,7 @@ int main(int argc, char* argv[]) {
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
+        {"ids",           required_argument, nullptr, OPT_ID_LIST},
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
         {"attr",          required_argument, nullptr, OPT_ATTR},
@@ -1023,7 +1025,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back(id);
         }
         if (!id_list_file.empty()) {
-            query_args.push_back("--id-list");
+            query_args.push_back("--ids");
             query_args.push_back(id_list_file);
         }
         if (!name.empty()) {
