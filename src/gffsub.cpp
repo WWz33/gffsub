@@ -36,7 +36,7 @@ static void usage(const char* prog) {
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
-        << "  --summary-format FMT\n"
+        << "  --summary FMT, --summary-format FMT\n"
         << "      Output summary instead of GFF3. Choices: tsv, json.\n"
         << "  --upstream N, --downstream N, --strand-aware\n"
         << "      Extract records overlapping the expanded window around --id.\n"
@@ -92,7 +92,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
         << "  " << prog << " annotation.gff3 --id GeneA -C\n"
-        << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --summary tsv\n"
         << "  " << prog << " annotation.gff3 --id GeneA --out-attrs ID,Name,Parent\n"
         << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
         << "  " << prog << " annotation.gff3 --qc\n"
@@ -121,7 +121,8 @@ static void query_usage(const char* prog) {
         << "  --output-attrs KEYS     Verbose alias for --out-attrs.\n"
         << "  --attrs KEYS            Deprecated alias for --out-attrs.\n"
         << "  -C, --include-children  Include descendants of matched IDs.\n"
-        << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
+        << "  --summary FMT           Output query summary instead of GFF3. Choices: tsv, json.\n"
+        << "  --summary-format FMT    Verbose alias for --summary.\n"
         << "  -h, --help              Display this help message.\n"
         << "\n"
         << "Attribute column example:\n"
@@ -506,12 +507,12 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             output_attrs.insert(output_attrs.end(), keys.begin(), keys.end());
-        } else if (arg == "--summary-format") {
-            auto value = require_value("--summary-format");
+        } else if (arg == "--summary" || arg == "--summary-format") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
             summary_format = *value;
             if (summary_format != "tsv" && summary_format != "json") {
-                std::cerr << "Error: --summary-format expects tsv or json\n";
+                std::cerr << "Error: " << arg << " expects tsv or json\n";
                 return 1;
             }
         } else if (arg == "-C" || arg == "--include-children") {
@@ -847,6 +848,7 @@ int main(int argc, char* argv[]) {
         {"output-attrs",  required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"out-attrs",     required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
+        {"summary",       required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
@@ -866,7 +868,8 @@ int main(int argc, char* argv[]) {
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:h", long_options, nullptr)) != -1) {
+    int option_index = 0;
+    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
             case OPT_ID_LIST: id_list_file = optarg; break;
@@ -893,7 +896,7 @@ int main(int argc, char* argv[]) {
             case OPT_SUMMARY_FORMAT:
                 summary_format = optarg;
                 if (summary_format != "tsv" && summary_format != "json") {
-                    std::cerr << "Error: --summary-format expects tsv or json\n";
+                    std::cerr << "Error: --" << long_options[option_index].name << " expects tsv or json\n";
                     return 1;
                 }
                 break;
@@ -1006,7 +1009,7 @@ int main(int argc, char* argv[]) {
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
-            std::cerr << "Error: --summary-format/--out-attrs only supports query-style selectors; "
+            std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
                       << "do not combine with --bed, --longest, --threads, --output-format, or --output\n";
             return 1;
         }
@@ -1043,7 +1046,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back("--include-children");
         }
         if (!summary_format.empty()) {
-            query_args.push_back("--summary-format");
+            query_args.push_back("--summary");
             query_args.push_back(summary_format);
         }
         if (!output_attrs.empty()) {

@@ -19,7 +19,7 @@
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt -C` |
-| Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
+| Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
@@ -67,7 +67,7 @@ gffsub annotation.gff3 --id GeneA -C
 gffsub annotation.gff3 --region chr1:1-100000
 
 # Query and summarize
-gffsub annotation.gff3 --id GeneA --summary-format tsv
+gffsub annotation.gff3 --id GeneA --summary tsv
 
 # Query and extract selected attributes
 gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent
@@ -145,8 +145,8 @@ Use the top-level selector form when the question starts from an identifier, nam
 For batch pipelines, ask for summaries instead of raw GFF3:
 
 ```bash
-./gffsub annotation.gff3 --id-list genes.txt --summary-format tsv
-./gffsub annotation.gff3 --id GeneA --summary-format json
+./gffsub annotation.gff3 --id-list genes.txt --summary tsv
+./gffsub annotation.gff3 --id GeneA --summary json
 ```
 
 Summary fields include query ID, matched ID, matched field, coordinates, strand, feature type, parent ID, child count, transcript count, exon count, CDS length, and status.
@@ -242,7 +242,7 @@ gffsub <input.gff3> [options]
 | `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
-| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. |
+| `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
 | `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. |
 | `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
@@ -278,10 +278,10 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `-C`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
-| `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. |
+| `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. `--summary-format` is a verbose alias. |
 | `-h`, `--help` | flag | Show help for query mode. |
 
-When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--out-attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary-format`, `--out-attrs` prints TSV.
+When `--summary` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--out-attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary`, `--out-attrs` prints TSV.
 
 ### Window Compatibility Mode
 

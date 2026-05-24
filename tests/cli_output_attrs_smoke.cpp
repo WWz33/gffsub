@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --summary-format json --out-attrs " + keys +
+    if (run_command(exe + " " + gff + " --id gene0001 --summary json --out-attrs " + keys +
                     " > output_attrs_json.json") != 0 ||
         require_contains("output_attrs_json.json", "\"attrs\":{\"ID\":\"gene0001\",\"Name\":\"ABC1\"") != 0 ||
         require_contains("output_attrs_json.json", "\"Alias\":\"ABC-1\"") != 0 ||
@@ -165,19 +165,26 @@ int main(int argc, char* argv[]) {
                                " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
         return 1;
     }
-    if (require_contains("output_attrs_bad.err", "Error: --summary-format/--out-attrs only supports query-style selectors") != 0) {
+    if (require_contains("output_attrs_bad.err", "Error: --summary/--summary-format/--out-attrs only supports query-style selectors") != 0) {
         return 1;
     }
 
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary xml" + bad_redirect) != 0 ||
+        require_contains("output_attrs_bad.err", "Error: --summary expects tsv or json") != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format xml" + bad_redirect) != 0 ||
+        require_contains("output_attrs_bad.err", "Error: --summary-format expects tsv or json") != 0) {
+        return 1;
+    }
+
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
                                " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
                                " --longest" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
                                " --threads 2" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
                                " --output-format gtf3" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
                                " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
         return 1;
     }
