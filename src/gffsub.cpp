@@ -189,6 +189,7 @@ static void qc_usage(const char* prog) {
         << "\n"
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
+        << "  missing_derives_from  Derives_from points to an absent ID.\n"
         << "  invalid_range     start greater than end.\n"
         << "  invalid_gap       Malformed Gap attribute.\n"
         << "  invalid_is_circular  Is_circular value is not true.\n"
@@ -1351,6 +1352,15 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             for (const auto& gap : gap_it->second) {
                 if (const auto error = gap_attribute_error(gap)) {
                     print_qc_row(std::cout, "error", "invalid_gap", rec.line_idx, id, *error);
+                }
+            }
+        }
+        const auto derives_it = attrs.find("Derives_from");
+        if (derives_it != attrs.end()) {
+            for (const auto& source_id : derives_it->second) {
+                if (by_id.find(source_id) == by_id.end()) {
+                    print_qc_row(std::cout, "error", "missing_derives_from", rec.line_idx, id,
+                                 "Derives_from " + source_id + " was not found");
                 }
             }
         }
