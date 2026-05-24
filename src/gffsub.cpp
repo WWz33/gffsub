@@ -436,6 +436,43 @@ static void print_qc_row(std::ostream& out,
         << message << '\n';
 }
 
+struct SequenceRegionParseResult {
+    std::unordered_map<std::string, Region> regions;
+    std::vector<std::pair<int, std::string>> issues;
+};
+
+static SequenceRegionParseResult parse_sequence_regions(const std::string& path) {
+    SequenceRegionParseResult result;
+    std::ifstream in{path};
+    std::string line;
+    int line_num = 0;
+    while (std::getline(in, line)) {
+        ++line_num;
+        if (line.rfind("##FASTA", 0) == 0) {
+            break;
+        }
+        if (line.rfind("##sequence-region ", 0) != 0) {
+            continue;
+        }
+
+        std::istringstream fields{line};
+        std::string directive;
+        std::string seqid;
+        int64_t start = 0;
+        int64_t end = 0;
+        if (!(fields >> directive >> seqid >> start >> end)) {
+            result.issues.emplace_back(line_num, "malformed ##sequence-region directive");
+            continue;
+        }
+        if (start < 1 || end < 1 || start > end) {
+            result.issues.emplace_back(line_num, "invalid ##sequence-region coordinates for " + seqid);
+            continue;
+        }
+        result.regions[seqid] = Region{seqid, start, end};
+    }
+    return result;
+}
+
 static void print_summary_tsv(std::ostream& out,
                               const std::vector<SummaryRow>& rows,
                               const std::vector<std::string>& output_attrs) {
@@ -892,6 +929,7 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         std::cerr << "Error: cannot parse " << input_file << '\n';
         return 1;
     }
+    const auto sequence_region_result = parse_sequence_regions(input_file);
 
     std::unordered_map<std::string, const GffRecord*> by_id;
     std::unordered_map<std::string, int> id_counts;
@@ -909,15 +947,27 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             print_qc_row(std::cout, "error", "duplicate_id", -1, id, "ID appears more than once");
         }
     }
+    for (const auto& issue : sequence_region_result.issues) {
+        print_qc_row(std::cout, "error", "invalid_sequence_region", issue.first, ".", issue.second);
+    }
 
     for (const auto& rec : data.records) {
         const std::string id = record_id(rec);
+        const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
         if (rec.start < 1 || rec.end < 1) {
             print_qc_row(std::cout, "error", "invalid_coordinate", rec.line_idx, id,
                          "start and end must be positive 1-based coordinates");
         }
         if (rec.start > rec.end) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
+        }
+        const auto sequence_region_it = sequence_region_result.regions.find(rec.seqid);
+        if (has_valid_coordinates && sequence_region_it != sequence_region_result.regions.end()) {
+            const auto& sequence_region = sequence_region_it->second;
+            if (rec.start < sequence_region.start || rec.end > sequence_region.end) {
+                print_qc_row(std::cout, "error", "outside_sequence_region", rec.line_idx, id,
+                             "feature is outside ##sequence-region " + rec.seqid);
+            }
         }
         if (rec.strand != '+' && rec.strand != '-' && rec.strand != '.' && rec.strand != '?') {
             print_qc_row(std::cout, "error", "invalid_strand", rec.line_idx, id,

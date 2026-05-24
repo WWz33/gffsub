@@ -254,7 +254,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 ./gffsub annotation.gff3 --qc
 ```
 
-当前检查会报告重复 ID、非正坐标、非法坐标范围、非法 strand 或 phase 列值、非法 CDS phase、Parent 缺失，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
+当前检查会报告重复 ID、非法 `##sequence-region` directive、非正坐标、非法坐标范围、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、Parent 缺失，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
 
 ## CLI 参数
 
@@ -353,7 +353,7 @@ gffsub window <input.gff3> --id ID [options]
 gffsub qc <input.gff3>
 ```
 
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_coordinate`、`invalid_range`、`invalid_strand`、`invalid_phase`、`invalid_cds_phase`、`missing_parent` 和 `child_outside_parent`。
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_sequence_region`、`invalid_coordinate`、`invalid_range`、`outside_sequence_region`、`invalid_strand`、`invalid_phase`、`invalid_cds_phase`、`missing_parent` 和 `child_outside_parent`。
 
 ## 输出格式
 
