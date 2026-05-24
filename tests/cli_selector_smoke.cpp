@@ -81,8 +81,11 @@ static int compare_files(const std::string& lhs_path, const std::string& rhs_pat
 static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
     std::remove("cli_selector_qc.gff3");
+    std::remove("cli_selector_ids.txt");
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
+    std::remove("selector_id_list.gff3");
+    std::remove("selector_query_id_list.gff3");
     std::remove("selector_name.gff3");
     std::remove("selector_query_name.gff3");
     std::remove("selector_alias.gff3");
@@ -125,6 +128,24 @@ int main(int argc, char* argv[]) {
 
     if (run_command(exe + " query " + gff + " --id gene0001 > selector_query_id.gff3") != 0 ||
         compare_files("selector_id.gff3", "selector_query_id.gff3") != 0) {
+        return 1;
+    }
+
+    const std::string id_list{"cli_selector_ids.txt"};
+    {
+        std::ofstream out{id_list};
+        if (!out.is_open()) {
+            std::cerr << "cannot write ID list\n";
+            return 1;
+        }
+        out << "gene0001\n"
+            << "gene0002\n";
+    }
+    if (run_command(exe + " " + gff + " --id-list " + id_list + " > selector_id_list.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id-list " + id_list + " > selector_query_id_list.gff3") != 0 ||
+        compare_files("selector_id_list.gff3", "selector_query_id_list.gff3") != 0 ||
+        require_contains("selector_id_list.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_id_list.gff3", "ID=gene0002") != 0) {
         return 1;
     }
 
