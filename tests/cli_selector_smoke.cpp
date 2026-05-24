@@ -147,6 +147,20 @@ static void cleanup_outputs() {
     std::remove("selector_model_bad.err");
     std::remove("selector_query_model_bad.out");
     std::remove("selector_query_model_bad.err");
+    std::remove("selector_nearest.gff3");
+    std::remove("selector_nearest_alias.gff3");
+    std::remove("selector_query_nearest.gff3");
+    std::remove("selector_query_nearest_alias.gff3");
+    std::remove("selector_nearest_overlap.gff3");
+    std::remove("selector_nearest_children.gff3");
+    std::remove("selector_nearest_seqid_keep.gff3");
+    std::remove("selector_nearest_seqid_drop.gff3");
+    std::remove("selector_nearest_summary.tsv");
+    std::remove("selector_nearest_not_found.tsv");
+    std::remove("selector_nearest_bad.out");
+    std::remove("selector_nearest_bad.err");
+    std::remove("selector_query_nearest_bad.out");
+    std::remove("selector_query_nearest_bad.err");
     std::remove("selector_region_intersection.gff3");
     std::remove("selector_seqid_chr2.gff3");
     std::remove("selector_seqid_gene.gff3");
@@ -207,6 +221,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_query_help.txt", "--children") != 0 ||
         require_contains("selector_query_help.txt", "--parents") != 0 ||
         require_contains("selector_query_help.txt", "--model") != 0 ||
+        require_contains("selector_query_help.txt", "--nearest REGION") != 0 ||
         require_contains("selector_query_help.txt", "--summary FMT") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --summary") != 0) {
         return 1;
@@ -230,6 +245,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--phase PHASE") != 0 ||
         require_contains("selector_help.txt", "--model") != 0 ||
+        require_contains("selector_help.txt", "--nearest REGION") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -421,11 +437,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --parents > selector_parents_bad.out 2> selector_parents_bad.err") == 0 ||
-        require_contains("selector_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest") != 0) {
         return 1;
     }
     if (run_command(exe + " query " + gff + " --parents > selector_query_parents_bad.out 2> selector_query_parents_bad.err") == 0 ||
-        require_contains("selector_query_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_query_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --id exon1 --model > selector_model.gff3") != 0 ||
@@ -463,11 +479,63 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --model > selector_model_bad.out 2> selector_model_bad.err") == 0 ||
-        require_contains("selector_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest") != 0) {
         return 1;
     }
     if (run_command(exe + " query " + gff + " --model > selector_query_model_bad.out 2> selector_query_model_bad.err") == 0 ||
-        require_contains("selector_query_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_query_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 > selector_nearest.gff3") != 0 ||
+        require_contains("selector_nearest.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_nearest.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest-gene chr1:450-500 > selector_nearest_alias.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --nearest chr1:450-500 > selector_query_nearest.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --nearest-gene chr1:450-500 > selector_query_nearest_alias.gff3") != 0 ||
+        compare_files("selector_nearest.gff3", "selector_nearest_alias.gff3") != 0 ||
+        compare_files("selector_nearest.gff3", "selector_query_nearest.gff3") != 0 ||
+        compare_files("selector_query_nearest.gff3", "selector_query_nearest_alias.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:610-620 > selector_nearest_overlap.gff3") != 0 ||
+        require_contains("selector_nearest_overlap.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_nearest_overlap.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 -C > selector_nearest_children.gff3") != 0 ||
+        require_contains("selector_nearest_children.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_nearest_children.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_nearest_children.gff3", "ID=exon1") != 0 ||
+        require_not_contains("selector_nearest_children.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 --seqid chr1 > selector_nearest_seqid_keep.gff3") != 0 ||
+        require_contains("selector_nearest_seqid_keep.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_nearest_seqid_keep.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 --seqid chr2 > selector_nearest_seqid_drop.gff3") != 0 ||
+        require_not_contains("selector_nearest_seqid_drop.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_nearest_seqid_drop.gff3", "ID=gene0003") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 --summary tsv > selector_nearest_summary.tsv") != 0 ||
+        require_contains("selector_nearest_summary.tsv", "chr1:450-500\tgene0001\tnearest") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr9:1-100 --summary tsv > selector_nearest_not_found.tsv") != 0 ||
+        require_contains("selector_nearest_not_found.tsv", "chr9:1-100\t\tnearest") != 0 ||
+        require_contains("selector_nearest_not_found.tsv", "not_found") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --nearest chr1-450-500 > selector_nearest_bad.out 2> selector_nearest_bad.err") == 0 ||
+        require_contains("selector_nearest_bad.err", "Error: invalid nearest region format chr1-450-500") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --nearest chr1-450-500 > selector_query_nearest_bad.out 2> selector_query_nearest_bad.err") == 0 ||
+        require_contains("selector_query_nearest_bad.err", "Error: invalid nearest region format chr1-450-500") != 0) {
         return 1;
     }
 

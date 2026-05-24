@@ -33,11 +33,13 @@ static void usage(const char* prog) {
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Top-level selector for exact column-9 KEY=VALUE matches. --attr is a compatibility alias.\n"
         << "  -C, --children, --include-children\n"
-        << "      Include descendants of records matched by --id, --ids, --name, or --where.\n"
+        << "      Include descendants of records matched by --id, --ids, --name, --where, or --nearest.\n"
         << "  --parents, --include-parents\n"
-        << "      Include ancestors of records matched by --id, --ids, --name, or --where.\n"
+        << "      Include ancestors of records matched by --id, --ids, --name, --where, or --nearest.\n"
         << "  --model, --gene-model\n"
-        << "      Include the full gene model for records matched by --id, --ids, --name, or --where.\n"
+        << "      Include the full gene model for records matched by --id, --ids, --name, --where, or --nearest.\n"
+        << "  --nearest REGION, --nearest-gene REGION\n"
+        << "      Keep the nearest gene to a 1-based inclusive CHR:START-END region.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
@@ -154,6 +156,8 @@ static void query_usage(const char* prog) {
         << "  --include-parents        Verbose alias for --parents.\n"
         << "  --model                  Include the full gene model for matched records.\n"
         << "  --gene-model             Verbose alias for --model.\n"
+        << "  --nearest REGION         Query the nearest gene to a 1-based inclusive CHR:START-END region.\n"
+        << "  --nearest-gene REGION    Verbose alias for --nearest.\n"
         << "  --summary FMT           Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --summary-format FMT    Verbose alias for --summary.\n"
         << "  -h, --help              Display this help message.\n"
@@ -526,6 +530,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::string name;
     std::string id_list_file;
     std::string region_str;
+    std::string nearest_region_str;
     std::string feature_type;
     std::string summary_format;
     std::vector<std::string> output_attrs;
@@ -561,6 +566,10 @@ static int run_query(int argc, char* argv[], const char* prog) {
             auto value = require_value("--region");
             if (!value) return 1;
             region_str = *value;
+        } else if (arg == "--nearest" || arg == "--nearest-gene") {
+            auto value = require_value(arg.c_str());
+            if (!value) return 1;
+            nearest_region_str = *value;
         } else if (arg == "--type") {
             auto value = require_value("--type");
             if (!value) return 1;
@@ -607,8 +616,8 @@ static int run_query(int argc, char* argv[], const char* prog) {
         }
     }
 
-    if ((include_children || include_parents || include_model) && ids.empty() && id_list_file.empty() && name.empty() && attr_filters.empty()) {
-        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, or --where\n";
+    if ((include_children || include_parents || include_model) && ids.empty() && id_list_file.empty() && name.empty() && attr_filters.empty() && nearest_region_str.empty()) {
+        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest\n";
         return 1;
     }
 
@@ -723,6 +732,21 @@ static int run_query(int argc, char* argv[], const char* prog) {
         }
         for (const auto& rec : index.overlap(region->seqid, region->start, region->end)) {
             add_match(rec, region_str, "region");
+        }
+    }
+    if (!nearest_region_str.empty()) {
+        const auto region = parse_region(nearest_region_str);
+        if (!region) {
+            std::cerr << "Error: invalid nearest region format " << nearest_region_str << '\n';
+            return 1;
+        }
+        const auto rec = index.nearest_gene(region->seqid, region->start, region->end);
+        if (rec) {
+            add_match(*rec, nearest_region_str, "nearest");
+        } else if (emit_summary) {
+            auto row = make_not_found_row(nearest_region_str, "nearest");
+            row.attrs.assign(output_attrs.size(), "");
+            summary_rows.push_back(std::move(row));
         }
     }
 
@@ -941,6 +965,7 @@ int main(int argc, char* argv[]) {
     bool strand_aware = false;
     bool do_qc = false;
     std::string region_str;
+    std::string nearest_region_str;
     std::string seqid_filter;
     std::string source_filter;
     std::optional<std::optional<double>> score_filter;
@@ -963,6 +988,7 @@ int main(int argc, char* argv[]) {
         OPT_SUMMARY_FORMAT,
         OPT_PARENTS,
         OPT_MODEL,
+        OPT_NEAREST,
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
         OPT_STRAND_AWARE,
@@ -989,6 +1015,8 @@ int main(int argc, char* argv[]) {
         {"include-parents", no_argument,      nullptr, OPT_PARENTS},
         {"model",         no_argument,       nullptr, OPT_MODEL},
         {"gene-model",    no_argument,       nullptr, OPT_MODEL},
+        {"nearest",       required_argument, nullptr, OPT_NEAREST},
+        {"nearest-gene",  required_argument, nullptr, OPT_NEAREST},
         {"up",            required_argument, nullptr, OPT_UPSTREAM},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
@@ -1050,6 +1078,7 @@ int main(int argc, char* argv[]) {
                 break;
             case OPT_PARENTS: include_parents = true; break;
             case OPT_MODEL: include_model = true; break;
+            case OPT_NEAREST: nearest_region_str = optarg; break;
             case 'C': include_children = true; break;
             case OPT_UPSTREAM: upstream_arg = optarg; break;
             case OPT_DOWNSTREAM: downstream_arg = optarg; break;
@@ -1111,9 +1140,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
+    const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty();
     if ((include_children || include_parents || include_model) && !has_query_style_selector) {
-        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, or --where\n";
+        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest\n";
         return 1;
     }
 
@@ -1138,7 +1167,7 @@ int main(int argc, char* argv[]) {
     std::string input_file = argv[optind];
 
     if (do_qc) {
-        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents || include_model ||
+        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
             strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
@@ -1156,7 +1185,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: window shortcut requires exactly one --id\n";
             return 1;
         }
-        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents || include_model ||
+        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
             !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
@@ -1215,6 +1244,10 @@ int main(int argc, char* argv[]) {
             query_args.push_back("--region");
             query_args.push_back(region_str);
         }
+        if (!nearest_region_str.empty()) {
+            query_args.push_back("--nearest");
+            query_args.push_back(nearest_region_str);
+        }
         if (!feature.empty()) {
             query_args.push_back("--type");
             query_args.push_back(feature);
@@ -1268,7 +1301,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!ids.empty() || !name.empty() || !attr_filters.empty()) {
+    if (!ids.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty()) {
         const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
         std::unordered_set<int> selected_lines;
         auto add_selected = [&](const GffRecord& rec) {
@@ -1323,6 +1356,17 @@ int main(int argc, char* argv[]) {
         for (const auto& [key, value] : attr_filters) {
             for (const auto& rec : index.with_attribute(key, value)) {
                 add_selected(rec);
+            }
+        }
+        if (!nearest_region_str.empty()) {
+            const auto nearest_region = parse_region(nearest_region_str);
+            if (!nearest_region) {
+                std::cerr << "Error: invalid nearest region format " << nearest_region_str << '\n';
+                return 1;
+            }
+            const auto rec = index.nearest_gene(nearest_region->seqid, nearest_region->start, nearest_region->end);
+            if (rec) {
+                add_selected(*rec);
             }
         }
         for (auto& rec : data.records) {

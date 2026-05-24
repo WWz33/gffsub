@@ -23,6 +23,7 @@
 | Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --where biotype=protein_coding` |
+| Find the nearest gene to a region | `gffsub annotation.gff3 --nearest chr1:1000-2000` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
 | Extract a feature and its parents | `gffsub annotation.gff3 --id ExonA --parents` |
 | Extract the full gene model from any feature | `gffsub annotation.gff3 --id ExonA --model` |
@@ -78,6 +79,9 @@ gffsub annotation.gff3 --name ABC1
 
 # Extract exact attribute matches
 gffsub annotation.gff3 --where biotype=protein_coding
+
+# Find the nearest gene to a 1-based inclusive region
+gffsub annotation.gff3 --nearest chr1:1000-2000
 
 # Extract a batch of IDs
 gffsub annotation.gff3 --ids genes.txt
@@ -181,6 +185,9 @@ Use the top-level selector form when the question starts from an identifier, nam
 # Attribute selector
 ./gffsub annotation.gff3 --where biotype=protein_coding
 
+# Nearest gene to a 1-based inclusive region
+./gffsub annotation.gff3 --nearest chr1:1000-2000
+
 # Include descendants such as transcript, exon, CDS, and UTR records
 ./gffsub annotation.gff3 --id Glyma.01G000100 -C
 
@@ -225,9 +232,10 @@ Non-region selectors use these column-9 keys:
 | Batch exact feature lookup | `--ids genes.txt` | `ID` values, one per line |
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
 | Any exact attribute filter | `--where Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
-| Include matched descendants | `-C`, `--children` | child records linked by `Parent`; `--include-children` is a verbose alias |
-| Include matched ancestors | `--parents` | parent records reached by walking `Parent` links upward; `--include-parents` is a verbose alias |
-| Extract full gene model | `--model`, `--gene-model` | starts from records matched by `--id`, `--ids`, `--name`, or `--where`, then returns the containing gene and its descendants |
+| Nearest gene lookup | `--nearest chr1:1000-2000` | same-seqid gene with the shortest distance to a 1-based inclusive region; overlapping genes have distance 0; ties use input file order |
+| Include matched descendants | `-C`, `--children` | child records linked by `Parent`; starts from records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`; `--include-children` is a verbose alias |
+| Include matched ancestors | `--parents` | parent records reached by walking `Parent` links upward; starts from records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`; `--include-parents` is a verbose alias |
+| Extract full gene model | `--model`, `--gene-model` | starts from records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`, then returns the containing gene and its descendants |
 | Print selected attributes | `--out-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
 Use `--out-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
@@ -291,9 +299,10 @@ gffsub <input.gff3> [options]
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. `--id-list` is a verbose alias. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
 | `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. `--attr` is a compatibility alias. |
-| `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-children` is a verbose alias. |
-| `--parents`, `--include-parents` | flag | Include ancestors of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-parents` is a verbose alias. |
-| `--model`, `--gene-model` | flag | Include the full gene model containing records matched by `--id`, `--ids`, `--name`, or `--where`; this returns the gene plus transcript/exon/CDS/UTR descendants. `--gene-model` is a verbose alias. |
+| `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`. `--include-children` is a verbose alias. |
+| `--parents`, `--include-parents` | flag | Include ancestors of records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`. `--include-parents` is a verbose alias. |
+| `--model`, `--gene-model` | flag | Include the full gene model containing records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`; this returns the gene plus transcript/exon/CDS/UTR descendants. `--gene-model` is a verbose alias. |
+| `--nearest`, `--nearest-gene` | `CHR:START-END` | Keep the nearest gene on the same seqid as a 1-based inclusive region; ties use input file order. `--nearest-gene` is a verbose alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -332,6 +341,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--name` | key | Gene lookup by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. |
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. `--id-list` is a verbose alias. |
 | `--region` | `CHR:START-END` | Query features overlapping a 1-based inclusive region. |
+| `--nearest`, `--nearest-gene` | `CHR:START-END` | Query the nearest gene on the same seqid as a 1-based inclusive region; ties use input file order. `--nearest-gene` is a verbose alias. |
 | `--type` | type | Restrict query output to one feature type. |
 | `--where`, `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. `--attr` is a compatibility alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
