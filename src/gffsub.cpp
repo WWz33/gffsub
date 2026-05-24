@@ -190,6 +190,7 @@ static void qc_usage(const char* prog) {
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_range     start greater than end.\n"
+        << "  invalid_gap       Malformed Gap attribute.\n"
         << "  invalid_is_circular  Is_circular value is not true.\n"
         << "  invalid_target    Malformed Target attribute.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
@@ -590,6 +591,30 @@ static std::optional<std::string> target_attribute_error(std::string_view target
     }
     if (tokens.size() == 4 && tokens[3] != "+" && tokens[3] != "-") {
         return "Target strand must be + or -";
+    }
+    return std::nullopt;
+}
+
+static bool is_gap_operation(char op) {
+    return op == 'M' || op == 'I' || op == 'D' || op == 'F' || op == 'R';
+}
+
+static std::optional<std::string> gap_attribute_error(std::string_view gap) {
+    std::istringstream fields{std::string{gap}};
+    std::string token;
+    bool saw_token = false;
+    while (fields >> token) {
+        saw_token = true;
+        if (token.size() < 2 || !is_gap_operation(token[0]) || !is_digits(std::string_view{token}.substr(1))) {
+            return "Gap must contain operation-length pairs such as M8 D3 M6";
+        }
+        int64_t length = 0;
+        if (!parse_positive_int64(std::string_view{token}.substr(1), length)) {
+            return "Gap operation lengths must be positive integers";
+        }
+    }
+    if (!saw_token) {
+        return "Gap must contain at least one operation-length pair";
     }
     return std::nullopt;
 }
@@ -1318,6 +1343,14 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             for (const auto& target : target_it->second) {
                 if (const auto error = target_attribute_error(target)) {
                     print_qc_row(std::cout, "error", "invalid_target", rec.line_idx, id, *error);
+                }
+            }
+        }
+        const auto gap_it = attrs.find("Gap");
+        if (gap_it != attrs.end()) {
+            for (const auto& gap : gap_it->second) {
+                if (const auto error = gap_attribute_error(gap)) {
+                    print_qc_row(std::cout, "error", "invalid_gap", rec.line_idx, id, *error);
                 }
             }
         }
