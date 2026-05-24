@@ -1003,6 +1003,10 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         if (rec.start > rec.end) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
         }
+        if (rec.score && !std::isfinite(*rec.score)) {
+            print_qc_row(std::cout, "error", "invalid_score", rec.line_idx, id,
+                         "score must be a finite floating point number or .");
+        }
         const auto sequence_region_it = directive_result.sequence_regions.find(rec.seqid);
         if (has_valid_coordinates && sequence_region_it != directive_result.sequence_regions.end()) {
             const auto& sequence_region = sequence_region_it->second;
