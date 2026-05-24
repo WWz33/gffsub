@@ -54,6 +54,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t190\t195\t.\t+\t.\tID=dup_attr;Name=A;Name=B\n"
         << "chr1\tsrc\tgene\t196\t198\t.\t+\t.\tID=bad_multivalue;Name=A,B\n"
         << "chr1\tsrc\tgene\t199\t199\t.\t+\t.\tID=bad_empty_attr;Name=\n"
+        << "chr1\tsrc\tgene\t201\t205\t.\t+\t.\tID=bad_empty_list_item;Alias=A,\n"
         << "bad seq\tsrc\tgene\t200\t210\t.\t+\t.\tID=bad_seqid\n"
         << "chr#bad\tsrc\tgene\t211\t215\t.\t+\t.\tID=bad_seqid_char\n"
         << "chr1\tsrc\t.\t220\t230\t.\t+\t.\tID=bad_type\n"
@@ -738,6 +739,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "duplicate_attribute_tag") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_multivalue") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_value") != 0 ||
+        require_contains("selector_qc_top.tsv", "attribute tag Alias must have a non-empty value") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_seqid") != 0 ||
         require_contains("selector_qc_top.tsv", "seqid contains unescaped character #") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_feature_type") != 0 ||

@@ -610,6 +610,10 @@ static std::optional<std::string> duplicate_attribute_tag(std::string_view attrs
     return std::nullopt;
 }
 
+static bool allows_multiple_attribute_values(std::string_view tag) {
+    return tag == "Parent" || tag == "Alias" || tag == "Note" || tag == "Dbxref" || tag == "Ontology_term";
+}
+
 static std::optional<std::string> empty_attribute_value_tag(std::string_view attrs) {
     if (attrs == ".") {
         return std::nullopt;
@@ -627,6 +631,15 @@ static std::optional<std::string> empty_attribute_value_tag(std::string_view att
             if (equals != std::string_view::npos && equals + 1 == field.size()) {
                 return std::string{field.substr(0, equals)};
             }
+            if (equals != std::string_view::npos) {
+                const auto tag = field.substr(0, equals);
+                const auto value = field.substr(equals + 1);
+                if (!value.empty() && allows_multiple_attribute_values(tag) &&
+                    (value.front() == ',' || value.back() == ',' ||
+                     value.find(",,") != std::string_view::npos)) {
+                    return std::string{tag};
+                }
+            }
         }
         if (end == attrs.size()) {
             break;
@@ -634,10 +647,6 @@ static std::optional<std::string> empty_attribute_value_tag(std::string_view att
         pos = end + 1;
     }
     return std::nullopt;
-}
-
-static bool allows_multiple_attribute_values(std::string_view tag) {
-    return tag == "Parent" || tag == "Alias" || tag == "Note" || tag == "Dbxref" || tag == "Ontology_term";
 }
 
 static std::optional<std::string> invalid_multi_value_attribute_tag(std::string_view attrs) {
