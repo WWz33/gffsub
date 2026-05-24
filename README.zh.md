@@ -353,7 +353,7 @@ gffsub window <input.gff3> --id ID [options]
 gffsub qc <input.gff3>
 ```
 
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_range`、`invalid_cds_phase`、`missing_parent` 和 `child_outside_parent`。
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `duplicate_id`、`invalid_range`、`invalid_strand`、`invalid_cds_phase`、`missing_parent` 和 `child_outside_parent`。
 
 ## 输出格式
 

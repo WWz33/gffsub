@@ -915,6 +915,10 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         if (rec.start > rec.end) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
         }
+        if (rec.strand != '+' && rec.strand != '-' && rec.strand != '.' && rec.strand != '?') {
+            print_qc_row(std::cout, "error", "invalid_strand", rec.line_idx, id,
+                         std::string{"strand "} + rec.strand + " must be +, -, ., or ?");
+        }
         if (rec.type == "CDS" && rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
             print_qc_row(std::cout, "error", "invalid_cds_phase", rec.line_idx, id,
                          std::string{"CDS phase "} + rec.phase + " must be 0, 1, or 2");
