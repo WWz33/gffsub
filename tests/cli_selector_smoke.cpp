@@ -51,6 +51,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t196\t198\t.\t+\t.\tID=bad_multivalue;Name=A,B\n"
         << "chr1\tsrc\tgene\t199\t199\t.\t+\t.\tID=bad_empty_attr;Name=\n"
         << "bad seq\tsrc\tgene\t200\t210\t.\t+\t.\tID=bad_seqid\n"
+        << "chr#bad\tsrc\tgene\t211\t215\t.\t+\t.\tID=bad_seqid_char\n"
         << "chr1\tsrc\t.\t220\t230\t.\t+\t.\tID=bad_type\n"
         << "chr1\tsrc\tSO:abc\t240\t250\t.\t+\t.\tID=bad_so_type\n"
         << "chr1\tsrc\tgene\t0\t50\t.\t+\t.\tID=bad_coordinate\n"
@@ -724,6 +725,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_attribute_multivalue") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_value") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_seqid") != 0 ||
+        require_contains("selector_qc_top.tsv", "seqid contains unescaped character #") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_feature_type") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||

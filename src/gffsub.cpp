@@ -810,10 +810,25 @@ static std::optional<std::string> seqid_syntax_error(std::string_view seqid) {
     if (seqid.front() == '>') {
         return "seqid must not begin with unescaped >";
     }
-    for (const unsigned char c : seqid) {
+    for (size_t i = 0; i < seqid.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(seqid[i]);
         if (std::isspace(c)) {
             return "seqid must not contain unescaped whitespace";
         }
+        if (seqid[i] == '%') {
+            if (i + 2 >= seqid.size() || !is_hex_digit(seqid[i + 1]) || !is_hex_digit(seqid[i + 2])) {
+                return "seqid percent escapes must be % followed by two hex digits";
+            }
+            i += 2;
+            continue;
+        }
+        if (std::isalnum(c) || seqid[i] == '.' || seqid[i] == ':' || seqid[i] == '^' ||
+            seqid[i] == '*' || seqid[i] == '$' || seqid[i] == '@' || seqid[i] == '!' ||
+            seqid[i] == '+' || seqid[i] == '_' || seqid[i] == '?' || seqid[i] == '-' ||
+            seqid[i] == '|') {
+            continue;
+        }
+        return std::string{"seqid contains unescaped character "} + seqid[i];
     }
     return std::nullopt;
 }
