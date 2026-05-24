@@ -455,6 +455,32 @@ static int count_tab_delimited_columns(const std::string& line) {
     return static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
 }
 
+static std::optional<std::string> attribute_syntax_error(std::string_view attrs) {
+    if (attrs == ".") {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    while (pos <= attrs.size()) {
+        size_t end = attrs.find(';', pos);
+        if (end == std::string_view::npos) {
+            end = attrs.size();
+        }
+        const auto field = attrs.substr(pos, end - pos);
+        if (!field.empty()) {
+            const auto equals = field.find('=');
+            if (equals == std::string_view::npos || equals == 0) {
+                return "attributes must be semicolon-separated tag=value fields";
+            }
+        }
+        if (end == attrs.size()) {
+            break;
+        }
+        pos = end + 1;
+    }
+    return std::nullopt;
+}
+
 static DirectiveParseResult parse_directives(const std::string& path) {
     DirectiveParseResult result;
     std::ifstream in{path};
@@ -483,9 +509,17 @@ static DirectiveParseResult parse_directives(const std::string& path) {
             continue;
         }
         if (line.rfind("##sequence-region ", 0) != 0) {
-            if (!line.empty() && line[0] != '#' && count_tab_delimited_columns(line) != 9) {
-                result.issues.push_back({line_num, "invalid_column_count",
-                                         "feature lines must contain exactly 9 tab-delimited columns"});
+            if (!line.empty() && line[0] != '#') {
+                if (count_tab_delimited_columns(line) != 9) {
+                    result.issues.push_back({line_num, "invalid_column_count",
+                                             "feature lines must contain exactly 9 tab-delimited columns"});
+                    continue;
+                }
+                const auto last_tab = line.rfind('\t');
+                const auto attrs = std::string_view{line}.substr(last_tab + 1);
+                if (const auto error = attribute_syntax_error(attrs)) {
+                    result.issues.push_back({line_num, "invalid_attribute_syntax", *error});
+                }
             }
             continue;
         }
