@@ -34,6 +34,7 @@ static bool write_qc_annotation(const std::string& path) {
     out << "##gff-version 3\n"
         << "##sequence-region chr1 1 1000\n"
         << "##sequence-region chr_bad 100 1\n"
+        << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t0\t50\t.\t+\t.\tID=bad_coordinate\n"
@@ -681,6 +682,7 @@ int main(int argc, char* argv[]) {
         run_command(exe + " qc " + qc_gff + " > selector_qc_command.tsv") != 0 ||
         compare_files("selector_qc_top.tsv", "selector_qc_command.tsv") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_id") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid_gff_version") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||

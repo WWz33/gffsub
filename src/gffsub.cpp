@@ -436,20 +436,47 @@ static void print_qc_row(std::ostream& out,
         << message << '\n';
 }
 
-struct SequenceRegionParseResult {
-    std::unordered_map<std::string, Region> regions;
-    std::vector<std::pair<int, std::string>> issues;
+struct DirectiveIssue {
+    int line_idx;
+    std::string code;
+    std::string message;
 };
 
-static SequenceRegionParseResult parse_sequence_regions(const std::string& path) {
-    SequenceRegionParseResult result;
+struct DirectiveParseResult {
+    std::unordered_map<std::string, Region> sequence_regions;
+    std::vector<DirectiveIssue> issues;
+};
+
+static bool is_gff3_version(std::string_view version) {
+    return version == "3" || version.rfind("3.", 0) == 0;
+}
+
+static DirectiveParseResult parse_directives(const std::string& path) {
+    DirectiveParseResult result;
     std::ifstream in{path};
     std::string line;
     int line_num = 0;
+    int gff_version_count = 0;
     while (std::getline(in, line)) {
         ++line_num;
         if (line.rfind("##FASTA", 0) == 0) {
             break;
+        }
+        if (line.rfind("##gff-version", 0) == 0) {
+            ++gff_version_count;
+            std::istringstream fields{line};
+            std::string directive;
+            std::string version;
+            fields >> directive >> version;
+            if (directive != "##gff-version" || !is_gff3_version(version)) {
+                result.issues.push_back({line_num, "invalid_gff_version",
+                                         "##gff-version must declare a version beginning with 3"});
+            }
+            if (line_num != 1) {
+                result.issues.push_back({line_num, "invalid_gff_version",
+                                         "##gff-version must be the topmost line"});
+            }
+            continue;
         }
         if (line.rfind("##sequence-region ", 0) != 0) {
             continue;
@@ -461,14 +488,21 @@ static SequenceRegionParseResult parse_sequence_regions(const std::string& path)
         int64_t start = 0;
         int64_t end = 0;
         if (!(fields >> directive >> seqid >> start >> end)) {
-            result.issues.emplace_back(line_num, "malformed ##sequence-region directive");
+            result.issues.push_back({line_num, "invalid_sequence_region",
+                                     "malformed ##sequence-region directive"});
             continue;
         }
         if (start < 1 || end < 1 || start > end) {
-            result.issues.emplace_back(line_num, "invalid ##sequence-region coordinates for " + seqid);
+            result.issues.push_back({line_num, "invalid_sequence_region",
+                                     "invalid ##sequence-region coordinates for " + seqid});
             continue;
         }
-        result.regions[seqid] = Region{seqid, start, end};
+        result.sequence_regions[seqid] = Region{seqid, start, end};
+    }
+    if (gff_version_count == 0) {
+        result.issues.push_back({-1, "invalid_gff_version", "missing ##gff-version directive"});
+    } else if (gff_version_count > 1) {
+        result.issues.push_back({-1, "invalid_gff_version", "##gff-version appears more than once"});
     }
     return result;
 }
@@ -929,7 +963,7 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         std::cerr << "Error: cannot parse " << input_file << '\n';
         return 1;
     }
-    const auto sequence_region_result = parse_sequence_regions(input_file);
+    const auto directive_result = parse_directives(input_file);
 
     std::unordered_map<std::string, const GffRecord*> by_id;
     std::unordered_map<std::string, int> id_counts;
@@ -947,8 +981,8 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             print_qc_row(std::cout, "error", "duplicate_id", -1, id, "ID appears more than once");
         }
     }
-    for (const auto& issue : sequence_region_result.issues) {
-        print_qc_row(std::cout, "error", "invalid_sequence_region", issue.first, ".", issue.second);
+    for (const auto& issue : directive_result.issues) {
+        print_qc_row(std::cout, "error", issue.code.c_str(), issue.line_idx, ".", issue.message);
     }
 
     for (const auto& rec : data.records) {
@@ -961,8 +995,8 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         if (rec.start > rec.end) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
         }
-        const auto sequence_region_it = sequence_region_result.regions.find(rec.seqid);
-        if (has_valid_coordinates && sequence_region_it != sequence_region_result.regions.end()) {
+        const auto sequence_region_it = directive_result.sequence_regions.find(rec.seqid);
+        if (has_valid_coordinates && sequence_region_it != directive_result.sequence_regions.end()) {
             const auto& sequence_region = sequence_region_it->second;
             if (rec.start < sequence_region.start || rec.end > sequence_region.end) {
                 print_qc_row(std::cout, "error", "outside_sequence_region", rec.line_idx, id,
