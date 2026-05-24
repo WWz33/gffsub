@@ -904,7 +904,8 @@ static DirectiveParseResult parse_directives(const std::string& path) {
         std::string seqid;
         int64_t start = 0;
         int64_t end = 0;
-        if (!(fields >> directive >> seqid >> start >> end)) {
+        std::string extra;
+        if (!(fields >> directive >> seqid >> start >> end) || (fields >> extra)) {
             result.issues.push_back({line_num, "invalid_sequence_region",
                                      "malformed ##sequence-region directive"});
             continue;

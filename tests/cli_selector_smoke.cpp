@@ -37,6 +37,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "##sequence-region chr1 1 1200\n"
         << "##sequence-region chr2 1 500\n"
         << "##sequence-region chr#bad 1 500\n"
+        << "##sequence-region chr_extra 1 500 extra\n"
         << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
@@ -719,6 +720,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid ##sequence-region seqid chr#bad") != 0 ||
+        require_contains("selector_qc_top.tsv", "malformed ##sequence-region directive") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
         require_contains("selector_qc_top.tsv", "attribute tag Name must not contain comma-separated values") != 0 ||
