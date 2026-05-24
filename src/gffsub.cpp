@@ -458,12 +458,98 @@ struct DirectiveParseResult {
     std::vector<DirectiveIssue> issues;
 };
 
+struct QcParseResult {
+    GffData data;
+    std::vector<DirectiveIssue> issues;
+    bool opened = false;
+};
+
 static bool is_gff3_version(std::string_view version) {
     return version == "3" || version.rfind("3.", 0) == 0;
 }
 
 static int count_tab_delimited_columns(const std::string& line) {
     return static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
+}
+
+static std::vector<std::string> split_tab_fields(const std::string& line) {
+    std::vector<std::string> cols;
+    size_t start = 0;
+    while (true) {
+        const auto pos = line.find('\t', start);
+        if (pos == std::string::npos) {
+            cols.emplace_back(line.substr(start));
+            break;
+        }
+        cols.emplace_back(line.substr(start, pos - start));
+        start = pos + 1;
+    }
+    return cols;
+}
+
+static std::optional<std::string> raw_attr_value(std::string_view attrs, std::string_view key) {
+    size_t pos = 0;
+    while (pos < attrs.size()) {
+        const auto key_end = attrs.find('=', pos);
+        if (key_end == std::string_view::npos) {
+            const auto next = attrs.find(';', pos);
+            pos = (next == std::string_view::npos) ? attrs.size() : next + 1;
+            continue;
+        }
+
+        const auto found_key = attrs.substr(pos, key_end - pos);
+        const size_t value_start = key_end + 1;
+        auto value_end = attrs.find(';', value_start);
+        if (value_end == std::string_view::npos) {
+            value_end = attrs.size();
+        }
+
+        if (found_key == key) {
+            return std::string{attrs.substr(value_start, value_end - value_start)};
+        }
+        pos = (value_end < attrs.size()) ? value_end + 1 : attrs.size();
+    }
+    return std::nullopt;
+}
+
+static bool parse_qc_int64(std::string_view value, int64_t& out) {
+    if (value.empty()) {
+        return false;
+    }
+    try {
+        const std::string copy{value};
+        size_t parsed = 0;
+        const auto parsed_value = std::stoll(copy, &parsed);
+        if (parsed != copy.size()) {
+            return false;
+        }
+        out = parsed_value;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+static bool parse_qc_score(std::string_view value, std::optional<double>& out) {
+    if (value == ".") {
+        out = std::nullopt;
+        return true;
+    }
+    if (value.empty()) {
+        return false;
+    }
+    try {
+        const std::string copy{value};
+        size_t parsed = 0;
+        const double parsed_value = std::stod(copy, &parsed);
+        if (parsed != copy.size()) {
+            return false;
+        }
+        out = parsed_value;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 static std::optional<std::string> attribute_syntax_error(std::string_view attrs) {
@@ -936,6 +1022,65 @@ static DirectiveParseResult parse_directives(const std::string& path) {
     return result;
 }
 
+static QcParseResult parse_qc_records(const std::string& path) {
+    QcParseResult result;
+    std::ifstream in{path};
+    if (!in.is_open()) {
+        return result;
+    }
+    result.opened = true;
+    std::string line;
+    int line_num = 0;
+    bool in_fasta = false;
+    while (std::getline(in, line)) {
+        ++line_num;
+        if (in_fasta) {
+            continue;
+        }
+        if (line.rfind("##FASTA", 0) == 0) {
+            in_fasta = true;
+            continue;
+        }
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (count_tab_delimited_columns(line) != 9) {
+            continue;
+        }
+
+        const auto cols = split_tab_fields(line);
+        GffRecord rec;
+        rec.seqid = cols[0];
+        rec.source = cols[1];
+        rec.type = cols[2];
+        rec.line_idx = static_cast<int>(result.data.size());
+        rec.kept = true;
+
+        if (!parse_qc_int64(cols[3], rec.start) || !parse_qc_int64(cols[4], rec.end)) {
+            result.issues.push_back({line_num, "invalid_coordinate",
+                                     "start and end must be integer 1-based coordinates"});
+            continue;
+        }
+
+        if (!parse_qc_score(cols[5], rec.score)) {
+            result.issues.push_back({line_num, "invalid_score",
+                                     "score must be a finite floating point number or ."});
+            rec.score = std::nullopt;
+        }
+
+        rec.strand = cols[6].empty() ? '.' : cols[6][0];
+        rec.phase = cols[7].empty() ? '.' : cols[7][0];
+        rec.attr_raw = cols[8];
+        rec.id = raw_attr_value(cols[8], "ID");
+        rec.parent_id = raw_attr_value(cols[8], "Parent");
+        rec.gene_id = raw_attr_value(cols[8], "gene_id");
+        rec.transcript_id = raw_attr_value(cols[8], "transcript_id");
+
+        result.data.append(rec);
+    }
+    return result;
+}
+
 static void print_summary_tsv(std::ostream& out,
                               const std::vector<SummaryRow>& rows,
                               const std::vector<std::string>& output_attrs) {
@@ -1385,13 +1530,13 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         return 1;
     }
 
-    GffData data;
-    IdIndex idx;
     const std::string input_file = argv[1];
-    if (parse_file(input_file, data, idx, InputFormat::GFF3) != 0) {
+    const auto qc_parse = parse_qc_records(input_file);
+    if (!qc_parse.opened) {
         std::cerr << "Error: cannot parse " << input_file << '\n';
         return 1;
     }
+    const auto& data = qc_parse.data;
     const auto directive_result = parse_directives(input_file);
 
     std::unordered_map<std::string, const GffRecord*> by_id;
@@ -1423,6 +1568,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         }
     }
     for (const auto& issue : directive_result.issues) {
+        print_qc_row(std::cout, "error", issue.code.c_str(), issue.line_idx, ".", issue.message);
+    }
+    for (const auto& issue : qc_parse.issues) {
         print_qc_row(std::cout, "error", issue.code.c_str(), issue.line_idx, ".", issue.message);
     }
 

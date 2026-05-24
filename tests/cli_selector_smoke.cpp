@@ -48,6 +48,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tpolypeptide\t450\t480\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\n"
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
+        << "chr1\tsrc\tgene\tabc\t180\t.\t+\t.\tID=bad_coordinate_text\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
         << "chr1\tsrc\tgene\t190\t195\t.\t+\t.\tID=dup_attr;Name=A;Name=B\n"
         << "chr1\tsrc\tgene\t196\t198\t.\t+\t.\tID=bad_multivalue;Name=A,B\n"
@@ -733,6 +734,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "seqid contains unescaped character #") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_feature_type") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
+        require_contains("selector_qc_top.tsv", "start and end must be integer 1-based coordinates") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||
         require_not_contains("selector_qc_top.tsv", "circular_region\tfeature is outside ##sequence-region") != 0 ||
         require_not_contains("selector_qc_top.tsv", "circular_gene\tfeature is outside ##sequence-region") != 0 ||
