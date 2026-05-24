@@ -96,6 +96,8 @@ static void cleanup_outputs() {
     std::remove("selector_query_parent.gff3");
     std::remove("selector_children.gff3");
     std::remove("selector_query_children.gff3");
+    std::remove("selector_children_type.gff3");
+    std::remove("selector_query_children_type.gff3");
     std::remove("selector_window_top.gff3");
     std::remove("selector_window_command.gff3");
     std::remove("selector_qc_top.tsv");
@@ -192,6 +194,14 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " query " + gff + " --id gene0001 --include-children > selector_query_children.gff3") != 0 ||
         compare_files("selector_children.gff3", "selector_query_children.gff3") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --id gene0001 --include-children -f mRNA > selector_children_type.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id gene0001 --include-children --type mRNA > selector_query_children_type.gff3") != 0 ||
+        compare_files("selector_children_type.gff3", "selector_query_children_type.gff3") != 0 ||
+        require_contains("selector_children_type.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_children_type.gff3", "ID=gene0001") != 0) {
         return 1;
     }
 
