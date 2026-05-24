@@ -451,6 +451,10 @@ static bool is_gff3_version(std::string_view version) {
     return version == "3" || version.rfind("3.", 0) == 0;
 }
 
+static int count_tab_delimited_columns(const std::string& line) {
+    return static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
+}
+
 static DirectiveParseResult parse_directives(const std::string& path) {
     DirectiveParseResult result;
     std::ifstream in{path};
@@ -479,6 +483,10 @@ static DirectiveParseResult parse_directives(const std::string& path) {
             continue;
         }
         if (line.rfind("##sequence-region ", 0) != 0) {
+            if (!line.empty() && line[0] != '#' && count_tab_delimited_columns(line) != 9) {
+                result.issues.push_back({line_num, "invalid_column_count",
+                                         "feature lines must contain exactly 9 tab-delimited columns"});
+            }
             continue;
         }
 
