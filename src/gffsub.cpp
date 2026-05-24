@@ -481,6 +481,34 @@ static std::optional<std::string> attribute_syntax_error(std::string_view attrs)
     return std::nullopt;
 }
 
+static std::optional<std::string> duplicate_attribute_tag(std::string_view attrs) {
+    if (attrs == ".") {
+        return std::nullopt;
+    }
+
+    std::unordered_set<std::string> seen;
+    size_t pos = 0;
+    while (pos <= attrs.size()) {
+        size_t end = attrs.find(';', pos);
+        if (end == std::string_view::npos) {
+            end = attrs.size();
+        }
+        const auto field = attrs.substr(pos, end - pos);
+        if (!field.empty()) {
+            const auto equals = field.find('=');
+            const std::string tag{field.substr(0, equals)};
+            if (!seen.insert(tag).second) {
+                return tag;
+            }
+        }
+        if (end == attrs.size()) {
+            break;
+        }
+        pos = end + 1;
+    }
+    return std::nullopt;
+}
+
 static DirectiveParseResult parse_directives(const std::string& path) {
     DirectiveParseResult result;
     std::ifstream in{path};
@@ -519,6 +547,9 @@ static DirectiveParseResult parse_directives(const std::string& path) {
                 const auto attrs = std::string_view{line}.substr(last_tab + 1);
                 if (const auto error = attribute_syntax_error(attrs)) {
                     result.issues.push_back({line_num, "invalid_attribute_syntax", *error});
+                } else if (const auto duplicate_tag = duplicate_attribute_tag(attrs)) {
+                    result.issues.push_back({line_num, "duplicate_attribute_tag",
+                                             "attribute tag " + *duplicate_tag + " appears more than once"});
                 }
             }
             continue;
