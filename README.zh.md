@@ -15,6 +15,7 @@
 | 提取某个基因组区间内的 feature | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | 提取某个染色体或 contig | `gffsub annotation.gff3 --seqid chr1` |
 | 提取某个注释来源的记录 | `gffsub annotation.gff3 --source Gnomon` |
+| 提取某个 score 的记录 | `gffsub annotation.gff3 --score 42.5` |
 | 提取某条链上的记录 | `gffsub annotation.gff3 --strand -` |
 | 提取某个 phase 的记录 | `gffsub annotation.gff3 --phase 0 -f CDS` |
 | 用 BED 区间作为输入 | `gffsub annotation.gff3 -b regions.bed -f exon` |
@@ -42,6 +43,9 @@ gffsub annotation.gff3 --seqid chr1
 
 # 按第 2 列 source 取子集
 gffsub annotation.gff3 --source Gnomon
+
+# 按第 6 列 score 取子集
+gffsub annotation.gff3 --score 42.5
 
 # 按第 7 列 strand 取子集
 gffsub annotation.gff3 --strand -
@@ -130,6 +134,9 @@ ctest --test-dir build --output-on-failure
 
 # 提取某个第 2 列 source 下的全部记录
 ./gffsub annotation.gff3 --source Gnomon
+
+# 提取某个第 6 列 score 下的全部记录
+./gffsub annotation.gff3 --score 42.5
 
 # 提取某个第 7 列 strand 下的全部记录
 ./gffsub annotation.gff3 --strand -
@@ -252,6 +259,7 @@ gffsub <input.gff3> [options]
 | `--qc` | 标志 | 运行注释 QC。 |
 | `--seqid` | seqid | 只保留第 1 列 GFF3 seqid 精确等于该值的记录。 |
 | `--source` | source | 只保留第 2 列 GFF3 source 精确等于该值的记录。 |
+| `--score` | 数字, `.` | 只保留第 6 列 GFF3 score 匹配该数值，或第 6 列为 `.` 的记录。 |
 | `--strand` | `+`, `-`, `.`, `?` | 只保留第 7 列 GFF3 strand 精确等于该值的记录。这是过滤器；`--strand-aware` 只改变 window 上下游解释。 |
 | `--phase` | `0`, `1`, `2`, `.` | 只保留第 8 列 GFF3 phase 精确等于该值的记录。对 CDS 记录，GFF3 phase 通常是 `0`、`1` 或 `2`；`.` 会匹配第 8 列为 `.` 的任何记录。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |

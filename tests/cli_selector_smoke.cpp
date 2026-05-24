@@ -12,7 +12,7 @@ static bool write_test_annotation(const std::string& path) {
 
     out << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t400\t.\t+\t.\tID=gene0001;Name=ABC1;gene_id=G1;locus_tag=Locus1;Alias=ABC-1,LegacyABC;Dbxref=GeneID:123\n"
-        << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
+        << "chr1\tsrc\tmRNA\t100\t400\t42.5\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
         << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=tx1\n"
         << "chr1\tsrc\tCDS\t150\t170\t.\t+\t0\tID=cds1;Parent=tx1\n"
         << "chr1\tsrc\tCDS\t200\t220\t.\t+\t1\tID=cds2;Parent=tx1\n"
@@ -130,6 +130,13 @@ static void cleanup_outputs() {
     std::remove("selector_source_other.gff3");
     std::remove("selector_source_gene.gff3");
     std::remove("selector_seqid_source_intersection.gff3");
+    std::remove("selector_score_value.gff3");
+    std::remove("selector_score_missing.gff3");
+    std::remove("selector_score_feature.gff3");
+    std::remove("selector_score_bad.out");
+    std::remove("selector_score_bad.err");
+    std::remove("selector_score_nan.out");
+    std::remove("selector_score_nan.err");
     std::remove("selector_strand_minus.gff3");
     std::remove("selector_strand_dot.gff3");
     std::remove("selector_strand_gene.gff3");
@@ -193,6 +200,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_help.txt", "--seqid SEQID") != 0 ||
         require_contains("selector_help.txt", "--source SOURCE") != 0 ||
+        require_contains("selector_help.txt", "--score SCORE") != 0 ||
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--phase PHASE") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
@@ -394,6 +402,30 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --seqid chr2 --source src > selector_seqid_source_intersection.gff3") != 0 ||
         require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0003") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --score 42.5 > selector_score_value.gff3") != 0 ||
+        require_contains("selector_score_value.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_score_value.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --score . > selector_score_missing.gff3") != 0 ||
+        require_contains("selector_score_missing.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_score_missing.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --score . -f gene > selector_score_feature.gff3") != 0 ||
+        require_contains("selector_score_feature.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_score_feature.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_score_feature.gff3", "ID=exon1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --score abc > selector_score_bad.out 2> selector_score_bad.err") == 0 ||
+        require_contains("selector_score_bad.err", "Error: --score expects a finite floating point number or .") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --score nan > selector_score_nan.out 2> selector_score_nan.err") == 0 ||
+        require_contains("selector_score_nan.err", "Error: --score expects a finite floating point number or .") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --strand - > selector_strand_minus.gff3") != 0 ||

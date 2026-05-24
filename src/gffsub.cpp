@@ -1,6 +1,7 @@
 #include "gff3.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <fstream>
@@ -49,6 +50,9 @@ static void usage(const char* prog) {
         << "\n"
         << "  --source SOURCE\n"
         << "      Extract features whose second column exactly matches SOURCE.\n"
+        << "\n"
+        << "  --score SCORE\n"
+        << "      Filter features by score (6th column). Use . for missing score.\n"
         << "\n"
         << "  -r, --region CHR:START-END\n"
         << "      Extract features overlapping the specified genomic region.\n"
@@ -113,6 +117,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 --seqid chr1 -f gene\n"
         << "  " << prog << " annotation.gff3 --source Gnomon -f mRNA\n"
+        << "  " << prog << " annotation.gff3 --score 42.5\n"
         << "  " << prog << " annotation.gff3 --strand - -f gene\n"
         << "  " << prog << " annotation.gff3 --phase 0 -f CDS\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
@@ -348,6 +353,24 @@ static std::optional<char> parse_phase_filter(std::string_view value) {
     const char phase = value[0];
     if (phase == '0' || phase == '1' || phase == '2' || phase == '.') {
         return phase;
+    }
+    return std::nullopt;
+}
+
+static std::optional<std::optional<double>> parse_score_filter(std::string_view value) {
+    if (value == ".") {
+        return std::optional<double>{};
+    }
+    if (value.empty()) {
+        return std::nullopt;
+    }
+    try {
+        size_t parsed = 0;
+        const double score = std::stod(std::string{value}, &parsed);
+        if (parsed == value.size() && std::isfinite(score)) {
+            return std::optional<double>{score};
+        }
+    } catch (const std::exception&) {
     }
     return std::nullopt;
 }
@@ -865,6 +888,7 @@ int main(int argc, char* argv[]) {
     std::string region_str;
     std::string seqid_filter;
     std::string source_filter;
+    std::optional<std::optional<double>> score_filter;
     std::optional<char> strand_filter;
     std::optional<char> phase_filter;
     std::string bed_file;
@@ -888,6 +912,7 @@ int main(int argc, char* argv[]) {
         OPT_QC,
         OPT_SEQID,
         OPT_SOURCE,
+        OPT_SCORE,
         OPT_STRAND_FILTER,
         OPT_PHASE
     };
@@ -911,6 +936,7 @@ int main(int argc, char* argv[]) {
         {"qc",            no_argument,       nullptr, OPT_QC},
         {"seqid",         required_argument, nullptr, OPT_SEQID},
         {"source",        required_argument, nullptr, OPT_SOURCE},
+        {"score",         required_argument, nullptr, OPT_SCORE},
         {"strand",        required_argument, nullptr, OPT_STRAND_FILTER},
         {"phase",         required_argument, nullptr, OPT_PHASE},
         {"children",      no_argument,       nullptr, 'C'},
@@ -968,6 +994,14 @@ int main(int argc, char* argv[]) {
             case OPT_QC: do_qc = true; break;
             case OPT_SEQID: seqid_filter = optarg; break;
             case OPT_SOURCE: source_filter = optarg; break;
+            case OPT_SCORE: {
+                score_filter = parse_score_filter(optarg);
+                if (!score_filter) {
+                    std::cerr << "Error: --score expects a finite floating point number or .\n";
+                    return 1;
+                }
+                break;
+            }
             case OPT_STRAND_FILTER: {
                 strand_filter = parse_strand_filter(optarg);
                 if (!strand_filter) {
@@ -1037,7 +1071,7 @@ int main(int argc, char* argv[]) {
     if (do_qc) {
         if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
-            strand_aware || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
+            strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: --qc only supports the input file\n";
             return 1;
@@ -1055,7 +1089,7 @@ int main(int argc, char* argv[]) {
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
-            !seqid_filter.empty() || !source_filter.empty() || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
+            !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
@@ -1082,14 +1116,14 @@ int main(int argc, char* argv[]) {
     }
 
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
-    const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && !strand_filter && !phase_filter && bed_file.empty() && !do_longest && !threads_set &&
+    const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && !score_filter && !strand_filter && !phase_filter && bed_file.empty() && !do_longest && !threads_set &&
                                                output_format == "gff3" && output_file.empty();
     const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
             std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
-                      << "do not combine with --seqid, --source, --strand, --phase, --bed, --longest, --threads, --format/--output-format, or --output\n";
+                      << "do not combine with --seqid, --source, --score, --strand, --phase, --bed, --longest, --threads, --format/--output-format, or --output\n";
             return 1;
         }
     }
@@ -1216,6 +1250,10 @@ int main(int argc, char* argv[]) {
 
     if (!source_filter.empty()) {
         filter_by_source(data, source_filter);
+    }
+
+    if (score_filter) {
+        filter_by_score(data, *score_filter);
     }
 
     if (strand_filter) {

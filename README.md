@@ -15,6 +15,7 @@
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | Extract one chromosome or contig | `gffsub annotation.gff3 --seqid chr1` |
 | Extract records from one annotation source | `gffsub annotation.gff3 --source Gnomon` |
+| Extract records with one score | `gffsub annotation.gff3 --score 42.5` |
 | Extract records on one strand | `gffsub annotation.gff3 --strand -` |
 | Extract records with one phase | `gffsub annotation.gff3 --phase 0 -f CDS` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
@@ -42,6 +43,9 @@ gffsub annotation.gff3 --seqid chr1
 
 # Source column subset
 gffsub annotation.gff3 --source Gnomon
+
+# Score column subset
+gffsub annotation.gff3 --score 42.5
 
 # Strand column subset
 gffsub annotation.gff3 --strand -
@@ -130,6 +134,9 @@ Use the classic mode when you already know the interval or have a BED file.
 
 # Extract all records from one GFF3 source column value
 ./gffsub annotation.gff3 --source Gnomon
+
+# Extract all records from one GFF3 score column value
+./gffsub annotation.gff3 --score 42.5
 
 # Extract all records from one GFF3 strand column value
 ./gffsub annotation.gff3 --strand -
@@ -278,6 +285,7 @@ gffsub <input.gff3> [options]
 | `--qc` | flag | Run annotation QC. |
 | `--seqid` | seqid | Keep records whose first GFF3 column exactly matches the value. |
 | `--source` | source | Keep records whose second GFF3 column exactly matches the value. |
+| `--score` | number, `.` | Keep records whose sixth GFF3 column matches the numeric score, or whose score column is `.`. |
 | `--strand` | `+`, `-`, `.`, `?` | Keep records whose seventh GFF3 column exactly matches the value. This is a filter, unlike `--strand-aware`, which only changes window interpretation. |
 | `--phase` | `0`, `1`, `2`, `.` | Keep records whose eighth GFF3 column exactly matches the value. For CDS records, GFF3 phase is normally `0`, `1`, or `2`; `.` matches any record whose phase column is `.`. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
