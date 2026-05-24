@@ -79,6 +79,8 @@ static void cleanup_outputs() {
     std::remove("selector_dbxref_summary.tsv");
     std::remove("selector_parent.gff3");
     std::remove("selector_children.gff3");
+    std::remove("selector_window_top.gff3");
+    std::remove("selector_window_command.gff3");
 }
 
 int main(int argc, char* argv[]) {
@@ -159,6 +161,12 @@ int main(int argc, char* argv[]) {
         require_contains("selector_children.gff3", "ID=tx1") != 0 ||
         require_contains("selector_children.gff3", "ID=exon1") != 0 ||
         require_not_contains("selector_children.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_top.gff3") != 0 ||
+        run_command(exe + " window " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_command.gff3") != 0 ||
+        compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0) {
         return 1;
     }
 
