@@ -524,6 +524,13 @@ static std::optional<std::string> seqid_syntax_error(std::string_view seqid) {
     return std::nullopt;
 }
 
+static std::optional<std::string> feature_type_syntax_error(std::string_view type) {
+    if (type.empty() || type == ".") {
+        return "feature type must be a Sequence Ontology term or accession";
+    }
+    return std::nullopt;
+}
+
 static DirectiveParseResult parse_directives(const std::string& path) {
     DirectiveParseResult result;
     std::ifstream in{path};
@@ -1078,6 +1085,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
         if (const auto error = seqid_syntax_error(rec.seqid)) {
             print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
+        }
+        if (const auto error = feature_type_syntax_error(rec.type)) {
+            print_qc_row(std::cout, "error", "invalid_feature_type", rec.line_idx, id, *error);
         }
         if (rec.start < 1 || rec.end < 1) {
             print_qc_row(std::cout, "error", "invalid_coordinate", rec.line_idx, id,
