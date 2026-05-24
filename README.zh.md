@@ -21,7 +21,7 @@
 | 批量提取 ID，并带上子 feature | `gffsub annotation.gff3 --ids genes.txt -C` |
 | 输出适合 pipeline 读取的 summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
-| 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
+| 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
 | 每个基因只保留最长转录本 | `gffsub annotation.gff3 --longest` |
 | 检查注释 graph 问题 | `gffsub annotation.gff3 --qc` |
 
@@ -73,7 +73,7 @@ gffsub annotation.gff3 --id GeneA --summary tsv
 gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent
 
 # 提取上下游窗口
-gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+gffsub annotation.gff3 --id GeneA --up 2000 --down 500
 
 # 输出 QC 表
 gffsub annotation.gff3 --qc
@@ -168,10 +168,10 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 
 ```bash
 # Genomic expansion：按参考序列左右扩展
-./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+./gffsub annotation.gff3 --id GeneA --up 2000 --down 500
 
 # Biological upstream/downstream：按 strand 解释上下游
-./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware
+./gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware
 ```
 
 不加 `--strand-aware` 时，upstream 表示更小的基因组坐标，downstream 表示更大的基因组坐标。加上 `--strand-aware` 后，上下游按 feature 的链方向解释。
@@ -218,8 +218,8 @@ gffsub <input.gff3> [options]
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
 | `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。`--summary-format` 是较长兼容别名。 |
-| `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。 |
-| `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
+| `--up`, `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。 |
+| `--down`, `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |
 | `--qc` | 标志 | 运行注释 QC。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
@@ -264,14 +264,14 @@ gffsub query <input.gff3> [options]
 gffsub window <input.gff3> --id ID [options]
 ```
 
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --id ID --upstream N --downstream N`。
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --id ID --up N --down N`。
 
 | 参数 | 值 | 含义 |
 |------|----|------|
 | `<input.gff3>` | 文件 | 输入注释文件。 |
 | `--id` | ID 或基因查找键 | 必填目标。命令会先查精确 `ID`，再做基因查找。 |
-| `--upstream` | 整数 | 加到目标上游的碱基数；必须非负。默认 `0`。 |
-| `--downstream` | 整数 | 加到目标下游的碱基数；必须非负。默认 `0`。 |
+| `--up`, `--upstream` | 整数 | 加到目标上游的碱基数；必须非负。默认 `0`。 |
+| `--down`, `--downstream` | 整数 | 加到目标下游的碱基数；必须非负。默认 `0`。 |
 | `--strand-aware` | 标志 | 按 feature 链方向解释 biological upstream/downstream。不加时，upstream 表示更小的基因组坐标，downstream 表示更大的基因组坐标。 |
 | `-h`, `--help` | 标志 | 显示 window 模式帮助。 |
 

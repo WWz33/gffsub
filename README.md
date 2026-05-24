@@ -21,7 +21,7 @@
 | Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
-| Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
+| Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
 | Check annotation graph problems | `gffsub annotation.gff3 --qc` |
 
@@ -73,7 +73,7 @@ gffsub annotation.gff3 --id GeneA --summary tsv
 gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent
 
 # Extract an upstream/downstream window
-gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+gffsub annotation.gff3 --id GeneA --up 2000 --down 500
 
 # QC table
 gffsub annotation.gff3 --qc
@@ -194,9 +194,10 @@ Use the top-level window options when you want a local annotation context around
 ```bash
 # Genomic expansion: left/right on the reference sequence
 ./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
+./gffsub annotation.gff3 --id GeneA --up 2000 --down 500
 
 # Biological upstream/downstream: strand-aware
-./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware
+./gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware
 ```
 
 Without `--strand-aware`, upstream means lower genomic coordinates and downstream means higher genomic coordinates. With `--strand-aware`, the interpretation follows the feature strand.
@@ -243,8 +244,8 @@ gffsub <input.gff3> [options]
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
-| `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. |
-| `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
+| `--up`, `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. |
+| `--down`, `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
 | `--qc` | flag | Run annotation QC. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
@@ -289,14 +290,14 @@ When `--summary` is used, the summary columns are `query_id`, `matched_id`, `mat
 gffsub window <input.gff3> --id ID [options]
 ```
 
-The same workflow can be written at top level with `gffsub <input.gff3> --id ID --upstream N --downstream N`.
+The same workflow can be written at top level with `gffsub <input.gff3> --id ID --up N --down N`.
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
 | `<input.gff3>` | file | Input annotation file. |
 | `--id` | ID or gene key | Required target. The command first tries exact `ID`, then gene lookup. |
-| `--upstream` | integer | Bases to add upstream of the target; must be non-negative. Default is `0`. |
-| `--downstream` | integer | Bases to add downstream of the target; must be non-negative. Default is `0`. |
+| `--up`, `--upstream` | integer | Bases to add upstream of the target; must be non-negative. Default is `0`. |
+| `--down`, `--downstream` | integer | Bases to add downstream of the target; must be non-negative. Default is `0`. |
 | `--strand-aware` | flag | Interpret upstream/downstream biologically by feature strand. Without it, upstream means lower genomic coordinates and downstream means higher genomic coordinates. |
 | `-h`, `--help` | flag | Show help for window mode. |
 

@@ -38,7 +38,7 @@ static void usage(const char* prog) {
         << "      --attrs remains as a deprecated alias.\n"
         << "  --summary FMT, --summary-format FMT\n"
         << "      Output summary instead of GFF3. Choices: tsv, json.\n"
-        << "  --upstream N, --downstream N, --strand-aware\n"
+        << "  --up N, --down N, --upstream N, --downstream N, --strand-aware\n"
         << "      Extract records overlapping the expanded window around --id.\n"
         << "  --qc\n"
         << "      Run annotation QC.\n"
@@ -95,7 +95,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id GeneA -C\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary tsv\n"
         << "  " << prog << " annotation.gff3 --id GeneA --out-attrs ID,Name,Parent\n"
-        << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --up 2000 --down 500\n"
         << "  " << prog << " annotation.gff3 --qc\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
@@ -136,12 +136,13 @@ static void query_usage(const char* prog) {
 static void window_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " window <input.gff3> [options]\n"
         << "\n"
-        << "Top-level equivalent: " << prog << " <input.gff3> --id ID --upstream N --downstream N\n"
+        << "Top-level equivalent: " << prog << " <input.gff3> --id ID --up N --down N\n"
         << "\n"
         << "Window Options:\n"
         << "  --id ID                 Target feature ID or gene lookup key.\n"
-        << "  --upstream N            Bases to add upstream of the target (default: 0).\n"
-        << "  --downstream N          Bases to add downstream of the target (default: 0).\n"
+        << "  --up N, --upstream N    Bases to add upstream of the target (default: 0).\n"
+        << "  --down N, --downstream N\n"
+        << "                          Bases to add downstream of the target (default: 0).\n"
         << "  --strand-aware          Interpret upstream/downstream by feature strand.\n"
         << "  -h, --help              Display this help message.\n";
 }
@@ -686,16 +687,16 @@ static int run_window(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             id = *value;
-        } else if (arg == "--upstream") {
-            auto value = require_value("--upstream");
+        } else if (arg == "--up" || arg == "--upstream") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
-            if (!parse_non_negative("--upstream", *value, upstream)) {
+            if (!parse_non_negative(arg.c_str(), *value, upstream)) {
                 return 1;
             }
-        } else if (arg == "--downstream") {
-            auto value = require_value("--downstream");
+        } else if (arg == "--down" || arg == "--downstream") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
-            if (!parse_non_negative("--downstream", *value, downstream)) {
+            if (!parse_non_negative(arg.c_str(), *value, downstream)) {
                 return 1;
             }
         } else if (arg == "--strand-aware") {
@@ -855,7 +856,9 @@ int main(int argc, char* argv[]) {
         {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"summary",       required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
+        {"up",            required_argument, nullptr, OPT_UPSTREAM},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
+        {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
         {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
         {"qc",            no_argument,       nullptr, OPT_QC},
@@ -983,7 +986,7 @@ int main(int argc, char* argv[]) {
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
             !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
-            std::cerr << "Error: window shortcut only supports --id, --upstream, --downstream, and --strand-aware\n";
+            std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
 
@@ -993,11 +996,11 @@ int main(int argc, char* argv[]) {
             window_args.push_back(id);
         }
         if (!upstream_arg.empty()) {
-            window_args.push_back("--upstream");
+            window_args.push_back("--up");
             window_args.push_back(upstream_arg);
         }
         if (!downstream_arg.empty()) {
-            window_args.push_back("--downstream");
+            window_args.push_back("--down");
             window_args.push_back(downstream_arg);
         }
         if (strand_aware) {

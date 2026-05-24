@@ -120,7 +120,9 @@ static void cleanup_outputs() {
     std::remove("selector_bed_format.bed");
     std::remove("selector_bed_output_format.bed");
     std::remove("selector_window_top.gff3");
+    std::remove("selector_window_top_short.gff3");
     std::remove("selector_window_command.gff3");
+    std::remove("selector_window_command_short.gff3");
     std::remove("selector_qc_top.tsv");
     std::remove("selector_qc_command.tsv");
     std::remove("selector_query_help.txt");
@@ -151,7 +153,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (run_command(exe + " window --help > selector_window_help.txt 2>&1") != 0 ||
-        require_contains("selector_window_help.txt", "Top-level equivalent") != 0) {
+        require_contains("selector_window_help.txt", "Top-level equivalent") != 0 ||
+        require_contains("selector_window_help.txt", "--up N") != 0 ||
+        require_contains("selector_window_help.txt", "--down N") != 0) {
         return 1;
     }
     if (run_command(exe + " qc --help > selector_qc_help.txt 2>&1") != 0 ||
@@ -326,8 +330,12 @@ int main(int argc, char* argv[]) {
     }
 
     if (run_command(exe + " " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_top.gff3") != 0 ||
+        run_command(exe + " " + gff + " --id gene0001 --up 50 --down 10 > selector_window_top_short.gff3") != 0 ||
         run_command(exe + " window " + gff + " --id gene0001 --upstream 50 --downstream 10 > selector_window_command.gff3") != 0 ||
-        compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0) {
+        run_command(exe + " window " + gff + " --id gene0001 --up 50 --down 10 > selector_window_command_short.gff3") != 0 ||
+        compare_files("selector_window_top.gff3", "selector_window_top_short.gff3") != 0 ||
+        compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0 ||
+        compare_files("selector_window_command.gff3", "selector_window_command_short.gff3") != 0) {
         return 1;
     }
 
