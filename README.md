@@ -252,7 +252,7 @@ gffsub <input.gff3> [options]
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
 | `-L`, `--longest` | flag | Keep the longest transcript isoform per gene. CDS length is used when CDS isoforms exist; otherwise exon length is used. |
 | `-@`, `--threads` | integer | Set worker threads for `--longest`; values above 256 are capped. Set this explicitly when reproducibility of resource use matters. |
-| `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | Select output format. `gtf` is accepted as `gtf2`. Default output is `gff3`. |
+| `-t`, `--format`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | Select output format. `gtf` is accepted as `gtf2`. Default output is `gff3`. `--output-format` is a verbose alias. |
 | `-o`, `--output` | file | Write output to a file instead of stdout. |
 | `-h`, `--help` | flag | Show help for top-level mode. |
 

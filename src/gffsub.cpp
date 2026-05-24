@@ -69,8 +69,9 @@ static void usage(const char* prog) {
         << "      Currently used with --longest for multi-chromosome parallelization.\n"
         << "\n"
         << "Output Options:\n"
-        << "  -t, --output-format FMT\n"
+        << "  -t, --format FMT, --output-format FMT\n"
         << "      Output format. Choices: gff3, gtf2, gtf3, bed\n"
+        << "      --output-format remains as a verbose alias.\n"
         << "      gff3  - GFF3 format (##gff-version 3)\n"
         << "      gtf2  - GTF2 format (##gtf-version 2)\n"
         << "      gtf3  - GTF3/Ensembl format (##gtf-version 2.2.1)\n"
@@ -102,7 +103,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
         << "  " << prog << " annotation.gff3 --longest -@ 6\n"
-        << "  " << prog << " annotation.gff3 -r chr1:1-100000 -t gtf3 -o out.gtf\n";
+        << "  " << prog << " annotation.gff3 -r chr1:1-100000 --format gtf3 -o out.gtf\n";
 }
 
 static void query_usage(const char* prog) {
@@ -863,6 +864,7 @@ int main(int argc, char* argv[]) {
         {"type",          required_argument, nullptr, 'f'},
         {"longest",       no_argument,       nullptr, 'L'},
         {"threads",       required_argument, nullptr, '@'},
+        {"format",        required_argument, nullptr, 't'},
         {"output-format", required_argument, nullptr, 't'},
         {"output",        required_argument, nullptr, 'o'},
         {"help",          no_argument,       nullptr, 'h'},
@@ -1012,7 +1014,7 @@ int main(int argc, char* argv[]) {
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
             std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
-                      << "do not combine with --bed, --longest, --threads, --output-format, or --output\n";
+                      << "do not combine with --bed, --longest, --threads, --format/--output-format, or --output\n";
             return 1;
         }
     }

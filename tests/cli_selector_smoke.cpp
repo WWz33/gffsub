@@ -112,6 +112,10 @@ static void cleanup_outputs() {
     std::remove("selector_children_type.gff3");
     std::remove("selector_query_children_type.gff3");
     std::remove("selector_region_intersection.gff3");
+    std::remove("selector_help.txt");
+    std::remove("selector_bed_short.bed");
+    std::remove("selector_bed_format.bed");
+    std::remove("selector_bed_output_format.bed");
     std::remove("selector_window_top.gff3");
     std::remove("selector_window_command.gff3");
     std::remove("selector_qc_top.tsv");
@@ -148,6 +152,11 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " qc --help > selector_qc_help.txt 2>&1") != 0 ||
         require_contains("selector_qc_help.txt", "Top-level equivalent") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " --help > selector_help.txt 2>&1") != 0 ||
+        require_contains("selector_help.txt", "--format FMT") != 0 ||
+        require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
 
@@ -292,6 +301,14 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_region_intersection.gff3", "ID=tx1") != 0 ||
         require_not_contains("selector_region_intersection.gff3", "ID=exon1") != 0 ||
         require_not_contains("selector_region_intersection.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " -r chr1:100-400 -t bed > selector_bed_short.bed") != 0 ||
+        run_command(exe + " " + gff + " -r chr1:100-400 --format bed > selector_bed_format.bed") != 0 ||
+        run_command(exe + " " + gff + " -r chr1:100-400 --output-format bed > selector_bed_output_format.bed") != 0 ||
+        compare_files("selector_bed_short.bed", "selector_bed_format.bed") != 0 ||
+        compare_files("selector_bed_short.bed", "selector_bed_output_format.bed") != 0 ||
+        require_contains("selector_bed_format.bed", "chr1\t99\t400\tgene0001") != 0) {
         return 1;
     }
 

@@ -227,7 +227,7 @@ gffsub <input.gff3> [options]
 | `-f`, `--feature`, `--type` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
 | `-L`, `--longest` | 标志 | 每个基因只保留最长转录本；存在 CDS isoform 时按 CDS 长度比较，否则按 exon 长度比较。 |
 | `-@`, `--threads` | 整数 | 设置 `--longest` 使用的线程数；超过 256 会被限制为 256。需要固定资源使用时建议显式设置。 |
-| `-t`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 会按 `gtf2` 处理。默认输出 `gff3`。 |
+| `-t`, `--format`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 会按 `gtf2` 处理。默认输出 `gff3`。`--output-format` 是较长兼容别名。 |
 | `-o`, `--output` | 文件 | 写入文件，而不是 stdout。 |
 | `-h`, `--help` | 标志 | 显示顶层模式帮助。 |
 
