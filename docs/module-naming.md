@@ -90,7 +90,7 @@ until the user-facing selector model is settled.
 Suggested threshold for extraction:
 
 - Add `query_command.cpp` when query option parsing, matching, and result assembly are no longer easy to audit together.
-- Add `summary_output.cpp` when TSV/JSON summary formatting or `--output-attrs` projection grows beyond simple row printing.
+- Add `summary_output.cpp` when TSV/JSON summary formatting or `--out-attrs` projection grows beyond simple row printing.
 - Keep `gffsub.cpp` as the command dispatcher and top-level option parser.
 
 ## Current Naming Audit

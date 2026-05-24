@@ -868,7 +868,7 @@ int main(int argc, char* argv[]) {
             case OPT_OUTPUT_ATTRS: {
                 const auto keys = split_attr_keys(optarg);
                 if (keys.empty()) {
-                    std::cerr << "Error: --output-attrs expects a comma-separated list of keys\n";
+                    std::cerr << "Error: --out-attrs expects a comma-separated list of keys\n";
                     return 1;
                 }
                 output_attrs.insert(output_attrs.end(), keys.begin(), keys.end());
@@ -990,7 +990,7 @@ int main(int argc, char* argv[]) {
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
-            std::cerr << "Error: --summary-format/--output-attrs only supports query-style selectors; "
+            std::cerr << "Error: --summary-format/--out-attrs only supports query-style selectors; "
                       << "do not combine with --bed, --longest, --threads, --output-format, or --output\n";
             return 1;
         }
@@ -1031,7 +1031,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back(summary_format);
         }
         if (!output_attrs.empty()) {
-            query_args.push_back("--output-attrs");
+            query_args.push_back("--out-attrs");
             query_args.push_back(join_values(output_attrs));
         }
 

@@ -148,6 +148,11 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string bad_redirect{" > output_attrs_bad.out 2> output_attrs_bad.err"};
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs , " + bad_redirect) != 0 ||
+        require_contains("output_attrs_bad.err", "Error: --out-attrs expects a comma-separated list of keys") != 0) {
+        return 1;
+    }
+
     if (expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
         expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
@@ -158,6 +163,9 @@ int main(int argc, char* argv[]) {
                                " --output-format gtf3" + bad_redirect) != 0 ||
         expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
+        return 1;
+    }
+    if (require_contains("output_attrs_bad.err", "Error: --summary-format/--out-attrs only supports query-style selectors") != 0) {
         return 1;
     }
 
