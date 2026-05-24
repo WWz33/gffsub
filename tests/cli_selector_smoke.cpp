@@ -86,6 +86,8 @@ static void cleanup_outputs() {
     std::remove("selector_query_id.gff3");
     std::remove("selector_id_list.gff3");
     std::remove("selector_query_id_list.gff3");
+    std::remove("selector_id_list_children.gff3");
+    std::remove("selector_query_id_list_children.gff3");
     std::remove("selector_name.gff3");
     std::remove("selector_query_name.gff3");
     std::remove("selector_alias.gff3");
@@ -147,6 +149,13 @@ int main(int argc, char* argv[]) {
         compare_files("selector_id_list.gff3", "selector_query_id_list.gff3") != 0 ||
         require_contains("selector_id_list.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_id_list.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id-list " + id_list + " --include-children > selector_id_list_children.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id-list " + id_list + " --include-children > selector_query_id_list_children.gff3") != 0 ||
+        compare_files("selector_id_list_children.gff3", "selector_query_id_list_children.gff3") != 0 ||
+        require_contains("selector_id_list_children.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_id_list_children.gff3", "ID=exon1") != 0) {
         return 1;
     }
 
