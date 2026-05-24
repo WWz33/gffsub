@@ -36,6 +36,8 @@ static void usage(const char* prog) {
         << "      Include descendants of records matched by --id, --ids, --name, or --where.\n"
         << "  --parents, --include-parents\n"
         << "      Include ancestors of records matched by --id, --ids, --name, or --where.\n"
+        << "  --model, --gene-model\n"
+        << "      Include the full gene model for records matched by --id, --ids, --name, or --where.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
@@ -150,6 +152,8 @@ static void query_usage(const char* prog) {
         << "  --include-children       Verbose alias for --children.\n"
         << "  --parents                Include ancestors of matched IDs.\n"
         << "  --include-parents        Verbose alias for --parents.\n"
+        << "  --model                  Include the full gene model for matched records.\n"
+        << "  --gene-model             Verbose alias for --model.\n"
         << "  --summary FMT           Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --summary-format FMT    Verbose alias for --summary.\n"
         << "  -h, --help              Display this help message.\n"
@@ -528,6 +532,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
     bool include_parents = false;
+    bool include_model = false;
 
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -590,6 +595,8 @@ static int run_query(int argc, char* argv[], const char* prog) {
             include_children = true;
         } else if (arg == "--parents" || arg == "--include-parents") {
             include_parents = true;
+        } else if (arg == "--model" || arg == "--gene-model") {
+            include_model = true;
         } else if (arg == "-h" || arg == "--help") {
             query_usage(prog);
             return 0;
@@ -600,8 +607,8 @@ static int run_query(int argc, char* argv[], const char* prog) {
         }
     }
 
-    if ((include_children || include_parents) && ids.empty() && id_list_file.empty() && name.empty() && attr_filters.empty()) {
-        std::cerr << "Error: --children/--parents require --id, --ids, --name, or --where\n";
+    if ((include_children || include_parents || include_model) && ids.empty() && id_list_file.empty() && name.empty() && attr_filters.empty()) {
+        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, or --where\n";
         return 1;
     }
 
@@ -636,6 +643,19 @@ static int run_query(int argc, char* argv[], const char* prog) {
     };
 
     auto add_match = [&](const GffRecord& rec, const std::string& query_id, const std::string& matched_by) {
+        if (include_model) {
+            const auto model = index.gene_model(record_id(rec));
+            if (model) {
+                for (const auto& model_rec : model->records) {
+                    if (feature_type.empty() || model_rec.type == feature_type) {
+                        if (append_unique(result, seen, model_rec)) {
+                            add_summary(query_id, "model", model_rec);
+                        }
+                    }
+                }
+                return;
+            }
+        }
         if (feature_type.empty() || rec.type == feature_type) {
             if (append_unique(result, seen, rec)) {
                 add_summary(query_id, matched_by, rec);
@@ -913,6 +933,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
     bool include_parents = false;
+    bool include_model = false;
     std::vector<std::string> output_attrs;
     std::string summary_format;
     std::string upstream_arg;
@@ -941,6 +962,7 @@ int main(int argc, char* argv[]) {
         OPT_OUTPUT_ATTRS,
         OPT_SUMMARY_FORMAT,
         OPT_PARENTS,
+        OPT_MODEL,
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
         OPT_STRAND_AWARE,
@@ -965,6 +987,8 @@ int main(int argc, char* argv[]) {
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"parents",       no_argument,       nullptr, OPT_PARENTS},
         {"include-parents", no_argument,      nullptr, OPT_PARENTS},
+        {"model",         no_argument,       nullptr, OPT_MODEL},
+        {"gene-model",    no_argument,       nullptr, OPT_MODEL},
         {"up",            required_argument, nullptr, OPT_UPSTREAM},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
@@ -1025,6 +1049,7 @@ int main(int argc, char* argv[]) {
                 }
                 break;
             case OPT_PARENTS: include_parents = true; break;
+            case OPT_MODEL: include_model = true; break;
             case 'C': include_children = true; break;
             case OPT_UPSTREAM: upstream_arg = optarg; break;
             case OPT_DOWNSTREAM: downstream_arg = optarg; break;
@@ -1087,8 +1112,8 @@ int main(int argc, char* argv[]) {
     }
 
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
-    if ((include_children || include_parents) && !has_query_style_selector) {
-        std::cerr << "Error: --children/--parents require --id, --ids, --name, or --where\n";
+    if ((include_children || include_parents || include_model) && !has_query_style_selector) {
+        std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, or --where\n";
         return 1;
     }
 
@@ -1113,7 +1138,7 @@ int main(int argc, char* argv[]) {
     std::string input_file = argv[optind];
 
     if (do_qc) {
-        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents ||
+        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
             strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
@@ -1131,7 +1156,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: window shortcut requires exactly one --id\n";
             return 1;
         }
-        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents ||
+        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
             !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
@@ -1204,6 +1229,9 @@ int main(int argc, char* argv[]) {
         if (include_parents) {
             query_args.push_back("--parents");
         }
+        if (include_model) {
+            query_args.push_back("--model");
+        }
         if (!summary_format.empty()) {
             query_args.push_back("--summary");
             query_args.push_back(summary_format);
@@ -1247,6 +1275,15 @@ int main(int argc, char* argv[]) {
             const bool newly_selected = selected_lines.insert(rec.line_idx).second;
             if (!newly_selected) {
                 return;
+            }
+            if (include_model) {
+                const auto model = index.gene_model(record_id(rec));
+                if (model) {
+                    for (const auto& model_rec : model->records) {
+                        selected_lines.insert(model_rec.line_idx);
+                    }
+                    return;
+                }
             }
             if (include_parents && rec.id) {
                 std::vector<GffRecord> stack = index.parents_of(*rec.id);

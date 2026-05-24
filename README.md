@@ -25,6 +25,7 @@
 | Find features by attribute value | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
 | Extract a feature and its parents | `gffsub annotation.gff3 --id ExonA --parents` |
+| Extract the full gene model from any feature | `gffsub annotation.gff3 --id ExonA --model` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
@@ -86,6 +87,9 @@ gffsub annotation.gff3 --id GeneA -C
 
 # Extract an ID and its ancestors
 gffsub annotation.gff3 --id ExonA --parents
+
+# Extract the full gene model containing an ID
+gffsub annotation.gff3 --id ExonA --model
 
 # Extract a region
 gffsub annotation.gff3 --region chr1:1-100000
@@ -182,6 +186,9 @@ Use the top-level selector form when the question starts from an identifier, nam
 
 # Include ancestors linked through Parent
 ./gffsub annotation.gff3 --id ExonA --parents
+
+# Return the full gene model containing this feature
+./gffsub annotation.gff3 --id ExonA --model
 ```
 
 For batch pipelines, ask for summaries instead of raw GFF3:
@@ -220,6 +227,7 @@ Non-region selectors use these column-9 keys:
 | Any exact attribute filter | `--where Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
 | Include matched descendants | `-C`, `--children` | child records linked by `Parent`; `--include-children` is a verbose alias |
 | Include matched ancestors | `--parents` | parent records reached by walking `Parent` links upward; `--include-parents` is a verbose alias |
+| Extract full gene model | `--model`, `--gene-model` | starts from records matched by `--id`, `--ids`, `--name`, or `--where`, then returns the containing gene and its descendants |
 | Print selected attributes | `--out-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
 Use `--out-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
@@ -285,6 +293,7 @@ gffsub <input.gff3> [options]
 | `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. `--attr` is a compatibility alias. |
 | `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-children` is a verbose alias. |
 | `--parents`, `--include-parents` | flag | Include ancestors of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-parents` is a verbose alias. |
+| `--model`, `--gene-model` | flag | Include the full gene model containing records matched by `--id`, `--ids`, `--name`, or `--where`; this returns the gene plus transcript/exon/CDS/UTR descendants. `--gene-model` is a verbose alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -329,6 +338,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `-C`, `--children`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. `--include-children` is a verbose alias. |
 | `--parents`, `--include-parents` | flag | Include ancestors of matched records by walking GFF3 `Parent` links upward. `--include-parents` is a verbose alias. |
+| `--model`, `--gene-model` | flag | Include the full gene model containing matched records. `--gene-model` is a verbose alias. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. `--summary-format` is a verbose alias. |
 | `-h`, `--help` | flag | Show help for query mode. |
 

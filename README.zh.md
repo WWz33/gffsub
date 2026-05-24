@@ -25,6 +25,7 @@
 | 按属性值提取 feature | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | 批量提取 ID，并带上子 feature | `gffsub annotation.gff3 --ids genes.txt -C` |
 | 提取一个 feature 及其父级 | `gffsub annotation.gff3 --id ExonA --parents` |
+| 从任意 feature 提取完整 gene model | `gffsub annotation.gff3 --id ExonA --model` |
 | 输出适合 pipeline 读取的 summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
@@ -86,6 +87,9 @@ gffsub annotation.gff3 --id GeneA -C
 
 # 提取 ID 及其祖先 feature
 gffsub annotation.gff3 --id ExonA --parents
+
+# 提取包含该 ID 的完整 gene model
+gffsub annotation.gff3 --id ExonA --model
 
 # 提取一个区间
 gffsub annotation.gff3 --region chr1:1-100000
@@ -182,6 +186,9 @@ ctest --test-dir build --output-on-failure
 
 # 包含通过 Parent 连接的祖先记录
 ./gffsub annotation.gff3 --id ExonA --parents
+
+# 返回包含该 feature 的完整 gene model
+./gffsub annotation.gff3 --id ExonA --model
 ```
 
 在批处理流程中，可以输出 summary，而不是原始 GFF3：
@@ -203,6 +210,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 | 任意精确属性过滤 | `--where Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
 | 包含匹配记录后代 | `-C`, `--children` | 通过 `Parent` 连接的 child 记录；`--include-children` 是较长兼容别名 |
 | 包含匹配记录祖先 | `--parents` | 沿 `Parent` 链向上找到的 parent 记录；`--include-parents` 是较长兼容别名 |
+| 提取完整 gene model | `--model`, `--gene-model` | 从 `--id`、`--ids`、`--name` 或 `--where` 匹配的记录出发，返回所属 gene 及其后代记录 |
 | 打印指定属性 | `--out-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
 
 ## 场景：提取上下游窗口
@@ -259,6 +267,7 @@ gffsub <input.gff3> [options]
 | `--where`, `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。`--attr` 是兼容别名。 |
 | `-C`, `--children`, `--include-children` | 标志 | 包含由 `--id`、`--ids`、`--name` 或 `--where` 匹配记录的后代。`--include-children` 是较长兼容别名。 |
 | `--parents`, `--include-parents` | 标志 | 包含由 `--id`、`--ids`、`--name` 或 `--where` 匹配记录的祖先。`--include-parents` 是较长兼容别名。 |
+| `--model`, `--gene-model` | 标志 | 包含由 `--id`、`--ids`、`--name` 或 `--where` 匹配记录所属的完整 gene model；输出 gene 以及 transcript/exon/CDS/UTR 等后代。`--gene-model` 是较长兼容别名。 |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
 | `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。`--summary-format` 是较长兼容别名。 |
@@ -303,6 +312,7 @@ gffsub query <input.gff3> [options]
 | `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `-C`, `--children`, `--include-children` | 标志 | 包含匹配记录的后代，例如 transcript、exon、CDS 和 UTR feature。`--include-children` 是较长兼容别名。 |
 | `--parents`, `--include-parents` | 标志 | 沿 GFF3 `Parent` 链向上包含匹配记录的祖先。`--include-parents` 是较长兼容别名。 |
+| `--model`, `--gene-model` | 标志 | 包含匹配记录所属的完整 gene model。`--gene-model` 是较长兼容别名。 |
 | `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。`--summary-format` 是较长兼容别名。 |
 | `-h`, `--help` | 标志 | 显示 query 模式帮助。 |
 

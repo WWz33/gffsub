@@ -19,7 +19,9 @@ static bool write_test_annotation(const std::string& path) {
         << "chr1\tsrc\tCDS\t230\t250\t.\t+\t2\tID=cds3;Parent=tx1\n"
         << "chr1\tsrc\tgene\t600\t700\t.\t-\t.\tID=gene0002;Name=XYZ1\n"
         << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n"
-        << "chr2\tother\texon\t250\t280\t.\t.\t.\tID=exon2\n";
+        << "chr2\tother\texon\t250\t280\t.\t.\t.\tID=exon2\n"
+        << "chr2\tother\tmRNA\t300\t380\t.\t+\t.\tID=orphan_tx\n"
+        << "chr2\tother\texon\t320\t360\t.\t+\t.\tID=orphan_exon;Parent=orphan_tx\n";
     return true;
 }
 
@@ -134,6 +136,17 @@ static void cleanup_outputs() {
     std::remove("selector_parents_bad.err");
     std::remove("selector_query_parents_bad.out");
     std::remove("selector_query_parents_bad.err");
+    std::remove("selector_model.gff3");
+    std::remove("selector_gene_model_alias.gff3");
+    std::remove("selector_query_model.gff3");
+    std::remove("selector_query_gene_model_alias.gff3");
+    std::remove("selector_model_gene.gff3");
+    std::remove("selector_query_model_gene.gff3");
+    std::remove("selector_model_orphan_children.gff3");
+    std::remove("selector_model_bad.out");
+    std::remove("selector_model_bad.err");
+    std::remove("selector_query_model_bad.out");
+    std::remove("selector_query_model_bad.err");
     std::remove("selector_region_intersection.gff3");
     std::remove("selector_seqid_chr2.gff3");
     std::remove("selector_seqid_gene.gff3");
@@ -193,6 +206,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_query_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_query_help.txt", "--children") != 0 ||
         require_contains("selector_query_help.txt", "--parents") != 0 ||
+        require_contains("selector_query_help.txt", "--model") != 0 ||
         require_contains("selector_query_help.txt", "--summary FMT") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --summary") != 0) {
         return 1;
@@ -215,6 +229,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--score SCORE") != 0 ||
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--phase PHASE") != 0 ||
+        require_contains("selector_help.txt", "--model") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -406,11 +421,53 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --parents > selector_parents_bad.out 2> selector_parents_bad.err") == 0 ||
-        require_contains("selector_parents_bad.err", "Error: --children/--parents require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
         return 1;
     }
     if (run_command(exe + " query " + gff + " --parents > selector_query_parents_bad.out 2> selector_query_parents_bad.err") == 0 ||
-        require_contains("selector_query_parents_bad.err", "Error: --children/--parents require --id, --ids, --name, or --where") != 0) {
+        require_contains("selector_query_parents_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id exon1 --model > selector_model.gff3") != 0 ||
+        require_contains("selector_model.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_model.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_model.gff3", "ID=exon1") != 0 ||
+        require_contains("selector_model.gff3", "ID=cds1") != 0 ||
+        require_contains("selector_model.gff3", "ID=cds2") != 0 ||
+        require_contains("selector_model.gff3", "ID=cds3") != 0 ||
+        require_not_contains("selector_model.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id exon1 --gene-model > selector_gene_model_alias.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id exon1 --model > selector_query_model.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id exon1 --gene-model > selector_query_gene_model_alias.gff3") != 0 ||
+        compare_files("selector_model.gff3", "selector_gene_model_alias.gff3") != 0 ||
+        compare_files("selector_model.gff3", "selector_query_model.gff3") != 0 ||
+        compare_files("selector_query_model.gff3", "selector_query_gene_model_alias.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id exon1 --model -f CDS > selector_model_gene.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --id exon1 --model --type CDS > selector_query_model_gene.gff3") != 0 ||
+        compare_files("selector_model_gene.gff3", "selector_query_model_gene.gff3") != 0 ||
+        require_contains("selector_model_gene.gff3", "ID=cds1") != 0 ||
+        require_contains("selector_model_gene.gff3", "ID=cds2") != 0 ||
+        require_contains("selector_model_gene.gff3", "ID=cds3") != 0 ||
+        require_not_contains("selector_model_gene.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_model_gene.gff3", "ID=exon1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id orphan_tx --model -C --seqid chr2 > selector_model_orphan_children.gff3") != 0 ||
+        require_contains("selector_model_orphan_children.gff3", "ID=orphan_tx") != 0 ||
+        require_contains("selector_model_orphan_children.gff3", "ID=orphan_exon") != 0 ||
+        require_not_contains("selector_model_orphan_children.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --model > selector_model_bad.out 2> selector_model_bad.err") == 0 ||
+        require_contains("selector_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --model > selector_query_model_bad.out 2> selector_query_model_bad.err") == 0 ||
+        require_contains("selector_query_model_bad.err", "Error: --children/--parents/--model require --id, --ids, --name, or --where") != 0) {
         return 1;
     }
 
