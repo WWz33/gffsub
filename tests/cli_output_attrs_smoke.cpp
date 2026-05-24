@@ -50,11 +50,21 @@ static int compare_files(const std::string& lhs_path, const std::string& rhs_pat
     return 0;
 }
 
+static int require_contains(const std::string& path, const std::string& needle) {
+    const auto text = read_file(path);
+    if (text.find(needle) == std::string::npos) {
+        std::cerr << "missing '" << needle << "' in " << path << '\n';
+        return 1;
+    }
+    return 0;
+}
+
 static void cleanup_outputs() {
     std::remove("cli_output_attrs_smoke.gff3");
     std::remove("output_attrs_main.tsv");
     std::remove("output_attrs_short.tsv");
     std::remove("output_attrs_old.tsv");
+    std::remove("output_attrs_json.json");
     std::remove("query_output_attrs_main.tsv");
     std::remove("query_output_attrs_short.tsv");
     std::remove("query_output_attrs_old.tsv");
@@ -97,6 +107,14 @@ int main(int argc, char* argv[]) {
     }
     if (compare_files("output_attrs_main.tsv", "output_attrs_short.tsv") != 0 ||
         compare_files("output_attrs_main.tsv", "output_attrs_old.tsv") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --id gene0001 --summary-format json --output-attrs " + keys +
+                    " > output_attrs_json.json") != 0 ||
+        require_contains("output_attrs_json.json", "\"attrs\":{\"ID\":\"gene0001\",\"Name\":\"ABC1\"") != 0 ||
+        require_contains("output_attrs_json.json", "\"Alias\":\"ABC-1\"") != 0 ||
+        require_contains("output_attrs_json.json", "\"Dbxref\":\"GeneID:123\"") != 0) {
         return 1;
     }
 
