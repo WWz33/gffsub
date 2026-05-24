@@ -33,8 +33,9 @@ static void usage(const char* prog) {
         << "      Default GFF3 output matches: " << prog << " query <input.gff3> --attr KEY=VALUE\n"
         << "  --include-children\n"
         << "      Include descendants of records matched by --id, --id-list, --name, or --attr.\n"
-        << "  --attrs KEYS\n"
+        << "  --output-attrs KEYS, --out-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
+        << "      --attrs remains as a deprecated alias.\n"
         << "  --summary-format FMT\n"
         << "      Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --upstream N, --downstream N, --strand-aware\n"
@@ -87,6 +88,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
         << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
+        << "  " << prog << " annotation.gff3 --id GeneA --output-attrs ID,Name,Parent\n"
         << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
         << "  " << prog << " annotation.gff3 --qc\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
@@ -108,7 +110,9 @@ static void query_usage(const char* prog) {
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
         << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
-        << "  --attrs KEYS            Output selected attributes as extra TSV/JSON fields.\n"
+        << "  --output-attrs KEYS     Output selected attributes as extra TSV/JSON fields.\n"
+        << "  --out-attrs KEYS        Short alias for --output-attrs.\n"
+        << "  --attrs KEYS            Deprecated alias for --output-attrs.\n"
         << "  --include-children      Include descendants of matched IDs.\n"
         << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  -h, --help              Display this help message.\n";
@@ -300,8 +304,8 @@ static std::string join_values(const std::vector<std::string>& values) {
     return out.str();
 }
 
-static std::vector<std::string> extract_selected_attrs(const std::string& attrs,
-                                                       const std::vector<std::string>& keys) {
+static std::vector<std::string> extract_output_attrs(const std::string& attrs,
+                                                     const std::vector<std::string>& keys) {
     const auto parsed = parse_attributes(attrs);
     std::vector<std::string> values;
     values.reserve(keys.size());
@@ -331,10 +335,10 @@ static void print_qc_row(std::ostream& out,
 
 static void print_summary_tsv(std::ostream& out,
                               const std::vector<SummaryRow>& rows,
-                              const std::vector<std::string>& selected_attrs) {
+                              const std::vector<std::string>& output_attrs) {
     out << "query_id\tmatched_id\tmatched_by\tseqid\tstart\tend\tstrand\ttype\tparent_id\t"
         << "child_count\ttranscript_count\texon_count\tcds_length\tstatus";
-    for (const auto& key : selected_attrs) {
+    for (const auto& key : output_attrs) {
         out << '\t' << key;
     }
     out << '\n';
@@ -353,7 +357,7 @@ static void print_summary_tsv(std::ostream& out,
             << row.exon_count << '\t'
             << row.cds_length << '\t'
             << row.status;
-        for (size_t i = 0; i < selected_attrs.size(); ++i) {
+        for (size_t i = 0; i < output_attrs.size(); ++i) {
             out << '\t';
             if (i < row.attrs.size()) {
                 out << row.attrs[i];
@@ -365,7 +369,7 @@ static void print_summary_tsv(std::ostream& out,
 
 static void print_summary_json(std::ostream& out,
                                const std::vector<SummaryRow>& rows,
-                               const std::vector<std::string>& selected_attrs) {
+                               const std::vector<std::string>& output_attrs) {
     out << "[\n";
     for (size_t i = 0; i < rows.size(); ++i) {
         const auto& row = rows[i];
@@ -384,15 +388,15 @@ static void print_summary_json(std::ostream& out,
             << "\"exon_count\":" << row.exon_count << ','
             << "\"cds_length\":" << row.cds_length << ','
             << "\"status\":\"" << row.status << "\"";
-        if (!selected_attrs.empty()) {
+        if (!output_attrs.empty()) {
             out << ",\"attrs\":{";
-            for (size_t j = 0; j < selected_attrs.size(); ++j) {
-                out << "\"" << json_escape(selected_attrs[j]) << "\":\"";
+            for (size_t j = 0; j < output_attrs.size(); ++j) {
+                out << "\"" << json_escape(output_attrs[j]) << "\":\"";
                 if (j < row.attrs.size()) {
                     out << json_escape(row.attrs[j]);
                 }
                 out << "\"";
-                if (j + 1 < selected_attrs.size()) {
+                if (j + 1 < output_attrs.size()) {
                     out << ',';
                 }
             }
@@ -425,7 +429,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::string region_str;
     std::string feature_type;
     std::string summary_format;
-    std::vector<std::string> selected_attrs;
+    std::vector<std::string> output_attrs;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
 
@@ -469,15 +473,15 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
-        } else if (arg == "--attrs") {
-            auto value = require_value("--attrs");
+        } else if (arg == "--output-attrs" || arg == "--out-attrs" || arg == "--attrs") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
             const auto keys = split_attr_keys(*value);
             if (keys.empty()) {
-                std::cerr << "Error: --attrs expects a comma-separated list of keys\n";
+                std::cerr << "Error: " << arg << " expects a comma-separated list of keys\n";
                 return 1;
             }
-            selected_attrs.insert(selected_attrs.end(), keys.begin(), keys.end());
+            output_attrs.insert(output_attrs.end(), keys.begin(), keys.end());
         } else if (arg == "--summary-format") {
             auto value = require_value("--summary-format");
             if (!value) return 1;
@@ -516,13 +520,13 @@ static int run_query(int argc, char* argv[], const char* prog) {
     GffData result;
     std::unordered_set<int> seen;
     std::vector<SummaryRow> summary_rows;
-    const bool emit_summary = !summary_format.empty() || !selected_attrs.empty();
+    const bool emit_summary = !summary_format.empty() || !output_attrs.empty();
 
     auto add_summary = [&](const std::string& query_id, const std::string& matched_by, const GffRecord& rec) {
         if (emit_summary) {
             auto row = make_summary_row(index, query_id, matched_by, rec);
-            if (!selected_attrs.empty()) {
-                row.attrs = extract_selected_attrs(rec.attr_raw, selected_attrs);
+            if (!output_attrs.empty()) {
+                row.attrs = extract_output_attrs(rec.attr_raw, output_attrs);
             }
             summary_rows.push_back(std::move(row));
         }
@@ -551,7 +555,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
             add_match(*rec, id, "ID");
         } else if (emit_summary) {
             auto row = make_not_found_row(id, "ID");
-            row.attrs.assign(selected_attrs.size(), "");
+            row.attrs.assign(output_attrs.size(), "");
             summary_rows.push_back(std::move(row));
         }
     }
@@ -562,7 +566,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
             add_match(*rec, name, infer_gene_match_key(index, name, *rec));
         } else if (emit_summary) {
             auto row = make_not_found_row(name, "name");
-            row.attrs.assign(selected_attrs.size(), "");
+            row.attrs.assign(output_attrs.size(), "");
             summary_rows.push_back(std::move(row));
         }
     }
@@ -586,7 +590,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
         }
         if (!matched && emit_summary) {
             auto row = make_not_found_row(key + "=" + value, key);
-            row.attrs.assign(selected_attrs.size(), "");
+            row.attrs.assign(output_attrs.size(), "");
             summary_rows.push_back(std::move(row));
         }
     }
@@ -596,9 +600,9 @@ static int run_query(int argc, char* argv[], const char* prog) {
                   return lhs.line_idx < rhs.line_idx;
               });
     if (summary_format == "json") {
-        print_summary_json(std::cout, summary_rows, selected_attrs);
+        print_summary_json(std::cout, summary_rows, output_attrs);
     } else if (emit_summary) {
-        print_summary_tsv(std::cout, summary_rows, selected_attrs);
+        print_summary_tsv(std::cout, summary_rows, output_attrs);
     } else {
         print_gff3(std::cout, result);
     }
@@ -774,7 +778,7 @@ int main(int argc, char* argv[]) {
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
-    std::vector<std::string> selected_attrs;
+    std::vector<std::string> output_attrs;
     std::string summary_format;
     std::string upstream_arg;
     std::string downstream_arg;
@@ -794,7 +798,7 @@ int main(int argc, char* argv[]) {
         OPT_ID_LIST,
         OPT_NAME,
         OPT_ATTR,
-        OPT_ATTRS,
+        OPT_OUTPUT_ATTRS,
         OPT_SUMMARY_FORMAT,
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
@@ -806,7 +810,9 @@ int main(int argc, char* argv[]) {
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
         {"attr",          required_argument, nullptr, OPT_ATTR},
-        {"attrs",         required_argument, nullptr, OPT_ATTRS},
+        {"output-attrs",  required_argument, nullptr, OPT_OUTPUT_ATTRS},
+        {"out-attrs",     required_argument, nullptr, OPT_OUTPUT_ATTRS},
+        {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
@@ -841,13 +847,13 @@ int main(int argc, char* argv[]) {
                 attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
                 break;
             }
-            case OPT_ATTRS: {
+            case OPT_OUTPUT_ATTRS: {
                 const auto keys = split_attr_keys(optarg);
                 if (keys.empty()) {
-                    std::cerr << "Error: --attrs expects a comma-separated list of keys\n";
+                    std::cerr << "Error: --output-attrs expects a comma-separated list of keys\n";
                     return 1;
                 }
-                selected_attrs.insert(selected_attrs.end(), keys.begin(), keys.end());
+                output_attrs.insert(output_attrs.end(), keys.begin(), keys.end());
                 break;
             }
             case OPT_SUMMARY_FORMAT:
@@ -914,7 +920,7 @@ int main(int argc, char* argv[]) {
 
     if (do_qc) {
         if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
-            !selected_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
+            !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
             strand_aware || !region_str.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: --qc only supports the input file\n";
@@ -936,7 +942,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
-            !selected_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
+            !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
             !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --upstream, --downstream, and --strand-aware\n";
             return 1;
@@ -967,9 +973,9 @@ int main(int argc, char* argv[]) {
         return run_window(static_cast<int>(window_argv.size()), window_argv.data(), argv[0]);
     }
 
-    if (!summary_format.empty() || !selected_attrs.empty()) {
+    if (!summary_format.empty() || !output_attrs.empty()) {
         if (!bed_file.empty() || do_longest || threads_set || output_format != "gff3" || !output_file.empty()) {
-            std::cerr << "Error: --summary-format/--attrs only supports query-style selectors; "
+            std::cerr << "Error: --summary-format/--output-attrs only supports query-style selectors; "
                       << "do not combine with --bed, --longest, --threads, --output-format, or --output\n";
             return 1;
         }
@@ -1006,9 +1012,9 @@ int main(int argc, char* argv[]) {
             query_args.push_back("--summary-format");
             query_args.push_back(summary_format);
         }
-        if (!selected_attrs.empty()) {
-            query_args.push_back("--attrs");
-            query_args.push_back(join_values(selected_attrs));
+        if (!output_attrs.empty()) {
+            query_args.push_back("--output-attrs");
+            query_args.push_back(join_values(output_attrs));
         }
 
         std::vector<char*> query_argv;

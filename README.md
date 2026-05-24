@@ -20,7 +20,7 @@
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt --include-children` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
-| Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent` |
+| Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --output-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | Keep the longest transcript per gene | `gffsub annotation.gff3 --longest` |
 | Check annotation graph problems | `gffsub annotation.gff3 --qc` |
@@ -70,7 +70,7 @@ gffsub annotation.gff3 --region chr1:1-100000
 gffsub annotation.gff3 --id GeneA --summary-format tsv
 
 # Query and extract selected attributes
-gffsub annotation.gff3 --id GeneA --attrs ID,Name,Parent
+gffsub annotation.gff3 --id GeneA --output-attrs ID,Name,Parent
 
 # Extract an upstream/downstream window
 gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
@@ -151,6 +151,31 @@ For batch pipelines, ask for summaries instead of raw GFF3:
 
 Summary fields include query ID, matched ID, matched field, coordinates, strand, feature type, parent ID, child count, transcript count, exon count, CDS length, and status.
 
+### Attribute Keys In Search And Output
+
+GFF3 stores record attributes in column 9 as semicolon-separated `KEY=VALUE` pairs:
+
+```gff3
+chr1	src	gene	100	400	.	+	.	ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123
+```
+
+Use `--id` for exact `ID` lookup, `--name` for gene lookup across common naming keys, and `--attr KEY=VALUE` for any exact attribute-value filter:
+
+```bash
+./gffsub annotation.gff3 --id gene0001
+./gffsub annotation.gff3 --name ABC1
+./gffsub annotation.gff3 --attr Alias=ABC-1
+./gffsub annotation.gff3 --attr Dbxref=GeneID:123
+```
+
+Use `--output-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
+
+```bash
+./gffsub annotation.gff3 --id gene0001 --output-attrs ID,Name,Alias,Dbxref
+```
+
+`--out-attrs` is a short alias. `--attrs` remains as a deprecated compatibility alias.
+
 ## Scenario: Extract Upstream Or Downstream Windows
 
 Use the top-level window options when you want a local annotation context around a gene or feature.
@@ -204,7 +229,8 @@ gffsub <input.gff3> [options]
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. Default GFF3 output is equivalent to `gffsub query <input.gff3> --name NAME`. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. Default GFF3 output is equivalent to `gffsub query <input.gff3> --attr KEY=VALUE`. |
 | `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
-| `--attrs` | `KEY1,KEY2,...` | Print selected attributes as extra TSV/JSON fields. This uses the same summary output as `query`; combine only with query-style selectors. |
+| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. This uses the same summary output as `query`; combine only with query-style selectors. |
+| `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--output-attrs`. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. This uses the same output as `query`; combine only with query-style selectors. |
 | `--upstream` | integer | With `--id`, extract records overlapping the upstream-expanded target window. Output is equivalent to `gffsub window <input.gff3> --id ID --upstream N`. |
 | `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. Output is equivalent to the `window` command. |
@@ -238,12 +264,13 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--region` | `CHR:START-END` | Query features overlapping a 1-based inclusive region. |
 | `--type` | type | Restrict query output to one feature type. |
 | `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. |
-| `--attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
+| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
+| `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--output-attrs`. |
 | `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. |
 | `-h`, `--help` | flag | Show help for query mode. |
 
-When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary-format`, `--attrs` prints TSV.
+When `--summary-format` is used, the summary columns are `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, and `status`. If `--output-attrs` is present, those keys are appended as extra TSV columns or as an `attrs` object in JSON. Without `--summary-format`, `--output-attrs` prints TSV.
 
 ### Window Compatibility Mode
 
