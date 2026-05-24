@@ -20,7 +20,7 @@
 | 按属性值提取 feature | `gffsub annotation.gff3 --attr biotype=protein_coding` |
 | 批量提取 ID，并带上子 feature | `gffsub annotation.gff3 --id-list genes.txt -C` |
 | 输出适合 pipeline 读取的 summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
-| 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --output-attrs ID,Name,Parent` |
+| 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
 | 每个基因只保留最长转录本 | `gffsub annotation.gff3 --longest` |
 | 检查注释 graph 问题 | `gffsub annotation.gff3 --qc` |
@@ -70,7 +70,7 @@ gffsub annotation.gff3 --region chr1:1-100000
 gffsub annotation.gff3 --id GeneA --summary-format tsv
 
 # 查询并提取指定属性
-gffsub annotation.gff3 --id GeneA --output-attrs ID,Name,Parent
+gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent
 
 # 提取上下游窗口
 gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
@@ -160,7 +160,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 | 基因名称查询 | `--name ABC1` | gene 记录上的 `ID`、`gene_id`、`Name`、`locus_tag`、`Alias` 或完整 `Dbxref` 值 |
 | 任意精确属性过滤 | `--attr Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
 | 包含匹配记录后代 | `-C`, `--include-children` | 通过 `Parent` 连接的 child 记录 |
-| 打印指定属性 | `--output-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
+| 打印指定属性 | `--out-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
 
 ## 场景：提取上下游窗口
 
@@ -215,8 +215,8 @@ gffsub <input.gff3> [options]
 | `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。这是常见基因命名键的顶层 selector。 |
 | `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。 |
 | `-C`, `--include-children` | 标志 | 包含由 `--id`、`--id-list`、`--name` 或 `--attr` 匹配记录的后代。 |
-| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
-| `--attrs` | `KEY1,KEY2,...` | `--output-attrs` 的兼容别名，已不推荐使用。 |
+| `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
+| `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。 |
 | `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。 |
 | `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
@@ -250,13 +250,13 @@ gffsub query <input.gff3> [options]
 | `--region` | `CHR:START-END` | 查询与 1-based 闭合区间重叠的 feature。 |
 | `--type` | 类型 | 将查询输出限制为一个 feature 类型。 |
 | `--attr` | `KEY=VALUE` | 按精确属性值查询。该参数可以重复使用。 |
-| `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | 将指定属性值追加为额外 TSV/JSON 字段。 |
-| `--attrs` | `KEY1,KEY2,...` | `--output-attrs` 的兼容别名，已不推荐使用。 |
+| `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值追加为额外 TSV/JSON 字段。 |
+| `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `-C`, `--include-children` | 标志 | 包含匹配记录的后代，例如 transcript、exon、CDS 和 UTR feature。 |
 | `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。 |
 | `-h`, `--help` | 标志 | 显示 query 模式帮助。 |
 
-使用 `--summary-format` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。如果使用 `--output-attrs`，这些属性键会追加为额外 TSV 列，或在 JSON 中输出为 `attrs` 对象。不加 `--summary-format` 时，`--output-attrs` 默认输出 TSV。
+使用 `--summary-format` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。如果使用 `--out-attrs`，这些属性键会追加为额外 TSV 列，或在 JSON 中输出为 `attrs` 对象。不加 `--summary-format` 时，`--out-attrs` 默认输出 TSV。
 
 ### Window 兼容模式
 

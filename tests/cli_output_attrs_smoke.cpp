@@ -62,12 +62,14 @@ static int require_contains(const std::string& path, const std::string& needle) 
 static void cleanup_outputs() {
     std::remove("cli_output_attrs_smoke.gff3");
     std::remove("output_attrs_main.tsv");
-    std::remove("output_attrs_short.tsv");
+    std::remove("output_attrs_verbose.tsv");
     std::remove("output_attrs_old.tsv");
     std::remove("output_attrs_json.json");
     std::remove("query_output_attrs_main.tsv");
-    std::remove("query_output_attrs_short.tsv");
+    std::remove("query_output_attrs_verbose.tsv");
     std::remove("query_output_attrs_old.tsv");
+    std::remove("output_attrs_help.txt");
+    std::remove("query_output_attrs_help.txt");
     std::remove("output_attrs_regions.bed");
     std::remove("output_attrs_bad.out");
     std::remove("output_attrs_bad.err");
@@ -96,21 +98,34 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string keys{"ID,Name,Alias,Dbxref"};
-    if (run_command(exe + " " + gff + " --id gene0001 --output-attrs " + keys + " > output_attrs_main.tsv") != 0) {
+    if (run_command(exe + " " + gff + " --help > output_attrs_help.txt 2>&1") != 0 ||
+        require_contains("output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
+        require_contains("output_attrs_help.txt", "--output-attrs KEYS") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --id gene0001 --out-attrs " + keys + " > output_attrs_short.tsv") != 0) {
+    if (run_command(exe + " query --help > query_output_attrs_help.txt 2>&1") != 0 ||
+        require_contains("query_output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
+        require_contains("query_output_attrs_help.txt", "Output selected attributes") != 0 ||
+        require_contains("query_output_attrs_help.txt", "--output-attrs KEYS") != 0 ||
+        require_contains("query_output_attrs_help.txt", "Verbose alias for --out-attrs") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --id gene0001 --out-attrs " + keys + " > output_attrs_main.tsv") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id gene0001 --output-attrs " + keys + " > output_attrs_verbose.tsv") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --id gene0001 --attrs " + keys + " > output_attrs_old.tsv") != 0) {
         return 1;
     }
-    if (compare_files("output_attrs_main.tsv", "output_attrs_short.tsv") != 0 ||
+    if (compare_files("output_attrs_main.tsv", "output_attrs_verbose.tsv") != 0 ||
         compare_files("output_attrs_main.tsv", "output_attrs_old.tsv") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --summary-format json --output-attrs " + keys +
+    if (run_command(exe + " " + gff + " --id gene0001 --summary-format json --out-attrs " + keys +
                     " > output_attrs_json.json") != 0 ||
         require_contains("output_attrs_json.json", "\"attrs\":{\"ID\":\"gene0001\",\"Name\":\"ABC1\"") != 0 ||
         require_contains("output_attrs_json.json", "\"Alias\":\"ABC-1\"") != 0 ||
@@ -118,30 +133,30 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " query " + gff + " --id gene0001 --output-attrs " + keys + " > query_output_attrs_main.tsv") != 0) {
+    if (run_command(exe + " query " + gff + " --id gene0001 --out-attrs " + keys + " > query_output_attrs_main.tsv") != 0) {
         return 1;
     }
-    if (run_command(exe + " query " + gff + " --id gene0001 --out-attrs " + keys + " > query_output_attrs_short.tsv") != 0) {
+    if (run_command(exe + " query " + gff + " --id gene0001 --output-attrs " + keys + " > query_output_attrs_verbose.tsv") != 0) {
         return 1;
     }
     if (run_command(exe + " query " + gff + " --id gene0001 --attrs " + keys + " > query_output_attrs_old.tsv") != 0) {
         return 1;
     }
-    if (compare_files("query_output_attrs_main.tsv", "query_output_attrs_short.tsv") != 0 ||
+    if (compare_files("query_output_attrs_main.tsv", "query_output_attrs_verbose.tsv") != 0 ||
         compare_files("query_output_attrs_main.tsv", "query_output_attrs_old.tsv") != 0) {
         return 1;
     }
 
     const std::string bad_redirect{" > output_attrs_bad.out 2> output_attrs_bad.err"};
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --longest" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --threads 2" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --output-format gtf3" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
                                " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
         return 1;
     }
