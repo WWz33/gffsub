@@ -194,6 +194,7 @@ static void qc_usage(const char* prog) {
         << "  invalid_range     start greater than end.\n"
         << "  invalid_gap       Malformed Gap attribute.\n"
         << "  invalid_is_circular  Is_circular value is not true.\n"
+        << "  invalid_ontology_term  Malformed Ontology_term attribute.\n"
         << "  invalid_target    Malformed Target attribute.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
         << "  parent_cycle      Parent relationships contain a cycle.\n"
@@ -621,10 +622,10 @@ static std::optional<std::string> gap_attribute_error(std::string_view gap) {
     return std::nullopt;
 }
 
-static std::optional<std::string> dbxref_attribute_error(std::string_view dbxref) {
-    const auto colon = dbxref.find(':');
-    if (colon == std::string_view::npos || colon == 0 || colon + 1 == dbxref.size()) {
-        return "Dbxref must have database:accession";
+static std::optional<std::string> database_accession_error(std::string_view label, std::string_view value) {
+    const auto colon = value.find(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 == value.size()) {
+        return std::string{label} + " must have database:accession";
     }
     return std::nullopt;
 }
@@ -1367,8 +1368,16 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const auto dbxref_it = attrs.find("Dbxref");
         if (dbxref_it != attrs.end()) {
             for (const auto& dbxref : dbxref_it->second) {
-                if (const auto error = dbxref_attribute_error(dbxref)) {
+                if (const auto error = database_accession_error("Dbxref", dbxref)) {
                     print_qc_row(std::cout, "error", "invalid_dbxref", rec.line_idx, id, *error);
+                }
+            }
+        }
+        const auto ontology_term_it = attrs.find("Ontology_term");
+        if (ontology_term_it != attrs.end()) {
+            for (const auto& ontology_term : ontology_term_it->second) {
+                if (const auto error = database_accession_error("Ontology_term", ontology_term)) {
+                    print_qc_row(std::cout, "error", "invalid_ontology_term", rec.line_idx, id, *error);
                 }
             }
         }
