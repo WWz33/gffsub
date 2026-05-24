@@ -5,6 +5,8 @@ PREFIX ?= /usr/local
 TARGET = gffsub
 SRCS = src/gffsub.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/region.cpp src/annotation_filter.cpp src/isoform_filter.cpp src/annotation_output.cpp
 HDRS = src/gff3.hpp src/annotation.hpp
+ANNOTATION_INDEX_SMOKE = annotation_index_smoke
+CLI_OUTPUT_ATTRS_SMOKE = cli_output_attrs_smoke
 
 .PHONY: all clean test install uninstall
 
@@ -13,13 +15,18 @@ all: $(TARGET)
 $(TARGET): $(SRCS) $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(SRCS)
 
-clean:
-	rm -f $(TARGET) src/*.o
+$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/region.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/region.cpp
 
-test: $(TARGET)
-	./$(TARGET) ../SoyL04.gene.gff -r Chr01:1-35000 -f gene
-	./$(TARGET) ../SoyL04.gene.gff --longest | head -10
-	./$(TARGET) ../SoyL04.gene.gff -r Chr01:1-35000 -t gtf3 | head -10
+$(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp
+	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp
+
+clean:
+	rm -f $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) src/*.o
+
+test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE)
+	./$(ANNOTATION_INDEX_SMOKE)
+	./$(CLI_OUTPUT_ATTRS_SMOKE) ./$(TARGET)
 
 install: $(TARGET)
 	install -d $(PREFIX)/bin
