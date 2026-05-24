@@ -660,6 +660,53 @@ static bool has_invalid_is_circular(const std::unordered_map<std::string, std::v
                         [](const std::string& value) { return value != "true"; }) != circular_it->second.end();
 }
 
+static std::vector<std::string> sorted_attribute_values(
+    const std::unordered_map<std::string, std::vector<std::string>>& attrs,
+    const char* key) {
+    const auto it = attrs.find(key);
+    if (it == attrs.end()) {
+        return {};
+    }
+    auto values = it->second;
+    values.erase(std::remove(values.begin(), values.end(), ""), values.end());
+    std::sort(values.begin(), values.end());
+    return values;
+}
+
+static bool share_discontinuous_relation(
+    const std::unordered_map<std::string, std::vector<std::string>>& first_attrs,
+    const std::unordered_map<std::string, std::vector<std::string>>& next_attrs) {
+    const auto first_parents = sorted_attribute_values(first_attrs, "Parent");
+    if (!first_parents.empty() && first_parents == sorted_attribute_values(next_attrs, "Parent")) {
+        return true;
+    }
+
+    const auto first_derives = sorted_attribute_values(first_attrs, "Derives_from");
+    return !first_derives.empty() && first_derives == sorted_attribute_values(next_attrs, "Derives_from");
+}
+
+static bool allowed_discontinuous_id(const std::vector<const GffRecord*>& records) {
+    if (records.size() < 2) {
+        return true;
+    }
+
+    const auto* first = records.front();
+    const auto first_attrs = parse_attributes(first->attr_raw);
+    for (size_t i = 1; i < records.size(); ++i) {
+        const auto* next = records[i];
+        if (next->seqid != first->seqid || next->source != first->source || next->type != first->type ||
+            next->strand != first->strand) {
+            return false;
+        }
+
+        const auto next_attrs = parse_attributes(next->attr_raw);
+        if (!share_discontinuous_relation(first_attrs, next_attrs)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static std::unordered_set<std::string> find_parent_cycle_ids(
     const std::unordered_map<std::string, std::vector<std::string>>& parents_by_id) {
     std::unordered_map<std::string, int> state;
@@ -1288,7 +1335,7 @@ static int run_qc(int argc, char* argv[], const char* prog) {
     const auto directive_result = parse_directives(input_file);
 
     std::unordered_map<std::string, const GffRecord*> by_id;
-    std::unordered_map<std::string, int> id_counts;
+    std::unordered_map<std::string, std::vector<const GffRecord*>> records_by_id;
     std::unordered_map<std::string, std::vector<std::string>> parents_by_id;
     std::unordered_set<std::string> circular_seqids;
     for (const auto& rec : data.records) {
@@ -1297,7 +1344,7 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             circular_seqids.insert(rec.seqid);
         }
         if (rec.id) {
-            ++id_counts[*rec.id];
+            records_by_id[*rec.id].push_back(&rec);
             by_id.emplace(*rec.id, &rec);
 
             const auto parent_it = attrs.find("Parent");
@@ -1310,8 +1357,8 @@ static int run_qc(int argc, char* argv[], const char* prog) {
 
     std::cout << "severity\tcode\tline_idx\tid\tmessage\n";
 
-    for (const auto& [id, count] : id_counts) {
-        if (count > 1) {
+    for (const auto& [id, records] : records_by_id) {
+        if (records.size() > 1 && !allowed_discontinuous_id(records)) {
             print_qc_row(std::cout, "error", "duplicate_id", -1, id, "ID appears more than once");
         }
     }

@@ -39,6 +39,11 @@ static bool write_qc_annotation(const std::string& path) {
         << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
+        << "chr1\tsrc\tmRNA\t410\t480\t.\t+\t.\tID=disc_tx;Parent=disc_gene\n"
+        << "chr1\tsrc\tCDS\t410\t430\t.\t+\t0\tID=disc_cds;Parent=disc_tx\n"
+        << "chr1\tsrc\tCDS\t450\t480\t.\t+\t2\tID=disc_cds;Parent=disc_tx\n"
+        << "chr1\tsrc\tpolypeptide\t410\t430\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
+        << "chr1\tsrc\tpolypeptide\t450\t480\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\n"
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
@@ -704,6 +709,8 @@ int main(int argc, char* argv[]) {
         run_command(exe + " qc " + qc_gff + " > selector_qc_command.tsv") != 0 ||
         compare_files("selector_qc_top.tsv", "selector_qc_command.tsv") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_id") != 0 ||
+        require_not_contains("selector_qc_top.tsv", "disc_cds\tID appears more than once") != 0 ||
+        require_not_contains("selector_qc_top.tsv", "disc_poly\tID appears more than once") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_gff_version") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
