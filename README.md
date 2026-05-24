@@ -24,6 +24,7 @@
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
+| Extract a feature and its parents | `gffsub annotation.gff3 --id ExonA --parents` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
@@ -82,6 +83,9 @@ gffsub annotation.gff3 --ids genes.txt
 
 # Extract an ID and its descendants
 gffsub annotation.gff3 --id GeneA -C
+
+# Extract an ID and its ancestors
+gffsub annotation.gff3 --id ExonA --parents
 
 # Extract a region
 gffsub annotation.gff3 --region chr1:1-100000
@@ -175,6 +179,9 @@ Use the top-level selector form when the question starts from an identifier, nam
 
 # Include descendants such as transcript, exon, CDS, and UTR records
 ./gffsub annotation.gff3 --id Glyma.01G000100 -C
+
+# Include ancestors linked through Parent
+./gffsub annotation.gff3 --id ExonA --parents
 ```
 
 For batch pipelines, ask for summaries instead of raw GFF3:
@@ -212,6 +219,7 @@ Non-region selectors use these column-9 keys:
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
 | Any exact attribute filter | `--where Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
 | Include matched descendants | `-C`, `--children` | child records linked by `Parent`; `--include-children` is a verbose alias |
+| Include matched ancestors | `--parents` | parent records reached by walking `Parent` links upward; `--include-parents` is a verbose alias |
 | Print selected attributes | `--out-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
 Use `--out-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
@@ -276,6 +284,7 @@ gffsub <input.gff3> [options]
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
 | `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. `--attr` is a compatibility alias. |
 | `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-children` is a verbose alias. |
+| `--parents`, `--include-parents` | flag | Include ancestors of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-parents` is a verbose alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -319,6 +328,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `-C`, `--children`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. `--include-children` is a verbose alias. |
+| `--parents`, `--include-parents` | flag | Include ancestors of matched records by walking GFF3 `Parent` links upward. `--include-parents` is a verbose alias. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. `--summary-format` is a verbose alias. |
 | `-h`, `--help` | flag | Show help for query mode. |
 

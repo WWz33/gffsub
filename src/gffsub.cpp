@@ -34,6 +34,8 @@ static void usage(const char* prog) {
         << "      Top-level selector for exact column-9 KEY=VALUE matches. --attr is a compatibility alias.\n"
         << "  -C, --children, --include-children\n"
         << "      Include descendants of records matched by --id, --ids, --name, or --where.\n"
+        << "  --parents, --include-parents\n"
+        << "      Include ancestors of records matched by --id, --ids, --name, or --where.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
@@ -146,6 +148,8 @@ static void query_usage(const char* prog) {
         << "  --attrs KEYS            Deprecated alias for --out-attrs.\n"
         << "  -C, --children           Include descendants of matched IDs.\n"
         << "  --include-children       Verbose alias for --children.\n"
+        << "  --parents                Include ancestors of matched IDs.\n"
+        << "  --include-parents        Verbose alias for --parents.\n"
         << "  --summary FMT           Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --summary-format FMT    Verbose alias for --summary.\n"
         << "  -h, --help              Display this help message.\n"
@@ -523,6 +527,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
     std::vector<std::string> output_attrs;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
+    bool include_parents = false;
 
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -583,6 +588,8 @@ static int run_query(int argc, char* argv[], const char* prog) {
             }
         } else if (arg == "-C" || arg == "--children" || arg == "--include-children") {
             include_children = true;
+        } else if (arg == "--parents" || arg == "--include-parents") {
+            include_parents = true;
         } else if (arg == "-h" || arg == "--help") {
             query_usage(prog);
             return 0;
@@ -591,6 +598,11 @@ static int run_query(int argc, char* argv[], const char* prog) {
             query_usage(prog);
             return 1;
         }
+    }
+
+    if ((include_children || include_parents) && ids.empty() && id_list_file.empty() && name.empty() && attr_filters.empty()) {
+        std::cerr << "Error: --children/--parents require --id, --ids, --name, or --where\n";
+        return 1;
     }
 
     if (!id_list_file.empty()) {
@@ -627,6 +639,27 @@ static int run_query(int argc, char* argv[], const char* prog) {
         if (feature_type.empty() || rec.type == feature_type) {
             if (append_unique(result, seen, rec)) {
                 add_summary(query_id, matched_by, rec);
+            }
+        }
+        if (include_parents && rec.id) {
+            std::vector<GffRecord> stack = index.parents_of(*rec.id);
+            std::unordered_set<int> visited_parents;
+            while (!stack.empty()) {
+                const auto parent = stack.back();
+                stack.pop_back();
+                if (!visited_parents.insert(parent.line_idx).second) {
+                    continue;
+                }
+                if (feature_type.empty() || parent.type == feature_type) {
+                    if (append_unique(result, seen, parent)) {
+                        add_summary(query_id, "parent", parent);
+                    }
+                }
+                if (parent.id) {
+                    for (const auto& grandparent : index.parents_of(*parent.id)) {
+                        stack.push_back(grandparent);
+                    }
+                }
             }
         }
         if (include_children && rec.id) {
@@ -879,6 +912,7 @@ int main(int argc, char* argv[]) {
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     bool include_children = false;
+    bool include_parents = false;
     std::vector<std::string> output_attrs;
     std::string summary_format;
     std::string upstream_arg;
@@ -906,6 +940,7 @@ int main(int argc, char* argv[]) {
         OPT_ATTR,
         OPT_OUTPUT_ATTRS,
         OPT_SUMMARY_FORMAT,
+        OPT_PARENTS,
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
         OPT_STRAND_AWARE,
@@ -928,6 +963,8 @@ int main(int argc, char* argv[]) {
         {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"summary",       required_argument, nullptr, OPT_SUMMARY_FORMAT},
         {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
+        {"parents",       no_argument,       nullptr, OPT_PARENTS},
+        {"include-parents", no_argument,      nullptr, OPT_PARENTS},
         {"up",            required_argument, nullptr, OPT_UPSTREAM},
         {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
         {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
@@ -987,6 +1024,7 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
                 break;
+            case OPT_PARENTS: include_parents = true; break;
             case 'C': include_children = true; break;
             case OPT_UPSTREAM: upstream_arg = optarg; break;
             case OPT_DOWNSTREAM: downstream_arg = optarg; break;
@@ -1048,6 +1086,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
+    if ((include_children || include_parents) && !has_query_style_selector) {
+        std::cerr << "Error: --children/--parents require --id, --ids, --name, or --where\n";
+        return 1;
+    }
+
     // Validate output format
     OutputFormat fmt = OutputFormat::GFF3;
     if (output_format == "gtf") {
@@ -1069,7 +1113,7 @@ int main(int argc, char* argv[]) {
     std::string input_file = argv[optind];
 
     if (do_qc) {
-        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
+        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
             strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
@@ -1087,7 +1131,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: window shortcut requires exactly one --id\n";
             return 1;
         }
-        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
+        if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children || include_parents ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
             !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
@@ -1115,7 +1159,6 @@ int main(int argc, char* argv[]) {
         return run_window(static_cast<int>(window_argv.size()), window_argv.data(), argv[0]);
     }
 
-    const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
     const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && !score_filter && !strand_filter && !phase_filter && bed_file.empty() && !do_longest && !threads_set &&
                                                output_format == "gff3" && output_file.empty();
     const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
@@ -1158,6 +1201,9 @@ int main(int argc, char* argv[]) {
         if (include_children) {
             query_args.push_back("--children");
         }
+        if (include_parents) {
+            query_args.push_back("--parents");
+        }
         if (!summary_format.empty()) {
             query_args.push_back("--summary");
             query_args.push_back(summary_format);
@@ -1198,7 +1244,28 @@ int main(int argc, char* argv[]) {
         const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
         std::unordered_set<int> selected_lines;
         auto add_selected = [&](const GffRecord& rec) {
-            if (selected_lines.insert(rec.line_idx).second && include_children && rec.id) {
+            const bool newly_selected = selected_lines.insert(rec.line_idx).second;
+            if (!newly_selected) {
+                return;
+            }
+            if (include_parents && rec.id) {
+                std::vector<GffRecord> stack = index.parents_of(*rec.id);
+                std::unordered_set<int> visited_parents;
+                while (!stack.empty()) {
+                    const auto parent = stack.back();
+                    stack.pop_back();
+                    if (!visited_parents.insert(parent.line_idx).second) {
+                        continue;
+                    }
+                    selected_lines.insert(parent.line_idx);
+                    if (parent.id) {
+                        for (const auto& grandparent : index.parents_of(*parent.id)) {
+                            stack.push_back(grandparent);
+                        }
+                    }
+                }
+            }
+            if (include_children && rec.id) {
                 for (const auto& child : index.descendants_of(*rec.id)) {
                     selected_lines.insert(child.line_idx);
                 }
