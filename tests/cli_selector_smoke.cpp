@@ -55,9 +55,20 @@ static int require_not_contains(const std::string& path, const std::string& need
     return 0;
 }
 
+static int compare_files(const std::string& lhs_path, const std::string& rhs_path) {
+    const auto lhs = read_file(lhs_path);
+    const auto rhs = read_file(rhs_path);
+    if (lhs != rhs) {
+        std::cerr << "output mismatch: " << lhs_path << " vs " << rhs_path << '\n';
+        return 1;
+    }
+    return 0;
+}
+
 static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
     std::remove("selector_id.gff3");
+    std::remove("selector_query_id.gff3");
     std::remove("selector_name.gff3");
     std::remove("selector_alias.gff3");
     std::remove("selector_dbxref.gff3");
@@ -86,6 +97,11 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --id gene0001 > selector_id.gff3") != 0 ||
         require_contains("selector_id.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_id.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " query " + gff + " --id gene0001 > selector_query_id.gff3") != 0 ||
+        compare_files("selector_id.gff3", "selector_query_id.gff3") != 0) {
         return 1;
     }
 
