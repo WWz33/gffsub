@@ -82,4 +82,12 @@ void filter_by_seqid(GffData& data, std::string_view seqid) {
     }
 }
 
+void filter_by_source(GffData& data, std::string_view source) {
+    for (auto& rec : data) {
+        if (rec.kept && rec.source != source) {
+            rec.kept = false;
+        }
+    }
+}
+
 }  // namespace gffsub

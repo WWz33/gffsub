@@ -47,6 +47,9 @@ static void usage(const char* prog) {
         << "  --seqid SEQID\n"
         << "      Extract features whose first column exactly matches SEQID.\n"
         << "\n"
+        << "  --source SOURCE\n"
+        << "      Extract features whose second column exactly matches SOURCE.\n"
+        << "\n"
         << "  -r, --region CHR:START-END\n"
         << "      Extract features overlapping the specified genomic region.\n"
         << "      Coordinates are 1-based and inclusive (GFF format).\n"
@@ -103,6 +106,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 --seqid chr1 -f gene\n"
+        << "  " << prog << " annotation.gff3 --source Gnomon -f mRNA\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
@@ -830,6 +834,7 @@ int main(int argc, char* argv[]) {
     bool do_qc = false;
     std::string region_str;
     std::string seqid_filter;
+    std::string source_filter;
     std::string bed_file;
     std::string feature;
     bool do_longest = false;
@@ -849,7 +854,8 @@ int main(int argc, char* argv[]) {
         OPT_DOWNSTREAM,
         OPT_STRAND_AWARE,
         OPT_QC,
-        OPT_SEQID
+        OPT_SEQID,
+        OPT_SOURCE
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
@@ -870,6 +876,7 @@ int main(int argc, char* argv[]) {
         {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
         {"qc",            no_argument,       nullptr, OPT_QC},
         {"seqid",         required_argument, nullptr, OPT_SEQID},
+        {"source",        required_argument, nullptr, OPT_SOURCE},
         {"children",      no_argument,       nullptr, 'C'},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
@@ -924,6 +931,7 @@ int main(int argc, char* argv[]) {
             case OPT_STRAND_AWARE: strand_aware = true; break;
             case OPT_QC: do_qc = true; break;
             case OPT_SEQID: seqid_filter = optarg; break;
+            case OPT_SOURCE: source_filter = optarg; break;
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -977,7 +985,7 @@ int main(int argc, char* argv[]) {
     if (do_qc) {
         if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
-            strand_aware || !region_str.empty() || !seqid_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
+            strand_aware || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: --qc only supports the input file\n";
             return 1;
@@ -995,7 +1003,7 @@ int main(int argc, char* argv[]) {
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
-            !seqid_filter.empty() || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
+            !seqid_filter.empty() || !source_filter.empty() || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
@@ -1022,14 +1030,14 @@ int main(int argc, char* argv[]) {
     }
 
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
-    const bool can_dispatch_summary_to_query = seqid_filter.empty() && bed_file.empty() && !do_longest && !threads_set &&
+    const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && bed_file.empty() && !do_longest && !threads_set &&
                                                output_format == "gff3" && output_file.empty();
     const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
             std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
-                      << "do not combine with --seqid, --bed, --longest, --threads, --format/--output-format, or --output\n";
+                      << "do not combine with --seqid, --source, --bed, --longest, --threads, --format/--output-format, or --output\n";
             return 1;
         }
     }
@@ -1152,6 +1160,10 @@ int main(int argc, char* argv[]) {
 
     if (!seqid_filter.empty()) {
         filter_by_seqid(data, seqid_filter);
+    }
+
+    if (!source_filter.empty()) {
+        filter_by_source(data, source_filter);
     }
 
     // Apply feature filters

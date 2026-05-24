@@ -39,6 +39,7 @@ void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
 void filter_by_feature(GffData& data, std::string_view feature_type);
 void filter_by_seqid(GffData& data, std::string_view seqid);
+void filter_by_source(GffData& data, std::string_view source);
 void filter_longest_isoform(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
 void filter_longest(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
 

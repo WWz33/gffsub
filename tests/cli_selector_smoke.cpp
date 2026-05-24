@@ -15,7 +15,7 @@ static bool write_test_annotation(const std::string& path) {
         << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
         << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=tx1\n"
         << "chr1\tsrc\tgene\t600\t700\t.\t+\t.\tID=gene0002;Name=XYZ1\n"
-        << "chr2\tsrc\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n";
+        << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n";
     return true;
 }
 
@@ -123,6 +123,9 @@ static void cleanup_outputs() {
     std::remove("selector_seqid_chr2.gff3");
     std::remove("selector_seqid_gene.gff3");
     std::remove("selector_seqid_id_intersection.gff3");
+    std::remove("selector_source_other.gff3");
+    std::remove("selector_source_gene.gff3");
+    std::remove("selector_seqid_source_intersection.gff3");
     std::remove("selector_help.txt");
     std::remove("selector_bed_short.bed");
     std::remove("selector_bed_format.bed");
@@ -175,6 +178,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--format FMT") != 0 ||
         require_contains("selector_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_help.txt", "--seqid SEQID") != 0 ||
+        require_contains("selector_help.txt", "--source SOURCE") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -357,6 +361,23 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --id gene0001 --seqid chr2 > selector_seqid_id_intersection.gff3") != 0 ||
         require_not_contains("selector_seqid_id_intersection.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_seqid_id_intersection.gff3", "ID=gene0003") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --source other > selector_source_other.gff3") != 0 ||
+        require_contains("selector_source_other.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_source_other.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --source src -f gene > selector_source_gene.gff3") != 0 ||
+        require_contains("selector_source_gene.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_source_gene.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_source_gene.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_source_gene.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --seqid chr2 --source src > selector_seqid_source_intersection.gff3") != 0 ||
+        require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0003") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " -r chr1:100-400 -t bed > selector_bed_short.bed") != 0 ||
