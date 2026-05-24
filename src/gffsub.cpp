@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -189,6 +190,7 @@ static void qc_usage(const char* prog) {
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_range     start greater than end.\n"
+        << "  invalid_target    Malformed Target attribute.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
         << "  parent_cycle      Parent relationships contain a cycle.\n"
         << "  child_outside_parent  Child coordinates outside parent coordinates.\n";
@@ -538,6 +540,55 @@ static std::optional<std::string> invalid_multi_value_attribute_tag(std::string_
             break;
         }
         pos = end + 1;
+    }
+    return std::nullopt;
+}
+
+static bool is_digits(std::string_view value) {
+    return !value.empty() &&
+           std::all_of(value.begin(), value.end(), [](const unsigned char c) { return std::isdigit(c); });
+}
+
+static bool parse_positive_int64(std::string_view value, int64_t& out) {
+    if (!is_digits(value)) {
+        return false;
+    }
+    try {
+        const std::string copy{value};
+        size_t parsed = 0;
+        const auto parsed_value = std::stoll(copy, &parsed);
+        if (parsed != copy.size() || parsed_value < 1) {
+            return false;
+        }
+        out = parsed_value;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+static std::optional<std::string> target_attribute_error(std::string_view target) {
+    std::istringstream fields{std::string{target}};
+    std::vector<std::string> tokens;
+    std::string token;
+    while (fields >> token) {
+        tokens.push_back(token);
+    }
+
+    if (tokens.size() != 3 && tokens.size() != 4) {
+        return "Target must have target_id start end [strand]";
+    }
+
+    int64_t start = 0;
+    int64_t end = 0;
+    if (!parse_positive_int64(tokens[1], start) || !parse_positive_int64(tokens[2], end)) {
+        return "Target start and end must be positive integers";
+    }
+    if (start > end) {
+        return "Target start is greater than end";
+    }
+    if (tokens.size() == 4 && tokens[3] != "+" && tokens[3] != "-") {
+        return "Target strand must be + or -";
     }
     return std::nullopt;
 }
@@ -1239,6 +1290,15 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         }
 
         const auto attrs = parse_attributes(rec.attr_raw);
+        const auto target_it = attrs.find("Target");
+        if (target_it != attrs.end()) {
+            for (const auto& target : target_it->second) {
+                if (const auto error = target_attribute_error(target)) {
+                    print_qc_row(std::cout, "error", "invalid_target", rec.line_idx, id, *error);
+                }
+            }
+        }
+
         const auto parent_it = attrs.find("Parent");
         if (rec.id && parent_cycle_ids.find(*rec.id) != parent_cycle_ids.end()) {
             print_qc_row(std::cout, "error", "parent_cycle", rec.line_idx, id,
