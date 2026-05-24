@@ -35,6 +35,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "##sequence-region chr1 1 1000\n"
         << "##sequence-region chr_bad 100 1\n"
         << "##sequence-region chr1 1 1200\n"
+        << "##sequence-region chr2 1 500\n"
         << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
@@ -50,7 +51,10 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tmRNA\t500\t600\t.\t+\t.\tID=orphan_tx;Parent=missing_gene\n"
         << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
         << "chr1\tsrc\tgene\t900\t950\t.\t+\tx\tID=bad_phase\n"
-        << "chr1\tsrc\tgene\t990\t1100\t.\t+\t.\tID=outside_region\n"
+        << "chr2\tsrc\tgene\t490\t510\t.\t+\t.\tID=outside_region\n"
+        << "chr1\tsrc\tregion\t1\t1200\t.\t+\t.\tID=circular_region;Is_circular=true\n"
+        << "chr1\tsrc\tgene\t1190\t1210\t.\t+\t.\tID=circular_gene\n"
+        << "chr1\tsrc\tregion\t1\t1200\t.\t+\t.\tID=bad_circular;Is_circular=false\n"
         << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_a;Parent=cycle_b\n"
         << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_b;Parent=cycle_a\n"
         << "chr1\tsrc\tmatch_part\t280\t290\t.\t+\t.\tID=bad_target;Target=read1 20 10\n"
@@ -708,6 +712,9 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_feature_type") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||
+        require_not_contains("selector_qc_top.tsv", "circular_region\tfeature is outside ##sequence-region") != 0 ||
+        require_not_contains("selector_qc_top.tsv", "circular_gene\tfeature is outside ##sequence-region") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid_is_circular") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_parent") != 0 ||
         require_contains("selector_qc_top.tsv", "parent_cycle") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_target") != 0 ||

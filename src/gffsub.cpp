@@ -190,6 +190,7 @@ static void qc_usage(const char* prog) {
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_range     start greater than end.\n"
+        << "  invalid_is_circular  Is_circular value is not true.\n"
         << "  invalid_target    Malformed Target attribute.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
         << "  parent_cycle      Parent relationships contain a cycle.\n"
@@ -591,6 +592,19 @@ static std::optional<std::string> target_attribute_error(std::string_view target
         return "Target strand must be + or -";
     }
     return std::nullopt;
+}
+
+static bool has_circular_true(const std::unordered_map<std::string, std::vector<std::string>>& attrs) {
+    const auto circular_it = attrs.find("Is_circular");
+    return circular_it != attrs.end() &&
+           std::find(circular_it->second.begin(), circular_it->second.end(), "true") != circular_it->second.end();
+}
+
+static bool has_invalid_is_circular(const std::unordered_map<std::string, std::vector<std::string>>& attrs) {
+    const auto circular_it = attrs.find("Is_circular");
+    return circular_it != attrs.end() &&
+           std::find_if(circular_it->second.begin(), circular_it->second.end(),
+                        [](const std::string& value) { return value != "true"; }) != circular_it->second.end();
 }
 
 static std::unordered_set<std::string> find_parent_cycle_ids(
@@ -1223,12 +1237,16 @@ static int run_qc(int argc, char* argv[], const char* prog) {
     std::unordered_map<std::string, const GffRecord*> by_id;
     std::unordered_map<std::string, int> id_counts;
     std::unordered_map<std::string, std::vector<std::string>> parents_by_id;
+    std::unordered_set<std::string> circular_seqids;
     for (const auto& rec : data.records) {
+        const auto attrs = parse_attributes(rec.attr_raw);
+        if (rec.type == "region" && has_circular_true(attrs)) {
+            circular_seqids.insert(rec.seqid);
+        }
         if (rec.id) {
             ++id_counts[*rec.id];
             by_id.emplace(*rec.id, &rec);
 
-            const auto attrs = parse_attributes(rec.attr_raw);
             const auto parent_it = attrs.find("Parent");
             if (parent_it != attrs.end()) {
                 parents_by_id.emplace(*rec.id, parent_it->second);
@@ -1251,6 +1269,7 @@ static int run_qc(int argc, char* argv[], const char* prog) {
     for (const auto& rec : data.records) {
         const std::string id = record_id(rec);
         const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
+        const auto attrs = parse_attributes(rec.attr_raw);
         if (const auto error = seqid_syntax_error(rec.seqid)) {
             print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
         }
@@ -1271,7 +1290,8 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const auto sequence_region_it = directive_result.sequence_regions.find(rec.seqid);
         if (has_valid_coordinates && sequence_region_it != directive_result.sequence_regions.end()) {
             const auto& sequence_region = sequence_region_it->second;
-            if (rec.start < sequence_region.start || rec.end > sequence_region.end) {
+            const bool outside_end = rec.end > sequence_region.end && circular_seqids.find(rec.seqid) == circular_seqids.end();
+            if (rec.start < sequence_region.start || outside_end) {
                 print_qc_row(std::cout, "error", "outside_sequence_region", rec.line_idx, id,
                              "feature is outside ##sequence-region " + rec.seqid);
             }
@@ -1288,8 +1308,11 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             print_qc_row(std::cout, "error", "invalid_cds_phase", rec.line_idx, id,
                          std::string{"CDS phase "} + rec.phase + " must be 0, 1, or 2");
         }
+        if (has_invalid_is_circular(attrs)) {
+            print_qc_row(std::cout, "error", "invalid_is_circular", rec.line_idx, id,
+                         "Is_circular value must be true");
+        }
 
-        const auto attrs = parse_attributes(rec.attr_raw);
         const auto target_it = attrs.find("Target");
         if (target_it != attrs.end()) {
             for (const auto& target : target_it->second) {
