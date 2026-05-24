@@ -53,6 +53,16 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME cli_output_attrs_smoke COMMAND cli_output_attrs_smoke $<TARGET_FILE:gffsub>)
+
+    add_executable(cli_selector_smoke
+        tests/cli_selector_smoke.cpp
+    )
+
+    target_compile_options(cli_selector_smoke PRIVATE
+        -Wall -O2
+    )
+
+    add_test(NAME cli_selector_smoke COMMAND cli_selector_smoke $<TARGET_FILE:gffsub>)
 endif()
 
 # Installation

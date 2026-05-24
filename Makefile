@@ -7,6 +7,7 @@ SRCS = src/gffsub.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parse
 HDRS = src/gff3.hpp src/annotation.hpp
 ANNOTATION_INDEX_SMOKE = annotation_index_smoke
 CLI_OUTPUT_ATTRS_SMOKE = cli_output_attrs_smoke
+CLI_SELECTOR_SMOKE = cli_selector_smoke
 
 .PHONY: all clean test install uninstall
 
@@ -21,12 +22,16 @@ $(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/attributes.cpp s
 $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp
 
-clean:
-	rm -f $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) src/*.o
+$(CLI_SELECTOR_SMOKE): tests/cli_selector_smoke.cpp
+	$(CXX) $(CXXFLAGS) -o $@ tests/cli_selector_smoke.cpp
 
-test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE)
+clean:
+	rm -f $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) src/*.o
+
+test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE)
 	./$(ANNOTATION_INDEX_SMOKE)
 	./$(CLI_OUTPUT_ATTRS_SMOKE) ./$(TARGET)
+	./$(CLI_SELECTOR_SMOKE) ./$(TARGET)
 
 install: $(TARGET)
 	install -d $(PREFIX)/bin
