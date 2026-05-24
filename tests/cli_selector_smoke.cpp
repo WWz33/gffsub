@@ -51,6 +51,8 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
         << "chr1\tsrc\tgene\t900\t950\t.\t+\tx\tID=bad_phase\n"
         << "chr1\tsrc\tgene\t990\t1100\t.\t+\t.\tID=outside_region\n"
+        << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_a;Parent=cycle_b\n"
+        << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_b;Parent=cycle_a\n"
         << "chr1\tsrc\texon\t120\t130\t.\t+\t.\tID=dup_parent;Parent=dup_gene,dup_gene\n"
         << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n";
     return true;
@@ -706,6 +708,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_parent") != 0 ||
+        require_contains("selector_qc_top.tsv", "parent_cycle") != 0 ||
         require_contains("selector_qc_top.tsv", "missing_parent") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_phase") != 0 ||

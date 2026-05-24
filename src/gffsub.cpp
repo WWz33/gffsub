@@ -190,6 +190,7 @@ static void qc_usage(const char* prog) {
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_range     start greater than end.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
+        << "  parent_cycle      Parent relationships contain a cycle.\n"
         << "  child_outside_parent  Child coordinates outside parent coordinates.\n";
 }
 
@@ -539,6 +540,67 @@ static std::optional<std::string> invalid_multi_value_attribute_tag(std::string_
         pos = end + 1;
     }
     return std::nullopt;
+}
+
+static std::unordered_set<std::string> find_parent_cycle_ids(
+    const std::unordered_map<std::string, std::vector<std::string>>& parents_by_id) {
+    std::unordered_map<std::string, int> state;
+    std::unordered_map<std::string, size_t> stack_pos;
+    std::unordered_set<std::string> cycle_ids;
+    std::vector<std::string> stack;
+
+    struct Frame {
+        std::string id;
+        size_t next_parent = 0;
+    };
+
+    for (const auto& [id, parents] : parents_by_id) {
+        (void)parents;
+        if (state.find(id) != state.end()) {
+            continue;
+        }
+
+        std::vector<Frame> frames{{id, 0}};
+        state[id] = 1;
+        stack_pos[id] = stack.size();
+        stack.push_back(id);
+
+        while (!frames.empty()) {
+            auto& frame = frames.back();
+            const auto parents_it = parents_by_id.find(frame.id);
+            if (parents_it == parents_by_id.end() || frame.next_parent == parents_it->second.size()) {
+                stack.pop_back();
+                stack_pos.erase(frame.id);
+                state[frame.id] = 2;
+                frames.pop_back();
+                continue;
+            }
+
+            const auto& parent_id = parents_it->second[frame.next_parent++];
+            if (parents_by_id.find(parent_id) == parents_by_id.end()) {
+                continue;
+            }
+
+            const auto parent_state_it = state.find(parent_id);
+            if (parent_state_it == state.end()) {
+                state[parent_id] = 1;
+                stack_pos[parent_id] = stack.size();
+                stack.push_back(parent_id);
+                frames.push_back({parent_id, 0});
+                continue;
+            }
+            if (parent_state_it->second == 1) {
+                const auto cycle_start_it = stack_pos.find(parent_id);
+                if (cycle_start_it != stack_pos.end()) {
+                    for (size_t i = cycle_start_it->second; i < stack.size(); ++i) {
+                        cycle_ids.insert(stack[i]);
+                    }
+                }
+            }
+        }
+    }
+
+    return cycle_ids;
 }
 
 static std::optional<std::string> seqid_syntax_error(std::string_view seqid) {
@@ -1109,12 +1171,20 @@ static int run_qc(int argc, char* argv[], const char* prog) {
 
     std::unordered_map<std::string, const GffRecord*> by_id;
     std::unordered_map<std::string, int> id_counts;
+    std::unordered_map<std::string, std::vector<std::string>> parents_by_id;
     for (const auto& rec : data.records) {
         if (rec.id) {
             ++id_counts[*rec.id];
             by_id.emplace(*rec.id, &rec);
+
+            const auto attrs = parse_attributes(rec.attr_raw);
+            const auto parent_it = attrs.find("Parent");
+            if (parent_it != attrs.end()) {
+                parents_by_id.emplace(*rec.id, parent_it->second);
+            }
         }
     }
+    const auto parent_cycle_ids = find_parent_cycle_ids(parents_by_id);
 
     std::cout << "severity\tcode\tline_idx\tid\tmessage\n";
 
@@ -1170,6 +1240,10 @@ static int run_qc(int argc, char* argv[], const char* prog) {
 
         const auto attrs = parse_attributes(rec.attr_raw);
         const auto parent_it = attrs.find("Parent");
+        if (rec.id && parent_cycle_ids.find(*rec.id) != parent_cycle_ids.end()) {
+            print_qc_row(std::cout, "error", "parent_cycle", rec.line_idx, id,
+                         "Parent relationships contain a cycle");
+        }
         if (parent_it == attrs.end()) {
             continue;
         }
