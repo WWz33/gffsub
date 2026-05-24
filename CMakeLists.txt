@@ -43,6 +43,16 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME annotation_index_smoke COMMAND annotation_index_smoke)
+
+    add_executable(cli_output_attrs_smoke
+        tests/cli_output_attrs_smoke.cpp
+    )
+
+    target_compile_options(cli_output_attrs_smoke PRIVATE
+        -Wall -O2
+    )
+
+    add_test(NAME cli_output_attrs_smoke COMMAND cli_output_attrs_smoke $<TARGET_FILE:gffsub>)
 endif()
 
 # Installation
