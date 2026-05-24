@@ -55,6 +55,16 @@ static int require_not_contains(const std::string& path, const std::string& need
     return 0;
 }
 
+static void cleanup_outputs() {
+    std::remove("cli_selector_smoke.gff3");
+    std::remove("selector_id.gff3");
+    std::remove("selector_name.gff3");
+    std::remove("selector_alias.gff3");
+    std::remove("selector_dbxref.gff3");
+    std::remove("selector_parent.gff3");
+    std::remove("selector_children.gff3");
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "usage: cli_selector_smoke <gffsub-executable>\n";
@@ -106,6 +116,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    cleanup_outputs();
     std::cout << "cli_selector_smoke OK\n";
     return 0;
 }

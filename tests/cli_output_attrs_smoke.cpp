@@ -41,6 +41,16 @@ static int compare_files(const std::string& lhs_path, const std::string& rhs_pat
     return 0;
 }
 
+static void cleanup_outputs() {
+    std::remove("cli_output_attrs_smoke.gff3");
+    std::remove("output_attrs_main.tsv");
+    std::remove("output_attrs_short.tsv");
+    std::remove("output_attrs_old.tsv");
+    std::remove("query_output_attrs_main.tsv");
+    std::remove("query_output_attrs_short.tsv");
+    std::remove("query_output_attrs_old.tsv");
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "usage: cli_output_attrs_smoke <gffsub-executable>\n";
@@ -83,6 +93,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    cleanup_outputs();
     std::cout << "cli_output_attrs_smoke OK\n";
     return 0;
 }

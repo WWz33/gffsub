@@ -1,5 +1,6 @@
 #include "gff3.hpp"
 
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -138,6 +139,7 @@ static int check_self_contained_annotation() {
         return 1;
     }
 
+    std::remove(path.c_str());
     return 0;
 }
 
