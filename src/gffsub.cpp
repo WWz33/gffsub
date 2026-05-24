@@ -518,6 +518,32 @@ static std::optional<std::string> duplicate_attribute_tag(std::string_view attrs
     return std::nullopt;
 }
 
+static std::optional<std::string> empty_attribute_value_tag(std::string_view attrs) {
+    if (attrs == ".") {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    while (pos <= attrs.size()) {
+        size_t end = attrs.find(';', pos);
+        if (end == std::string_view::npos) {
+            end = attrs.size();
+        }
+        const auto field = attrs.substr(pos, end - pos);
+        if (!field.empty()) {
+            const auto equals = field.find('=');
+            if (equals != std::string_view::npos && equals + 1 == field.size()) {
+                return std::string{field.substr(0, equals)};
+            }
+        }
+        if (end == attrs.size()) {
+            break;
+        }
+        pos = end + 1;
+    }
+    return std::nullopt;
+}
+
 static bool allows_multiple_attribute_values(std::string_view tag) {
     return tag == "Parent" || tag == "Alias" || tag == "Note" || tag == "Dbxref" || tag == "Ontology_term";
 }
@@ -835,6 +861,9 @@ static DirectiveParseResult parse_directives(const std::string& path) {
                 const auto attrs = std::string_view{line}.substr(last_tab + 1);
                 if (const auto error = attribute_syntax_error(attrs)) {
                     result.issues.push_back({line_num, "invalid_attribute_syntax", *error});
+                } else if (const auto empty_value_tag = empty_attribute_value_tag(attrs)) {
+                    result.issues.push_back({line_num, "invalid_attribute_value",
+                                             "attribute tag " + *empty_value_tag + " must have a non-empty value"});
                 } else if (const auto duplicate_tag = duplicate_attribute_tag(attrs)) {
                     result.issues.push_back({line_num, "duplicate_attribute_tag",
                                              "attribute tag " + *duplicate_tag + " appears more than once"});
