@@ -128,6 +128,19 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+                               " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+                               " --longest" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+                               " --threads 2" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+                               " --output-format gtf3" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format tsv" +
+                               " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
+        return 1;
+    }
+
     cleanup_outputs();
     std::cout << "cli_output_attrs_smoke OK\n";
     return 0;
