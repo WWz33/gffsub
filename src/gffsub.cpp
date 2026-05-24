@@ -83,6 +83,11 @@ static void usage(const char* prog) {
         << "  -h, --help\n"
         << "      Display this help message.\n"
         << "\n"
+        << "Attribute column example:\n"
+        << "  ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123\n"
+        << "  --id searches ID exactly; --name searches common gene naming keys.\n"
+        << "  --attr KEY=VALUE filters records; --output-attrs prints selected attributes.\n"
+        << "\n"
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
@@ -115,7 +120,11 @@ static void query_usage(const char* prog) {
         << "  --attrs KEYS            Deprecated alias for --output-attrs.\n"
         << "  --include-children      Include descendants of matched IDs.\n"
         << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
-        << "  -h, --help              Display this help message.\n";
+        << "  -h, --help              Display this help message.\n"
+        << "\n"
+        << "Attribute column example:\n"
+        << "  ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123\n"
+        << "  --attr Alias=ABC-1 filters records; --output-attrs ID,Name prints fields.\n";
 }
 
 static void window_usage(const char* prog) {
