@@ -509,6 +509,38 @@ static std::optional<std::string> duplicate_attribute_tag(std::string_view attrs
     return std::nullopt;
 }
 
+static bool allows_multiple_attribute_values(std::string_view tag) {
+    return tag == "Parent" || tag == "Alias" || tag == "Note" || tag == "Dbxref" || tag == "Ontology_term";
+}
+
+static std::optional<std::string> invalid_multi_value_attribute_tag(std::string_view attrs) {
+    if (attrs == ".") {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    while (pos <= attrs.size()) {
+        size_t end = attrs.find(';', pos);
+        if (end == std::string_view::npos) {
+            end = attrs.size();
+        }
+        const auto field = attrs.substr(pos, end - pos);
+        if (!field.empty()) {
+            const auto equals = field.find('=');
+            const auto tag = field.substr(0, equals);
+            const auto value = field.substr(equals + 1);
+            if (value.find(',') != std::string_view::npos && !allows_multiple_attribute_values(tag)) {
+                return std::string{tag};
+            }
+        }
+        if (end == attrs.size()) {
+            break;
+        }
+        pos = end + 1;
+    }
+    return std::nullopt;
+}
+
 static std::optional<std::string> seqid_syntax_error(std::string_view seqid) {
     if (seqid.empty()) {
         return "seqid must not be empty";
@@ -579,6 +611,9 @@ static DirectiveParseResult parse_directives(const std::string& path) {
                 } else if (const auto duplicate_tag = duplicate_attribute_tag(attrs)) {
                     result.issues.push_back({line_num, "duplicate_attribute_tag",
                                              "attribute tag " + *duplicate_tag + " appears more than once"});
+                } else if (const auto tag = invalid_multi_value_attribute_tag(attrs)) {
+                    result.issues.push_back({line_num, "invalid_attribute_multivalue",
+                                             "attribute tag " + *tag + " must not contain comma-separated values"});
                 }
             }
             continue;
