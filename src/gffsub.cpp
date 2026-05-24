@@ -863,10 +863,11 @@ static DirectiveParseResult parse_directives(const std::string& path) {
             std::istringstream fields{line};
             std::string directive;
             std::string version;
+            std::string extra;
             fields >> directive >> version;
-            if (directive != "##gff-version" || !is_gff3_version(version)) {
+            if (directive != "##gff-version" || !is_gff3_version(version) || (fields >> extra)) {
                 result.issues.push_back({line_num, "invalid_gff_version",
-                                         "##gff-version must declare a version beginning with 3"});
+                                         "##gff-version must declare exactly one version beginning with 3"});
             }
             if (line_num != 1) {
                 result.issues.push_back({line_num, "invalid_gff_version",

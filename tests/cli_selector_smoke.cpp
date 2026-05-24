@@ -38,7 +38,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "##sequence-region chr2 1 500\n"
         << "##sequence-region chr#bad 1 500\n"
         << "##sequence-region chr_extra 1 500 extra\n"
-        << "##gff-version 3\n"
+        << "##gff-version 3 extra\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tmRNA\t410\t480\t.\t+\t.\tID=disc_tx;Parent=disc_gene\n"
@@ -717,6 +717,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_qc_top.tsv", "disc_cds\tID appears more than once") != 0 ||
         require_not_contains("selector_qc_top.tsv", "disc_poly\tID appears more than once") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_gff_version") != 0 ||
+        require_contains("selector_qc_top.tsv", "##gff-version must declare exactly one version beginning with 3") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid ##sequence-region seqid chr#bad") != 0 ||
