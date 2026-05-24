@@ -84,6 +84,7 @@ static void cleanup_outputs() {
     std::remove("cli_selector_ids.txt");
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
+    std::remove("selector_attr_id.gff3");
     std::remove("selector_id_list.gff3");
     std::remove("selector_query_id_list.gff3");
     std::remove("selector_id_list_children.gff3");
@@ -131,6 +132,11 @@ int main(int argc, char* argv[]) {
 
     if (run_command(exe + " query " + gff + " --id gene0001 > selector_query_id.gff3") != 0 ||
         compare_files("selector_id.gff3", "selector_query_id.gff3") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --attr ID=gene0001 > selector_attr_id.gff3") != 0 ||
+        compare_files("selector_id.gff3", "selector_attr_id.gff3") != 0) {
         return 1;
     }
 
