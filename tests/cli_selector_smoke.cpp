@@ -41,6 +41,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
         << "chr1\tsrc\tgene\t190\t195\t.\t+\t.\tID=dup_attr;Name=A;Name=B\n"
+        << "bad seq\tsrc\tgene\t200\t210\t.\t+\t.\tID=bad_seqid\n"
         << "chr1\tsrc\tgene\t0\t50\t.\t+\t.\tID=bad_coordinate\n"
         << "chr1\tsrc\tmRNA\t500\t600\t.\t+\t.\tID=orphan_tx;Parent=missing_gene\n"
         << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
@@ -692,6 +693,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_syntax") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_attribute_tag") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid_seqid") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
         require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "missing_parent") != 0 ||

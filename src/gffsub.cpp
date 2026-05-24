@@ -509,6 +509,21 @@ static std::optional<std::string> duplicate_attribute_tag(std::string_view attrs
     return std::nullopt;
 }
 
+static std::optional<std::string> seqid_syntax_error(std::string_view seqid) {
+    if (seqid.empty()) {
+        return "seqid must not be empty";
+    }
+    if (seqid.front() == '>') {
+        return "seqid must not begin with unescaped >";
+    }
+    for (const unsigned char c : seqid) {
+        if (std::isspace(c)) {
+            return "seqid must not contain unescaped whitespace";
+        }
+    }
+    return std::nullopt;
+}
+
 static DirectiveParseResult parse_directives(const std::string& path) {
     DirectiveParseResult result;
     std::ifstream in{path};
@@ -1061,6 +1076,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
     for (const auto& rec : data.records) {
         const std::string id = record_id(rec);
         const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
+        if (const auto error = seqid_syntax_error(rec.seqid)) {
+            print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
+        }
         if (rec.start < 1 || rec.end < 1) {
             print_qc_row(std::cout, "error", "invalid_coordinate", rec.line_idx, id,
                          "start and end must be positive 1-based coordinates");
