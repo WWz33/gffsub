@@ -1138,7 +1138,13 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         if (parent_it == attrs.end()) {
             continue;
         }
+        std::unordered_set<std::string> seen_parents;
         for (const auto& parent_id : parent_it->second) {
+            if (!seen_parents.insert(parent_id).second) {
+                print_qc_row(std::cout, "error", "duplicate_parent", rec.line_idx, id,
+                             "Parent " + parent_id + " appears more than once");
+                continue;
+            }
             const auto parent_record_it = by_id.find(parent_id);
             if (parent_record_it == by_id.end()) {
                 print_qc_row(std::cout, "error", "missing_parent", rec.line_idx, id,
