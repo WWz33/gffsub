@@ -74,4 +74,12 @@ void filter_by_feature(GffData& data, std::string_view feature_type) {
     }
 }
 
+void filter_by_seqid(GffData& data, std::string_view seqid) {
+    for (auto& rec : data) {
+        if (rec.kept && rec.seqid != seqid) {
+            rec.kept = false;
+        }
+    }
+}
+
 }  // namespace gffsub

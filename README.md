@@ -13,6 +13,7 @@
 | I want to... | Use this |
 |-------------|----------|
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
+| Extract one chromosome or contig | `gffsub annotation.gff3 --seqid chr1` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
 | Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
 | Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
@@ -32,6 +33,9 @@ These are the shortest forms for the common workflows:
 ```bash
 # Region subset
 gffsub annotation.gff3 -r chr1:1-100000
+
+# Whole seqid subset
+gffsub annotation.gff3 --seqid chr1
 
 # Region subset, one feature type
 gffsub annotation.gff3 -r chr1:1-100000 -f gene
@@ -108,6 +112,9 @@ Use the classic mode when you already know the interval or have a BED file.
 ```bash
 # Extract genes in a 1-based inclusive GFF region
 ./gffsub annotation.gff3 -r chr1:1-100000 -f gene
+
+# Extract all records from one GFF3 seqid column value
+./gffsub annotation.gff3 --seqid chr1
 
 # Extract exons overlapping BED intervals
 ./gffsub annotation.gff3 -b regions.bed -f exon
@@ -248,6 +255,7 @@ gffsub <input.gff3> [options]
 | `--down`, `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
 | `--qc` | flag | Run annotation QC. |
+| `--seqid` | seqid | Keep records whose first GFF3 column exactly matches the value. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |
