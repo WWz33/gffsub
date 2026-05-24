@@ -1044,11 +1044,10 @@ static QcParseResult parse_qc_records(const std::string& path) {
         if (line.empty() || line[0] == '#') {
             continue;
         }
-        if (count_tab_delimited_columns(line) != 9) {
+        const auto cols = split_tab_fields(line);
+        if (cols.size() < 9) {
             continue;
         }
-
-        const auto cols = split_tab_fields(line);
         GffRecord rec;
         rec.seqid = cols[0];
         rec.source = cols[1];
