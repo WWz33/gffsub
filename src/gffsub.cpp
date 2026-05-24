@@ -190,7 +190,7 @@ static void qc_usage(const char* prog) {
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_attribute_value  Empty tag=value attribute value.\n"
-        << "  invalid_attribute_escape  Unescaped ampersand in attributes.\n"
+        << "  invalid_attribute_escape  Unescaped ampersand or double quote in attributes.\n"
         << "  invalid_dbxref    Malformed Dbxref attribute.\n"
         << "  missing_derives_from  Derives_from points to an absent ID.\n"
         << "  invalid_range     start greater than end.\n"
@@ -687,6 +687,9 @@ static std::optional<std::string> percent_encoding_error(std::string_view attrs)
 static std::optional<std::string> attribute_escape_error(std::string_view attrs) {
     if (attrs.find('&') != std::string_view::npos) {
         return "ampersand in attributes must be percent-escaped as %26";
+    }
+    if (attrs.find('"') != std::string_view::npos) {
+        return "double quote in attributes must be percent-escaped as %22";
     }
     return std::nullopt;
 }
