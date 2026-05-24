@@ -472,6 +472,10 @@ static int count_tab_delimited_columns(const std::string& line) {
     return static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
 }
 
+static bool is_fasta_boundary(const std::string& line) {
+    return line.rfind("##FASTA", 0) == 0 || line.rfind(">", 0) == 0;
+}
+
 static std::vector<std::string> split_tab_fields(const std::string& line) {
     std::vector<std::string> cols;
     size_t start = 0;
@@ -941,7 +945,7 @@ static DirectiveParseResult parse_directives(const std::string& path) {
     int gff_version_count = 0;
     while (std::getline(in, line)) {
         ++line_num;
-        if (line.rfind("##FASTA", 0) == 0) {
+        if (is_fasta_boundary(line)) {
             break;
         }
         if (line.rfind("##gff-version", 0) == 0) {
@@ -1037,7 +1041,7 @@ static QcParseResult parse_qc_records(const std::string& path) {
         if (in_fasta) {
             continue;
         }
-        if (line.rfind("##FASTA", 0) == 0) {
+        if (is_fasta_boundary(line)) {
             in_fasta = true;
             continue;
         }

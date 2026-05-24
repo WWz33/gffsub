@@ -76,7 +76,9 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t396\t398\t.\t+\t.\tID=bad_percent;Note=bad%escape\n"
         << "chr1\tsrc\tgene\t399\t400\t.\t+\t.\tID=bad_escape;Note=A&B\n"
         << "chr1\tsrc\texon\t120\t130\t.\t+\t.\tID=dup_parent;Parent=dup_gene,dup_gene\n"
-        << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n";
+        << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n"
+        << ">chr1\n"
+        << "chr1\tsrc\tmRNA\t800\t810\t.\t+\t.\tID=fasta_feature;Parent=fasta_parent\n";
     return true;
 }
 
@@ -754,6 +756,9 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_phase") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_cds_phase") != 0) {
+        return 1;
+    }
+    if (require_not_contains("selector_qc_top.tsv", "fasta_parent") != 0) {
         return 1;
     }
 
