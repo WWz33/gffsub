@@ -195,6 +195,7 @@ static void qc_usage(const char* prog) {
         << "  invalid_gap       Malformed Gap attribute.\n"
         << "  invalid_is_circular  Is_circular value is not true.\n"
         << "  invalid_ontology_term  Malformed Ontology_term attribute.\n"
+        << "  invalid_percent_encoding  Malformed percent encoding in attributes.\n"
         << "  invalid_target    Malformed Target attribute.\n"
         << "  missing_parent    Parent points to an absent ID.\n"
         << "  parent_cycle      Parent relationships contain a cycle.\n"
@@ -545,6 +546,22 @@ static std::optional<std::string> invalid_multi_value_attribute_tag(std::string_
             break;
         }
         pos = end + 1;
+    }
+    return std::nullopt;
+}
+
+static bool is_hex_digit(char c) {
+    return std::isxdigit(static_cast<unsigned char>(c));
+}
+
+static std::optional<std::string> percent_encoding_error(std::string_view attrs) {
+    for (size_t i = 0; i < attrs.size(); ++i) {
+        if (attrs[i] != '%') {
+            continue;
+        }
+        if (i + 2 >= attrs.size() || !is_hex_digit(attrs[i + 1]) || !is_hex_digit(attrs[i + 2])) {
+            return "percent escapes must be % followed by two hex digits";
+        }
     }
     return std::nullopt;
 }
@@ -1306,6 +1323,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const std::string id = record_id(rec);
         const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
         const auto attrs = parse_attributes(rec.attr_raw);
+        if (const auto error = percent_encoding_error(rec.attr_raw)) {
+            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id, *error);
+        }
         if (const auto error = seqid_syntax_error(rec.seqid)) {
             print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
         }
