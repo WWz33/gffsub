@@ -60,6 +60,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tmatch_part\t280\t290\t.\t+\t.\tID=bad_target;Target=read1 20 10\n"
         << "chr1\tsrc\tmatch_part\t300\t320\t.\t+\t.\tID=bad_gap;Gap=M8 X3\n"
         << "chr1\tsrc\tpolypeptide\t330\t360\t.\t+\t.\tID=bad_derives;Derives_from=missing_transcript\n"
+        << "chr1\tsrc\tgene\t370\t380\t.\t+\t.\tID=bad_dbxref;Dbxref=GeneID\n"
         << "chr1\tsrc\texon\t120\t130\t.\t+\t.\tID=dup_parent;Parent=dup_gene,dup_gene\n"
         << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n";
     return true;
@@ -721,6 +722,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "parent_cycle") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_target") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_gap") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid_dbxref") != 0 ||
         require_contains("selector_qc_top.tsv", "missing_derives_from") != 0 ||
         require_contains("selector_qc_top.tsv", "missing_parent") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||

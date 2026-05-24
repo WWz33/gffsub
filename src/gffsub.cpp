@@ -189,6 +189,7 @@ static void qc_usage(const char* prog) {
         << "\n"
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
+        << "  invalid_dbxref    Malformed Dbxref attribute.\n"
         << "  missing_derives_from  Derives_from points to an absent ID.\n"
         << "  invalid_range     start greater than end.\n"
         << "  invalid_gap       Malformed Gap attribute.\n"
@@ -616,6 +617,14 @@ static std::optional<std::string> gap_attribute_error(std::string_view gap) {
     }
     if (!saw_token) {
         return "Gap must contain at least one operation-length pair";
+    }
+    return std::nullopt;
+}
+
+static std::optional<std::string> dbxref_attribute_error(std::string_view dbxref) {
+    const auto colon = dbxref.find(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 == dbxref.size()) {
+        return "Dbxref must have database:accession";
     }
     return std::nullopt;
 }
@@ -1352,6 +1361,14 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             for (const auto& gap : gap_it->second) {
                 if (const auto error = gap_attribute_error(gap)) {
                     print_qc_row(std::cout, "error", "invalid_gap", rec.line_idx, id, *error);
+                }
+            }
+        }
+        const auto dbxref_it = attrs.find("Dbxref");
+        if (dbxref_it != attrs.end()) {
+            for (const auto& dbxref : dbxref_it->second) {
+                if (const auto error = dbxref_attribute_error(dbxref)) {
+                    print_qc_row(std::cout, "error", "invalid_dbxref", rec.line_idx, id, *error);
                 }
             }
         }
