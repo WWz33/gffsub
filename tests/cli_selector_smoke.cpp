@@ -101,6 +101,7 @@ static void cleanup_outputs() {
     std::remove("selector_query_children.gff3");
     std::remove("selector_children_type.gff3");
     std::remove("selector_query_children_type.gff3");
+    std::remove("selector_region_intersection.gff3");
     std::remove("selector_window_top.gff3");
     std::remove("selector_window_command.gff3");
     std::remove("selector_qc_top.tsv");
@@ -223,6 +224,14 @@ int main(int argc, char* argv[]) {
         compare_files("selector_children_type.gff3", "selector_query_children_type.gff3") != 0 ||
         require_contains("selector_children_type.gff3", "ID=tx1") != 0 ||
         require_not_contains("selector_children_type.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --id gene0001 --region chr1:130-140 > selector_region_intersection.gff3") != 0 ||
+        require_contains("selector_region_intersection.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_region_intersection.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_region_intersection.gff3", "ID=exon1") != 0 ||
+        require_not_contains("selector_region_intersection.gff3", "ID=gene0002") != 0) {
         return 1;
     }
 
