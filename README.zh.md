@@ -254,7 +254,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 ./gffsub annotation.gff3 --qc
 ```
 
-当前检查会报告非法 `##gff-version` directive、非法列数、非法属性语法、重复属性 tag、非法逗号分隔属性值、非法 seqid、非法 feature type、重复 ID、非法或重复的 `##sequence-region` directive、非正坐标、非法坐标范围、非法 score 值、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、非法 `Dbxref`、`Gap`、`Is_circular`、`Ontology_term`、`Target` 或 percent-encoding 属性格式、Parent 重复、Parent 环、缺失 `Derives_from` 或 Parent 引用，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
+当前检查会报告非法 `##gff-version` directive、非法列数、非法属性语法、空属性值、重复属性 tag、非法逗号分隔属性值、未转义的 ampersand、非法 seqid、非法 feature type、重复 ID、非法或重复的 `##sequence-region` directive、非正坐标、非法坐标范围、非法 score 值、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、非法 `Dbxref`、`Gap`、`Is_circular`、`Ontology_term`、`Target` 或 percent-encoding 属性格式、Parent 重复、Parent 环、缺失 `Derives_from` 或 Parent 引用，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
 
 ## CLI 参数
 
@@ -353,7 +353,7 @@ gffsub window <input.gff3> --id ID [options]
 gffsub qc <input.gff3>
 ```
 
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `invalid_gff_version`、`invalid_column_count`、`invalid_attribute_syntax`、`invalid_attribute_value`、`duplicate_attribute_tag`、`invalid_attribute_multivalue`、`invalid_seqid`、`invalid_feature_type`、`duplicate_id`、`invalid_sequence_region`、`duplicate_sequence_region`、`invalid_coordinate`、`invalid_range`、`invalid_score`、`outside_sequence_region`、`invalid_strand`、`invalid_phase`、`invalid_cds_phase`、`invalid_dbxref`、`invalid_gap`、`invalid_is_circular`、`invalid_ontology_term`、`invalid_percent_encoding`、`invalid_target`、`duplicate_parent`、`parent_cycle`、`missing_derives_from`、`missing_parent` 和 `child_outside_parent`。在严格 GFF3 QC 中，每个 `tag=value` 属性都必须有非空 value，逗号分隔多值只接受 `Parent`、`Alias`、`Note`、`Dbxref` 和 `Ontology_term`；其他属性值里的字面逗号应做 URL escape。带 `Is_circular=true` 的 `region` feature 可以让同一 seqid 上的 feature 越过其 `##sequence-region` 终点。
+同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `invalid_gff_version`、`invalid_column_count`、`invalid_attribute_syntax`、`invalid_attribute_value`、`invalid_attribute_escape`、`duplicate_attribute_tag`、`invalid_attribute_multivalue`、`invalid_seqid`、`invalid_feature_type`、`duplicate_id`、`invalid_sequence_region`、`duplicate_sequence_region`、`invalid_coordinate`、`invalid_range`、`invalid_score`、`outside_sequence_region`、`invalid_strand`、`invalid_phase`、`invalid_cds_phase`、`invalid_dbxref`、`invalid_gap`、`invalid_is_circular`、`invalid_ontology_term`、`invalid_percent_encoding`、`invalid_target`、`duplicate_parent`、`parent_cycle`、`missing_derives_from`、`missing_parent` 和 `child_outside_parent`。在严格 GFF3 QC 中，每个 `tag=value` 属性都必须有非空 value，属性内容里的 ampersand 必须写成 `%26`，逗号分隔多值只接受 `Parent`、`Alias`、`Note`、`Dbxref` 和 `Ontology_term`；其他属性值里的字面逗号应做 URL escape。带 `Is_circular=true` 的 `region` feature 可以让同一 seqid 上的 feature 越过其 `##sequence-region` 终点。
 
 ## 输出格式
 

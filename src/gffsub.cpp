@@ -189,6 +189,8 @@ static void qc_usage(const char* prog) {
         << "\n"
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
+        << "  invalid_attribute_value  Empty tag=value attribute value.\n"
+        << "  invalid_attribute_escape  Unescaped ampersand in attributes.\n"
         << "  invalid_dbxref    Malformed Dbxref attribute.\n"
         << "  missing_derives_from  Derives_from points to an absent ID.\n"
         << "  invalid_range     start greater than end.\n"
@@ -588,6 +590,13 @@ static std::optional<std::string> percent_encoding_error(std::string_view attrs)
         if (i + 2 >= attrs.size() || !is_hex_digit(attrs[i + 1]) || !is_hex_digit(attrs[i + 2])) {
             return "percent escapes must be % followed by two hex digits";
         }
+    }
+    return std::nullopt;
+}
+
+static std::optional<std::string> attribute_escape_error(std::string_view attrs) {
+    if (attrs.find('&') != std::string_view::npos) {
+        return "ampersand in attributes must be percent-escaped as %26";
     }
     return std::nullopt;
 }
@@ -1401,6 +1410,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const auto attrs = parse_attributes(rec.attr_raw);
         if (const auto error = percent_encoding_error(rec.attr_raw)) {
             print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id, *error);
+        }
+        if (const auto error = attribute_escape_error(rec.attr_raw)) {
+            print_qc_row(std::cout, "error", "invalid_attribute_escape", rec.line_idx, id, *error);
         }
         if (const auto error = seqid_syntax_error(rec.seqid)) {
             print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
