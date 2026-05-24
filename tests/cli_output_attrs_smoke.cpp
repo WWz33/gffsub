@@ -31,6 +31,15 @@ static int run_command(const std::string& command) {
     return status;
 }
 
+static int expect_command_failure(const std::string& command) {
+    const int status = std::system(command.c_str());
+    if (status == 0) {
+        std::cerr << "command unexpectedly succeeded: " << command << '\n';
+        return 1;
+    }
+    return 0;
+}
+
 static int compare_files(const std::string& lhs_path, const std::string& rhs_path) {
     const auto lhs = read_file(lhs_path);
     const auto rhs = read_file(rhs_path);
@@ -49,6 +58,10 @@ static void cleanup_outputs() {
     std::remove("query_output_attrs_main.tsv");
     std::remove("query_output_attrs_short.tsv");
     std::remove("query_output_attrs_old.tsv");
+    std::remove("output_attrs_regions.bed");
+    std::remove("output_attrs_bad.out");
+    std::remove("output_attrs_bad.err");
+    std::remove("output_attrs_bad.gff3");
 }
 
 int main(int argc, char* argv[]) {
@@ -62,6 +75,14 @@ int main(int argc, char* argv[]) {
     if (!write_test_annotation(gff)) {
         std::cerr << "cannot write test annotation\n";
         return 1;
+    }
+    {
+        std::ofstream bed{"output_attrs_regions.bed"};
+        if (!bed.is_open()) {
+            std::cerr << "cannot write BED test regions\n";
+            return 1;
+        }
+        bed << "chr1\t99\t400\n";
     }
 
     const std::string keys{"ID,Name,Alias,Dbxref"};
@@ -90,6 +111,20 @@ int main(int argc, char* argv[]) {
     }
     if (compare_files("query_output_attrs_main.tsv", "query_output_attrs_short.tsv") != 0 ||
         compare_files("query_output_attrs_main.tsv", "query_output_attrs_old.tsv") != 0) {
+        return 1;
+    }
+
+    const std::string bad_redirect{" > output_attrs_bad.out 2> output_attrs_bad.err"};
+    if (expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+                               " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+                               " --longest" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+                               " --threads 2" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+                               " --output-format gtf3" + bad_redirect) != 0 ||
+        expect_command_failure(exe + " " + gff + " --id gene0001 --output-attrs " + keys +
+                               " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
         return 1;
     }
 
