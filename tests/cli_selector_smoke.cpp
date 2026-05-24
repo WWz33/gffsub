@@ -61,6 +61,11 @@ static void cleanup_outputs() {
     std::remove("selector_name.gff3");
     std::remove("selector_alias.gff3");
     std::remove("selector_dbxref.gff3");
+    std::remove("selector_name_summary.tsv");
+    std::remove("selector_gene_id_summary.tsv");
+    std::remove("selector_locus_tag_summary.tsv");
+    std::remove("selector_alias_summary.tsv");
+    std::remove("selector_dbxref_summary.tsv");
     std::remove("selector_parent.gff3");
     std::remove("selector_children.gff3");
 }
@@ -99,6 +104,31 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --name GeneID:123 > selector_dbxref.gff3") != 0 ||
         require_contains("selector_dbxref.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_dbxref.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --name ABC1 --summary-format tsv > selector_name_summary.tsv") != 0 ||
+        require_contains("selector_name_summary.tsv", "ABC1\tgene0001\tName") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --name G1 --summary-format tsv > selector_gene_id_summary.tsv") != 0 ||
+        require_contains("selector_gene_id_summary.tsv", "G1\tgene0001\tgene_id") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --name Locus1 --summary-format tsv > selector_locus_tag_summary.tsv") != 0 ||
+        require_contains("selector_locus_tag_summary.tsv", "Locus1\tgene0001\tlocus_tag") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --name LegacyABC --summary-format tsv > selector_alias_summary.tsv") != 0 ||
+        require_contains("selector_alias_summary.tsv", "LegacyABC\tgene0001\tAlias") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe + " " + gff + " --name GeneID:123 --summary-format tsv > selector_dbxref_summary.tsv") != 0 ||
+        require_contains("selector_dbxref_summary.tsv", "GeneID:123\tgene0001\tDbxref") != 0) {
         return 1;
     }
 
