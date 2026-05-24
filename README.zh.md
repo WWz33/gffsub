@@ -151,6 +151,17 @@ ctest --test-dir build --output-on-failure
 
 summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向、feature 类型、parent ID、child 数量、transcript 数量、exon 数量、CDS 长度和状态。
 
+非 region 查询常用这些第 9 列属性键：
+
+| 任务 | 命令 | 使用的键 |
+|------|------|----------|
+| 精确 feature 查询 | `--id gene0001` | `ID` |
+| 批量精确 feature 查询 | `--id-list genes.txt` | 每行一个 `ID` 值 |
+| 基因名称查询 | `--name ABC1` | gene 记录上的 `ID`、`gene_id`、`Name`、`locus_tag`、`Alias` 或完整 `Dbxref` 值 |
+| 任意精确属性过滤 | `--attr Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
+| 包含匹配记录后代 | `--include-children` | 通过 `Parent` 连接的 child 记录 |
+| 打印指定属性 | `--output-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
+
 ## 场景：提取上下游窗口
 
 当你需要某个基因或 feature 周围的局部注释背景时，优先使用顶层 window 参数。
