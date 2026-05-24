@@ -1617,9 +1617,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
             print_qc_row(std::cout, "error", "invalid_strand", rec.line_idx, id,
                          std::string{"strand "} + rec.strand + " must be +, -, ., or ?");
         }
-        if (rec.type != "CDS" && rec.phase != '.' && rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
+        if (rec.type != "CDS" && rec.phase != '.') {
             print_qc_row(std::cout, "error", "invalid_phase", rec.line_idx, id,
-                         std::string{"phase "} + rec.phase + " must be ., 0, 1, or 2");
+                         std::string{"non-CDS phase "} + rec.phase + " must be .");
         }
         if (rec.type == "CDS" && rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
             print_qc_row(std::cout, "error", "invalid_cds_phase", rec.line_idx, id,

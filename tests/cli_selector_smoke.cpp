@@ -62,6 +62,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tmRNA\t610\t620\t.\t+\t.\tID=extra_column_child;Parent=missing_extra_parent\textra\n"
         << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
         << "chr1\tsrc\tgene\t900\t950\t.\t+\tx\tID=bad_phase\n"
+        << "chr1\tsrc\texon\t700\t710\t.\t+\t1\tID=bad_non_cds_phase\n"
         << "chr2\tsrc\tgene\t490\t510\t.\t+\t.\tID=outside_region\n"
         << "chr1\tsrc\tregion\t1\t1200\t.\t+\t.\tID=circular_region;Is_circular=true\n"
         << "chr1\tsrc\tgene\t1190\t1210\t.\t+\t.\tID=circular_gene\n"
@@ -755,6 +756,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "Parent missing_extra_parent was not found") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_phase") != 0 ||
+        require_contains("selector_qc_top.tsv", "non-CDS phase 1 must be .") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_cds_phase") != 0) {
         return 1;
     }
