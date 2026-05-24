@@ -17,7 +17,7 @@
 | Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
 | Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
-| Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
+| Find features by attribute value | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | Extract many IDs and include their children | `gffsub annotation.gff3 --ids genes.txt -C` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
@@ -55,7 +55,7 @@ gffsub annotation.gff3 --id GeneA
 gffsub annotation.gff3 --name ABC1
 
 # Extract exact attribute matches
-gffsub annotation.gff3 --attr biotype=protein_coding
+gffsub annotation.gff3 --where biotype=protein_coding
 
 # Extract a batch of IDs
 gffsub annotation.gff3 --ids genes.txt
@@ -136,7 +136,7 @@ Use the top-level selector form when the question starts from an identifier, nam
 ./gffsub annotation.gff3 --name ABC1
 
 # Attribute selector
-./gffsub annotation.gff3 --attr biotype=protein_coding
+./gffsub annotation.gff3 --where biotype=protein_coding
 
 # Include descendants such as transcript, exon, CDS, and UTR records
 ./gffsub annotation.gff3 --id Glyma.01G000100 -C
@@ -159,13 +159,13 @@ GFF3 stores record attributes in column 9 as semicolon-separated `KEY=VALUE` pai
 chr1	src	gene	100	400	.	+	.	ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123
 ```
 
-Use `--id` for exact `ID` lookup, `--name` for gene lookup across common naming keys, and `--attr KEY=VALUE` for any exact attribute-value filter:
+Use `--id` for exact `ID` lookup, `--name` for gene lookup across common naming keys, and `--where KEY=VALUE` for any exact attribute-value filter:
 
 ```bash
 ./gffsub annotation.gff3 --id gene0001
 ./gffsub annotation.gff3 --name ABC1
-./gffsub annotation.gff3 --attr Alias=ABC-1
-./gffsub annotation.gff3 --attr Dbxref=GeneID:123
+./gffsub annotation.gff3 --where Alias=ABC-1
+./gffsub annotation.gff3 --where Dbxref=GeneID:123
 ```
 
 Non-region selectors use these column-9 keys:
@@ -175,7 +175,7 @@ Non-region selectors use these column-9 keys:
 | Exact feature lookup | `--id gene0001` | `ID` |
 | Batch exact feature lookup | `--ids genes.txt` | `ID` values, one per line |
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
-| Any exact attribute filter | `--attr Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
+| Any exact attribute filter | `--where Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
 | Include matched descendants | `-C`, `--include-children` | child records linked by `Parent` |
 | Print selected attributes | `--out-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
@@ -185,7 +185,7 @@ Use `--out-attrs` when the records are already selected and you want selected co
 ./gffsub annotation.gff3 --id gene0001 --out-attrs ID,Name,Alias,Dbxref
 ```
 
-`--output-attrs` is a verbose alias. `--attrs` remains as a deprecated compatibility alias.
+`--attr KEY=VALUE` is a compatibility alias for `--where KEY=VALUE`. `--output-attrs` is a verbose alias for `--out-attrs`. `--attrs` remains as a deprecated compatibility alias.
 
 ## Scenario: Extract Upstream Or Downstream Windows
 
@@ -238,8 +238,8 @@ gffsub <input.gff3> [options]
 | `--id` | ID | Keep the exact feature `ID`. This option can be repeated. This is the top-level selector for exact-ID extraction. |
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. `--id-list` is a verbose alias. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
-| `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. |
-| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--attr`. |
+| `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. `--attr` is a compatibility alias. |
+| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -274,7 +274,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. `--id-list` is a verbose alias. |
 | `--region` | `CHR:START-END` | Query features overlapping a 1-based inclusive region. |
 | `--type` | type | Restrict query output to one feature type. |
-| `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. |
+| `--where`, `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. `--attr` is a compatibility alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `-C`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |

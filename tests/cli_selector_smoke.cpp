@@ -85,6 +85,7 @@ static void cleanup_outputs() {
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
     std::remove("selector_attr_id.gff3");
+    std::remove("selector_where_id.gff3");
     std::remove("selector_id_list.gff3");
     std::remove("selector_id_list_verbose.gff3");
     std::remove("selector_query_id_list.gff3");
@@ -104,7 +105,9 @@ static void cleanup_outputs() {
     std::remove("selector_alias_summary.tsv");
     std::remove("selector_dbxref_summary.tsv");
     std::remove("selector_parent.gff3");
+    std::remove("selector_parent_attr.gff3");
     std::remove("selector_query_parent.gff3");
+    std::remove("selector_query_parent_attr.gff3");
     std::remove("selector_children.gff3");
     std::remove("selector_query_children.gff3");
     std::remove("selector_query_children_short.gff3");
@@ -142,6 +145,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_query_help.txt", "Most workflows can use the top-level form") != 0 ||
         require_contains("selector_query_help.txt", "--ids FILE") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --ids") != 0 ||
+        require_contains("selector_query_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_query_help.txt", "--summary FMT") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --summary") != 0) {
         return 1;
@@ -156,6 +160,7 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " --help > selector_help.txt 2>&1") != 0 ||
         require_contains("selector_help.txt", "--format FMT") != 0 ||
+        require_contains("selector_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -173,6 +178,10 @@ int main(int argc, char* argv[]) {
 
     if (run_command(exe + " " + gff + " --attr ID=gene0001 > selector_attr_id.gff3") != 0 ||
         compare_files("selector_id.gff3", "selector_attr_id.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --where ID=gene0001 > selector_where_id.gff3") != 0 ||
+        compare_files("selector_id.gff3", "selector_where_id.gff3") != 0) {
         return 1;
     }
 
@@ -258,13 +267,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --attr Parent=tx1 > selector_parent.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --where Parent=tx1 > selector_parent.gff3") != 0 ||
         require_contains("selector_parent.gff3", "ID=exon1") != 0 ||
         require_not_contains("selector_parent.gff3", "ID=gene0001") != 0) {
         return 1;
     }
-    if (run_command(exe + " query " + gff + " --attr Parent=tx1 > selector_query_parent.gff3") != 0 ||
-        compare_files("selector_parent.gff3", "selector_query_parent.gff3") != 0) {
+    if (run_command(exe + " " + gff + " --attr Parent=tx1 > selector_parent_attr.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --where Parent=tx1 > selector_query_parent.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --attr Parent=tx1 > selector_query_parent_attr.gff3") != 0 ||
+        compare_files("selector_parent.gff3", "selector_parent_attr.gff3") != 0 ||
+        compare_files("selector_parent.gff3", "selector_query_parent.gff3") != 0 ||
+        compare_files("selector_query_parent.gff3", "selector_query_parent_attr.gff3") != 0) {
         return 1;
     }
 

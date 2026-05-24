@@ -17,7 +17,7 @@
 | 按精确 ID 提取一个 feature | `gffsub annotation.gff3 --id GeneA` |
 | 批量提取精确 ID | `gffsub annotation.gff3 --ids genes.txt` |
 | 按 name 找一个基因或 feature | `gffsub annotation.gff3 --name GeneA` |
-| 按属性值提取 feature | `gffsub annotation.gff3 --attr biotype=protein_coding` |
+| 按属性值提取 feature | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | 批量提取 ID，并带上子 feature | `gffsub annotation.gff3 --ids genes.txt -C` |
 | 输出适合 pipeline 读取的 summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
@@ -55,7 +55,7 @@ gffsub annotation.gff3 --id GeneA
 gffsub annotation.gff3 --name ABC1
 
 # 提取精确属性匹配
-gffsub annotation.gff3 --attr biotype=protein_coding
+gffsub annotation.gff3 --where biotype=protein_coding
 
 # 批量提取 ID
 gffsub annotation.gff3 --ids genes.txt
@@ -136,7 +136,7 @@ ctest --test-dir build --output-on-failure
 ./gffsub annotation.gff3 --name ABC1
 
 # 属性选择器
-./gffsub annotation.gff3 --attr biotype=protein_coding
+./gffsub annotation.gff3 --where biotype=protein_coding
 
 # 包含 transcript、exon、CDS、UTR 等后代记录
 ./gffsub annotation.gff3 --id Glyma.01G000100 -C
@@ -158,7 +158,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 | 精确 feature 查询 | `--id gene0001` | `ID` |
 | 批量精确 feature 查询 | `--ids genes.txt` | 每行一个 `ID` 值 |
 | 基因名称查询 | `--name ABC1` | gene 记录上的 `ID`、`gene_id`、`Name`、`locus_tag`、`Alias` 或完整 `Dbxref` 值 |
-| 任意精确属性过滤 | `--attr Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
+| 任意精确属性过滤 | `--where Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
 | 包含匹配记录后代 | `-C`, `--include-children` | 通过 `Parent` 连接的 child 记录 |
 | 打印指定属性 | `--out-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
 
@@ -213,8 +213,8 @@ gffsub <input.gff3> [options]
 | `--id` | ID | 保留精确 feature `ID`。该参数可以重复使用。这是精确 ID 提取的顶层 selector。 |
 | `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。这是批量精确 ID 提取的顶层 selector。`--id-list` 是较长兼容别名。 |
 | `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。这是常见基因命名键的顶层 selector。 |
-| `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。 |
-| `-C`, `--include-children` | 标志 | 包含由 `--id`、`--ids`、`--name` 或 `--attr` 匹配记录的后代。 |
+| `--where`, `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。`--attr` 是兼容别名。 |
+| `-C`, `--include-children` | 标志 | 包含由 `--id`、`--ids`、`--name` 或 `--where` 匹配记录的后代。 |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
 | `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。`--summary-format` 是较长兼容别名。 |
@@ -249,7 +249,7 @@ gffsub query <input.gff3> [options]
 | `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。`--id-list` 是较长兼容别名。 |
 | `--region` | `CHR:START-END` | 查询与 1-based 闭合区间重叠的 feature。 |
 | `--type` | 类型 | 将查询输出限制为一个 feature 类型。 |
-| `--attr` | `KEY=VALUE` | 按精确属性值查询。该参数可以重复使用。 |
+| `--where`, `--attr` | `KEY=VALUE` | 按精确属性值查询。该参数可以重复使用。`--attr` 是兼容别名。 |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值追加为额外 TSV/JSON 字段。 |
 | `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
 | `-C`, `--include-children` | 标志 | 包含匹配记录的后代，例如 transcript、exon、CDS 和 UTR feature。 |

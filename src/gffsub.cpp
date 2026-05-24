@@ -28,11 +28,11 @@ static void usage(const char* prog) {
         << "  --name NAME\n"
         << "      Extract a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
         << "      Top-level selector for common gene naming keys.\n"
-        << "  --attr KEY=VALUE\n"
+        << "  --where KEY=VALUE, --attr KEY=VALUE\n"
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
-        << "      Top-level selector for exact column-9 KEY=VALUE matches.\n"
+        << "      Top-level selector for exact column-9 KEY=VALUE matches. --attr is a compatibility alias.\n"
         << "  -C, --include-children\n"
-        << "      Include descendants of records matched by --id, --ids, --name, or --attr.\n"
+        << "      Include descendants of records matched by --id, --ids, --name, or --where.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
         << "      --attrs remains as a deprecated alias.\n"
@@ -87,7 +87,7 @@ static void usage(const char* prog) {
         << "Attribute column example:\n"
         << "  ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123\n"
         << "  --id searches ID exactly; --name searches common gene naming keys.\n"
-        << "  --attr KEY=VALUE filters records; --out-attrs prints selected attributes.\n"
+        << "  --where KEY=VALUE filters records; --out-attrs prints selected attributes.\n"
         << "\n"
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
@@ -98,7 +98,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
         << "  " << prog << " annotation.gff3 --qc\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
-        << "  " << prog << " annotation.gff3 --attr biotype=protein_coding\n"
+        << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
@@ -118,7 +118,8 @@ static void query_usage(const char* prog) {
         << "  --id-list FILE          Verbose alias for --ids.\n"
         << "  --region CHR:START-END  Query features overlapping a 1-based inclusive region.\n"
         << "  --type TYPE             Restrict query output by feature type.\n"
-        << "  --attr KEY=VALUE        Query features by an exact GFF3 attribute value.\n"
+        << "  --where KEY=VALUE       Query features by an exact GFF3 attribute value.\n"
+        << "  --attr KEY=VALUE        Compatibility alias for --where.\n"
         << "  --out-attrs KEYS        Output selected attributes as extra TSV/JSON fields.\n"
         << "  --output-attrs KEYS     Verbose alias for --out-attrs.\n"
         << "  --attrs KEYS            Deprecated alias for --out-attrs.\n"
@@ -129,7 +130,7 @@ static void query_usage(const char* prog) {
         << "\n"
         << "Attribute column example:\n"
         << "  ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123\n"
-        << "  --attr Alias=ABC-1 filters records; --out-attrs ID,Name prints fields.\n";
+        << "  --where Alias=ABC-1 filters records; --out-attrs ID,Name prints fields.\n";
 }
 
 static void window_usage(const char* prog) {
@@ -491,12 +492,12 @@ static int run_query(int argc, char* argv[], const char* prog) {
             auto value = require_value("--type");
             if (!value) return 1;
             feature_type = *value;
-        } else if (arg == "--attr") {
-            auto value = require_value("--attr");
+        } else if (arg == "--where" || arg == "--attr") {
+            auto value = require_value(arg.c_str());
             if (!value) return 1;
             const auto equal_pos = value->find('=');
             if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value->size()) {
-                std::cerr << "Error: --attr expects KEY=VALUE\n";
+                std::cerr << "Error: " << arg << " expects KEY=VALUE\n";
                 return 1;
             }
             attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
@@ -847,6 +848,7 @@ int main(int argc, char* argv[]) {
         {"ids",           required_argument, nullptr, OPT_ID_LIST},
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
         {"name",          required_argument, nullptr, OPT_NAME},
+        {"where",         required_argument, nullptr, OPT_ATTR},
         {"attr",          required_argument, nullptr, OPT_ATTR},
         {"output-attrs",  required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"out-attrs",     required_argument, nullptr, OPT_OUTPUT_ATTRS},
@@ -882,7 +884,7 @@ int main(int argc, char* argv[]) {
                 const std::string value{optarg};
                 const auto equal_pos = value.find('=');
                 if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value.size()) {
-                    std::cerr << "Error: --attr expects KEY=VALUE\n";
+                    std::cerr << "Error: --" << long_options[option_index].name << " expects KEY=VALUE\n";
                     return 1;
                 }
                 attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
@@ -1043,7 +1045,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back(feature);
         }
         for (const auto& [key, value] : attr_filters) {
-            query_args.push_back("--attr");
+            query_args.push_back("--where");
             query_args.push_back(key + "=" + value);
         }
         if (include_children) {
