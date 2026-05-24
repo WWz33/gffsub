@@ -84,6 +84,7 @@ static void cleanup_outputs() {
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
     std::remove("selector_name.gff3");
+    std::remove("selector_query_name.gff3");
     std::remove("selector_alias.gff3");
     std::remove("selector_dbxref.gff3");
     std::remove("selector_name_summary.tsv");
@@ -92,7 +93,9 @@ static void cleanup_outputs() {
     std::remove("selector_alias_summary.tsv");
     std::remove("selector_dbxref_summary.tsv");
     std::remove("selector_parent.gff3");
+    std::remove("selector_query_parent.gff3");
     std::remove("selector_children.gff3");
+    std::remove("selector_query_children.gff3");
     std::remove("selector_window_top.gff3");
     std::remove("selector_window_command.gff3");
     std::remove("selector_qc_top.tsv");
@@ -126,6 +129,10 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --name ABC1 > selector_name.gff3") != 0 ||
         require_contains("selector_name.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_name.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --name ABC1 > selector_query_name.gff3") != 0 ||
+        compare_files("selector_name.gff3", "selector_query_name.gff3") != 0) {
         return 1;
     }
 
@@ -171,12 +178,20 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_parent.gff3", "ID=gene0001") != 0) {
         return 1;
     }
+    if (run_command(exe + " query " + gff + " --attr Parent=tx1 > selector_query_parent.gff3") != 0 ||
+        compare_files("selector_parent.gff3", "selector_query_parent.gff3") != 0) {
+        return 1;
+    }
 
     if (run_command(exe + " " + gff + " --id gene0001 --include-children > selector_children.gff3") != 0 ||
         require_contains("selector_children.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_children.gff3", "ID=tx1") != 0 ||
         require_contains("selector_children.gff3", "ID=exon1") != 0 ||
         require_not_contains("selector_children.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --id gene0001 --include-children > selector_query_children.gff3") != 0 ||
+        compare_files("selector_children.gff3", "selector_query_children.gff3") != 0) {
         return 1;
     }
 
