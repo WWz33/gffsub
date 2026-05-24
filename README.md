@@ -168,6 +168,17 @@ Use `--id` for exact `ID` lookup, `--name` for gene lookup across common naming 
 ./gffsub annotation.gff3 --attr Dbxref=GeneID:123
 ```
 
+Non-region selectors use these column-9 keys:
+
+| Task | Command | Keys used |
+|------|---------|-----------|
+| Exact feature lookup | `--id gene0001` | `ID` |
+| Batch exact feature lookup | `--id-list genes.txt` | `ID` values, one per line |
+| Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
+| Any exact attribute filter | `--attr Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
+| Include matched descendants | `--include-children` | child records linked by `Parent` |
+| Print selected attributes | `--output-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
+
 Use `--output-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
 
 ```bash
