@@ -50,6 +50,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
         << "chr1\tsrc\tgene\tabc\t180\t.\t+\t.\tID=bad_coordinate_text\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
+        << "chr1\tsrc\tgene\t181\t190\t.\t+\t.\tID=bad_attr_equals;Note=A=B\n"
         << "chr1\tsrc\tgene\t190\t195\t.\t+\t.\tID=dup_attr;Name=A;Name=B\n"
         << "chr1\tsrc\tgene\t196\t198\t.\t+\t.\tID=bad_multivalue;Name=A,B\n"
         << "chr1\tsrc\tgene\t199\t199\t.\t+\t.\tID=bad_empty_attr;Name=\n"
@@ -731,6 +732,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
         require_contains("selector_qc_top.tsv", "attribute tag Name must not contain comma-separated values") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_syntax") != 0 ||
+        require_contains("selector_qc_top.tsv", "attributes must be semicolon-separated tag=value fields") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_attribute_tag") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_multivalue") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_value") != 0 ||

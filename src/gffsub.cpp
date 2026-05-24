@@ -570,7 +570,7 @@ static std::optional<std::string> attribute_syntax_error(std::string_view attrs)
         const auto field = attrs.substr(pos, end - pos);
         if (!field.empty()) {
             const auto equals = field.find('=');
-            if (equals == std::string_view::npos || equals == 0) {
+            if (equals == std::string_view::npos || equals == 0 || field.find('=', equals + 1) != std::string_view::npos) {
                 return "attributes must be semicolon-separated tag=value fields";
             }
         }
