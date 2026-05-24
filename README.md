@@ -280,7 +280,7 @@ Run `--qc` before feeding annotations into a graph-aware workflow.
 ./gffsub annotation.gff3 --qc
 ```
 
-Current checks report duplicate IDs, invalid ranges, invalid CDS phases, missing parents, and child features outside parent coordinates. Output is TSV so it can be filtered with standard command-line tools.
+Current checks report duplicate IDs, invalid ranges, invalid strand or phase column values, invalid CDS phases, missing parents, and child features outside parent coordinates. Output is TSV so it can be filtered with standard command-line tools.
 
 ## CLI Parameters
 
@@ -379,7 +379,7 @@ The output is GFF3 records overlapping the expanded window.
 gffsub qc <input.gff3>
 ```
 
-The same workflow can be written at top level with `gffsub <input.gff3> --qc`. QC writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `duplicate_id`, `invalid_range`, `invalid_strand`, `invalid_cds_phase`, `missing_parent`, and `child_outside_parent`.
+The same workflow can be written at top level with `gffsub <input.gff3> --qc`. QC writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `duplicate_id`, `invalid_range`, `invalid_strand`, `invalid_phase`, `invalid_cds_phase`, `missing_parent`, and `child_outside_parent`.
 
 ## Output Formats
 
