@@ -145,6 +145,8 @@ static void window_usage(const char* prog) {
 static void qc_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " qc <input.gff3>\n"
         << "\n"
+        << "Top-level equivalent: " << prog << " <input.gff3> --qc\n"
+        << "\n"
         << "QC checks:\n"
         << "  duplicate_id      Repeated ID attributes.\n"
         << "  invalid_range     start greater than end.\n"
@@ -729,6 +731,11 @@ static int run_window(int argc, char* argv[], const char* prog) {
 }
 
 static int run_qc(int argc, char* argv[], const char* prog) {
+    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        qc_usage(prog);
+        return 0;
+    }
+
     if (argc != 2) {
         qc_usage(prog);
         return 1;

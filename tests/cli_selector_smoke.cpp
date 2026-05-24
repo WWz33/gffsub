@@ -113,6 +113,7 @@ static void cleanup_outputs() {
     std::remove("selector_qc_command.tsv");
     std::remove("selector_query_help.txt");
     std::remove("selector_window_help.txt");
+    std::remove("selector_qc_help.txt");
 }
 
 int main(int argc, char* argv[]) {
@@ -134,6 +135,10 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " window --help > selector_window_help.txt 2>&1") != 0 ||
         require_contains("selector_window_help.txt", "Top-level equivalent") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " qc --help > selector_qc_help.txt 2>&1") != 0 ||
+        require_contains("selector_qc_help.txt", "Top-level equivalent") != 0) {
         return 1;
     }
 
