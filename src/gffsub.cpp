@@ -909,6 +909,11 @@ static DirectiveParseResult parse_directives(const std::string& path) {
                                      "malformed ##sequence-region directive"});
             continue;
         }
+        if (const auto error = seqid_syntax_error(seqid)) {
+            result.issues.push_back({line_num, "invalid_sequence_region",
+                                     "invalid ##sequence-region seqid " + seqid + ": " + *error});
+            continue;
+        }
         if (start < 1 || end < 1 || start > end) {
             result.issues.push_back({line_num, "invalid_sequence_region",
                                      "invalid ##sequence-region coordinates for " + seqid});

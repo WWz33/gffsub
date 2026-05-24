@@ -254,7 +254,7 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 ./gffsub annotation.gff3 --qc
 ```
 
-当前检查会报告非法 `##gff-version` directive、非法列数、非法属性语法、空属性值、重复属性 tag、非法逗号分隔属性值、未转义的 ampersand、非法 seqid（包括 SO seqid 字符集之外的未转义字符）、非法 feature type、重复 ID、非法或重复的 `##sequence-region` directive、非正坐标、非法坐标范围、非法 score 值、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、非法 `Dbxref`、`Gap`、`Is_circular`、`Ontology_term`、`Target` 或 percent-encoding 属性格式、Parent 重复、Parent 环、缺失 `Derives_from` 或 Parent 引用，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
+当前检查会报告非法 `##gff-version` directive、非法列数、非法属性语法、空属性值、重复属性 tag、非法逗号分隔属性值、未转义的 ampersand、非法 seqid（包括 SO seqid 字符集之外的未转义字符）、非法 feature type、重复 ID、非法或重复的 `##sequence-region` directive（包括 directive seqid 非法）、非正坐标、非法坐标范围、非法 score 值、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、非法 `Dbxref`、`Gap`、`Is_circular`、`Ontology_term`、`Target` 或 percent-encoding 属性格式、Parent 重复、Parent 环、缺失 `Derives_from` 或 Parent 引用，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
 
 ## CLI 参数
 
