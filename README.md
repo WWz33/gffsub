@@ -15,6 +15,7 @@
 | Extract features in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
 | Extract one chromosome or contig | `gffsub annotation.gff3 --seqid chr1` |
 | Extract records from one annotation source | `gffsub annotation.gff3 --source Gnomon` |
+| Extract records on one strand | `gffsub annotation.gff3 --strand -` |
 | Use BED regions as input | `gffsub annotation.gff3 -b regions.bed -f exon` |
 | Find one feature by exact ID | `gffsub annotation.gff3 --id GeneA` |
 | Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
@@ -40,6 +41,9 @@ gffsub annotation.gff3 --seqid chr1
 
 # Source column subset
 gffsub annotation.gff3 --source Gnomon
+
+# Strand column subset
+gffsub annotation.gff3 --strand -
 
 # Region subset, one feature type
 gffsub annotation.gff3 -r chr1:1-100000 -f gene
@@ -122,6 +126,9 @@ Use the classic mode when you already know the interval or have a BED file.
 
 # Extract all records from one GFF3 source column value
 ./gffsub annotation.gff3 --source Gnomon
+
+# Extract all records from one GFF3 strand column value
+./gffsub annotation.gff3 --strand -
 
 # Extract exons overlapping BED intervals
 ./gffsub annotation.gff3 -b regions.bed -f exon
@@ -264,6 +271,7 @@ gffsub <input.gff3> [options]
 | `--qc` | flag | Run annotation QC. |
 | `--seqid` | seqid | Keep records whose first GFF3 column exactly matches the value. |
 | `--source` | source | Keep records whose second GFF3 column exactly matches the value. |
+| `--strand` | `+`, `-`, `.`, `?` | Keep records whose seventh GFF3 column exactly matches the value. This is a filter, unlike `--strand-aware`, which only changes window interpretation. |
 | `-r`, `--region` | `CHR:START-END` | Keep features overlapping a 1-based inclusive region. |
 | `-b`, `--bed` | file | Keep features overlapping BED intervals; BED is read as 0-based half-open. |
 | `-f`, `--feature`, `--type` | type | Keep only records whose third column matches the feature type, such as `gene`, `mRNA`, `transcript`, `exon`, or `CDS`. |

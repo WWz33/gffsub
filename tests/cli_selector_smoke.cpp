@@ -14,8 +14,9 @@ static bool write_test_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t100\t400\t.\t+\t.\tID=gene0001;Name=ABC1;gene_id=G1;locus_tag=Locus1;Alias=ABC-1,LegacyABC;Dbxref=GeneID:123\n"
         << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
         << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=tx1\n"
-        << "chr1\tsrc\tgene\t600\t700\t.\t+\t.\tID=gene0002;Name=XYZ1\n"
-        << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n";
+        << "chr1\tsrc\tgene\t600\t700\t.\t-\t.\tID=gene0002;Name=XYZ1\n"
+        << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n"
+        << "chr2\tother\texon\t250\t280\t.\t.\t.\tID=exon2\n";
     return true;
 }
 
@@ -126,6 +127,11 @@ static void cleanup_outputs() {
     std::remove("selector_source_other.gff3");
     std::remove("selector_source_gene.gff3");
     std::remove("selector_seqid_source_intersection.gff3");
+    std::remove("selector_strand_minus.gff3");
+    std::remove("selector_strand_dot.gff3");
+    std::remove("selector_strand_gene.gff3");
+    std::remove("selector_strand_bad.out");
+    std::remove("selector_strand_bad.err");
     std::remove("selector_help.txt");
     std::remove("selector_bed_short.bed");
     std::remove("selector_bed_format.bed");
@@ -179,6 +185,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_help.txt", "--seqid SEQID") != 0 ||
         require_contains("selector_help.txt", "--source SOURCE") != 0 ||
+        require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -378,6 +385,26 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --seqid chr2 --source src > selector_seqid_source_intersection.gff3") != 0 ||
         require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_seqid_source_intersection.gff3", "ID=gene0003") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --strand - > selector_strand_minus.gff3") != 0 ||
+        require_contains("selector_strand_minus.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_strand_minus.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --strand . > selector_strand_dot.gff3") != 0 ||
+        require_contains("selector_strand_dot.gff3", "ID=exon2") != 0 ||
+        require_not_contains("selector_strand_dot.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --strand - -f gene > selector_strand_gene.gff3") != 0 ||
+        require_contains("selector_strand_gene.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_strand_gene.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_strand_gene.gff3", "ID=exon2") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --strand forward > selector_strand_bad.out 2> selector_strand_bad.err") == 0 ||
+        require_contains("selector_strand_bad.err", "Error: --strand expects one of +, -, ., ?") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " -r chr1:100-400 -t bed > selector_bed_short.bed") != 0 ||

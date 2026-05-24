@@ -90,4 +90,12 @@ void filter_by_source(GffData& data, std::string_view source) {
     }
 }
 
+void filter_by_strand(GffData& data, char strand) {
+    for (auto& rec : data) {
+        if (rec.kept && rec.strand != strand) {
+            rec.kept = false;
+        }
+    }
+}
+
 }  // namespace gffsub

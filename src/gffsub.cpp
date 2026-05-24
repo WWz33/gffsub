@@ -65,6 +65,9 @@ static void usage(const char* prog) {
         << "      Filter features by type (3rd column in GFF/GTF).\n"
         << "      Examples: gene, mRNA, exon, CDS, transcript\n"
         << "\n"
+        << "  --strand STRAND\n"
+        << "      Filter features by strand (7th column). Choices: +, -, ., ?\n"
+        << "\n"
         << "  -L, --longest\n"
         << "      Keep only the longest transcript isoform for each gene.\n"
         << "      Per-gene comparison (AGAT logic): if gene has CDS isoforms,\n"
@@ -107,6 +110,7 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
         << "  " << prog << " annotation.gff3 --seqid chr1 -f gene\n"
         << "  " << prog << " annotation.gff3 --source Gnomon -f mRNA\n"
+        << "  " << prog << " annotation.gff3 --strand - -f gene\n"
         << "  " << prog << " annotation.gff3 -r chr1:1-100000 -f gene\n"
         << "  " << prog << " annotation.gff3 --bed regions.bed -f exon\n"
         << "  " << prog << " annotation.gff3 --longest\n"
@@ -320,6 +324,17 @@ static std::vector<std::string> split_attr_keys(std::string_view keys) {
         pos = comma + 1;
     }
     return result;
+}
+
+static std::optional<char> parse_strand_filter(std::string_view value) {
+    if (value.size() != 1) {
+        return std::nullopt;
+    }
+    const char strand = value[0];
+    if (strand == '+' || strand == '-' || strand == '.' || strand == '?') {
+        return strand;
+    }
+    return std::nullopt;
 }
 
 static std::string join_values(const std::vector<std::string>& values) {
@@ -835,6 +850,7 @@ int main(int argc, char* argv[]) {
     std::string region_str;
     std::string seqid_filter;
     std::string source_filter;
+    std::optional<char> strand_filter;
     std::string bed_file;
     std::string feature;
     bool do_longest = false;
@@ -855,7 +871,8 @@ int main(int argc, char* argv[]) {
         OPT_STRAND_AWARE,
         OPT_QC,
         OPT_SEQID,
-        OPT_SOURCE
+        OPT_SOURCE,
+        OPT_STRAND_FILTER
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
@@ -877,6 +894,7 @@ int main(int argc, char* argv[]) {
         {"qc",            no_argument,       nullptr, OPT_QC},
         {"seqid",         required_argument, nullptr, OPT_SEQID},
         {"source",        required_argument, nullptr, OPT_SOURCE},
+        {"strand",        required_argument, nullptr, OPT_STRAND_FILTER},
         {"children",      no_argument,       nullptr, 'C'},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
@@ -932,6 +950,14 @@ int main(int argc, char* argv[]) {
             case OPT_QC: do_qc = true; break;
             case OPT_SEQID: seqid_filter = optarg; break;
             case OPT_SOURCE: source_filter = optarg; break;
+            case OPT_STRAND_FILTER: {
+                strand_filter = parse_strand_filter(optarg);
+                if (!strand_filter) {
+                    std::cerr << "Error: --strand expects one of +, -, ., ?\n";
+                    return 1;
+                }
+                break;
+            }
             case 'r': region_str = optarg; break;
             case 'b': bed_file = optarg; break;
             case 'f': feature = optarg; break;
@@ -985,7 +1011,7 @@ int main(int argc, char* argv[]) {
     if (do_qc) {
         if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
-            strand_aware || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
+            strand_aware || strand_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
             output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: --qc only supports the input file\n";
             return 1;
@@ -1003,7 +1029,7 @@ int main(int argc, char* argv[]) {
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || include_children ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
-            !seqid_filter.empty() || !source_filter.empty() || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
+            !seqid_filter.empty() || !source_filter.empty() || strand_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
@@ -1030,14 +1056,14 @@ int main(int argc, char* argv[]) {
     }
 
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty();
-    const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && bed_file.empty() && !do_longest && !threads_set &&
+    const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && !strand_filter && bed_file.empty() && !do_longest && !threads_set &&
                                                output_format == "gff3" && output_file.empty();
     const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
 
     if (!summary_format.empty() || !output_attrs.empty()) {
         if (!can_dispatch_summary_to_query) {
             std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
-                      << "do not combine with --seqid, --source, --bed, --longest, --threads, --format/--output-format, or --output\n";
+                      << "do not combine with --seqid, --source, --strand, --bed, --longest, --threads, --format/--output-format, or --output\n";
             return 1;
         }
     }
@@ -1164,6 +1190,10 @@ int main(int argc, char* argv[]) {
 
     if (!source_filter.empty()) {
         filter_by_source(data, source_filter);
+    }
+
+    if (strand_filter) {
+        filter_by_strand(data, *strand_filter);
     }
 
     // Apply feature filters
