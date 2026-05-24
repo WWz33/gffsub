@@ -912,6 +912,10 @@ static int run_qc(int argc, char* argv[], const char* prog) {
 
     for (const auto& rec : data.records) {
         const std::string id = record_id(rec);
+        if (rec.start < 1 || rec.end < 1) {
+            print_qc_row(std::cout, "error", "invalid_coordinate", rec.line_idx, id,
+                         "start and end must be positive 1-based coordinates");
+        }
         if (rec.start > rec.end) {
             print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
         }
