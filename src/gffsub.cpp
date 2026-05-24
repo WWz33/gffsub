@@ -31,7 +31,7 @@ static void usage(const char* prog) {
         << "  --attr KEY=VALUE\n"
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Top-level selector for exact column-9 KEY=VALUE matches.\n"
-        << "  --include-children\n"
+        << "  -C, --include-children\n"
         << "      Include descendants of records matched by --id, --id-list, --name, or --attr.\n"
         << "  --output-attrs KEYS, --out-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
@@ -91,7 +91,7 @@ static void usage(const char* prog) {
         << "Examples:\n"
         << "  " << prog << " annotation.gff3 --id GeneA\n"
         << "  " << prog << " annotation.gff3 --id-list genes.txt\n"
-        << "  " << prog << " annotation.gff3 --id GeneA --include-children\n"
+        << "  " << prog << " annotation.gff3 --id GeneA -C\n"
         << "  " << prog << " annotation.gff3 --id GeneA --summary-format tsv\n"
         << "  " << prog << " annotation.gff3 --id GeneA --output-attrs ID,Name,Parent\n"
         << "  " << prog << " annotation.gff3 --id GeneA --upstream 2000 --downstream 500\n"
@@ -118,7 +118,7 @@ static void query_usage(const char* prog) {
         << "  --output-attrs KEYS     Output selected attributes as extra TSV/JSON fields.\n"
         << "  --out-attrs KEYS        Short alias for --output-attrs.\n"
         << "  --attrs KEYS            Deprecated alias for --output-attrs.\n"
-        << "  --include-children      Include descendants of matched IDs.\n"
+        << "  -C, --include-children  Include descendants of matched IDs.\n"
         << "  --summary-format FMT    Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  -h, --help              Display this help message.\n"
         << "\n"
@@ -508,7 +508,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 std::cerr << "Error: --summary-format expects tsv or json\n";
                 return 1;
             }
-        } else if (arg == "--include-children") {
+        } else if (arg == "-C" || arg == "--include-children") {
             include_children = true;
         } else if (arg == "-h" || arg == "--help") {
             query_usage(prog);
@@ -850,7 +850,7 @@ int main(int argc, char* argv[]) {
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "r:b:f:L@:t:o:h", long_options, nullptr)) != -1) {
+    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:h", long_options, nullptr)) != -1) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
             case OPT_ID_LIST: id_list_file = optarg; break;

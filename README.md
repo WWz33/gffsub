@@ -18,7 +18,7 @@
 | Extract many exact IDs | `gffsub annotation.gff3 --id-list genes.txt` |
 | Find a gene or feature by name | `gffsub annotation.gff3 --name GeneA` |
 | Find features by attribute value | `gffsub annotation.gff3 --attr biotype=protein_coding` |
-| Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt --include-children` |
+| Extract many IDs and include their children | `gffsub annotation.gff3 --id-list genes.txt -C` |
 | Produce a pipeline-friendly summary | `gffsub annotation.gff3 --id GeneA --summary-format tsv` |
 | Extract selected attribute values | `gffsub annotation.gff3 --id GeneA --output-attrs ID,Name,Parent` |
 | Extract upstream/downstream context | `gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500 --strand-aware` |
@@ -61,7 +61,7 @@ gffsub annotation.gff3 --attr biotype=protein_coding
 gffsub annotation.gff3 --id-list genes.txt
 
 # Extract an ID and its descendants
-gffsub annotation.gff3 --id GeneA --include-children
+gffsub annotation.gff3 --id GeneA -C
 
 # Extract a region
 gffsub annotation.gff3 --region chr1:1-100000
@@ -139,7 +139,7 @@ Use the top-level selector form when the question starts from an identifier, nam
 ./gffsub annotation.gff3 --attr biotype=protein_coding
 
 # Include descendants such as transcript, exon, CDS, and UTR records
-./gffsub annotation.gff3 --id Glyma.01G000100 --include-children
+./gffsub annotation.gff3 --id Glyma.01G000100 -C
 ```
 
 For batch pipelines, ask for summaries instead of raw GFF3:
@@ -176,7 +176,7 @@ Non-region selectors use these column-9 keys:
 | Batch exact feature lookup | `--id-list genes.txt` | `ID` values, one per line |
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
 | Any exact attribute filter | `--attr Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
-| Include matched descendants | `--include-children` | child records linked by `Parent` |
+| Include matched descendants | `-C`, `--include-children` | child records linked by `Parent` |
 | Print selected attributes | `--output-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
 Use `--output-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
@@ -239,7 +239,7 @@ gffsub <input.gff3> [options]
 | `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
 | `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. |
-| `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
+| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--id-list`, `--name`, or `--attr`. |
 | `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--output-attrs`. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. |
@@ -277,7 +277,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. |
 | `--output-attrs`, `--out-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--output-attrs`. |
-| `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
+| `-C`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
 | `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. |
 | `-h`, `--help` | flag | Show help for query mode. |
 

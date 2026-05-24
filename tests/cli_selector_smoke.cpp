@@ -102,6 +102,8 @@ static void cleanup_outputs() {
     std::remove("selector_query_parent.gff3");
     std::remove("selector_children.gff3");
     std::remove("selector_query_children.gff3");
+    std::remove("selector_query_children_short.gff3");
+    std::remove("selector_children_short.gff3");
     std::remove("selector_children_type.gff3");
     std::remove("selector_query_children_type.gff3");
     std::remove("selector_region_intersection.gff3");
@@ -231,6 +233,14 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " query " + gff + " --id gene0001 --include-children > selector_query_children.gff3") != 0 ||
         compare_files("selector_children.gff3", "selector_query_children.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --id gene0001 -C > selector_query_children_short.gff3") != 0 ||
+        compare_files("selector_children.gff3", "selector_query_children_short.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --id gene0001 -C > selector_children_short.gff3") != 0 ||
+        compare_files("selector_children.gff3", "selector_children_short.gff3") != 0) {
         return 1;
     }
 
