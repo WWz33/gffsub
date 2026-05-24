@@ -111,6 +111,8 @@ static void cleanup_outputs() {
     std::remove("selector_window_command.gff3");
     std::remove("selector_qc_top.tsv");
     std::remove("selector_qc_command.tsv");
+    std::remove("selector_query_help.txt");
+    std::remove("selector_window_help.txt");
 }
 
 int main(int argc, char* argv[]) {
@@ -123,6 +125,15 @@ int main(int argc, char* argv[]) {
     const std::string gff{"cli_selector_smoke.gff3"};
     if (!write_test_annotation(gff)) {
         std::cerr << "cannot write test annotation\n";
+        return 1;
+    }
+
+    if (run_command(exe + " query --help > selector_query_help.txt 2>&1") != 0 ||
+        require_contains("selector_query_help.txt", "Most workflows can use the top-level form") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " window --help > selector_window_help.txt 2>&1") != 0 ||
+        require_contains("selector_window_help.txt", "Top-level equivalent") != 0) {
         return 1;
     }
 

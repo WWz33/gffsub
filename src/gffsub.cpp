@@ -108,6 +108,8 @@ static void usage(const char* prog) {
 static void query_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " query <input.gff3> [options]\n"
         << "\n"
+        << "Most workflows can use the top-level form: " << prog << " <input.gff3> [selectors]\n"
+        << "\n"
         << "Query Options:\n"
         << "  --id ID                 Query a feature by ID.\n"
         << "  --name NAME             Query a gene by ID/Name/gene_id/locus_tag/Alias/Dbxref.\n"
@@ -129,6 +131,8 @@ static void query_usage(const char* prog) {
 
 static void window_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " window <input.gff3> [options]\n"
+        << "\n"
+        << "Top-level equivalent: " << prog << " <input.gff3> --id ID --upstream N --downstream N\n"
         << "\n"
         << "Window Options:\n"
         << "  --id ID                 Target feature ID or gene lookup key.\n"
@@ -628,6 +632,11 @@ static int run_query(int argc, char* argv[], const char* prog) {
 }
 
 static int run_window(int argc, char* argv[], const char* prog) {
+    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        window_usage(prog);
+        return 0;
+    }
+
     if (argc < 2) {
         window_usage(prog);
         return 1;
