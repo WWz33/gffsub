@@ -599,6 +599,11 @@ static DirectiveParseResult parse_directives(const std::string& path) {
                                      "invalid ##sequence-region coordinates for " + seqid});
             continue;
         }
+        if (result.sequence_regions.find(seqid) != result.sequence_regions.end()) {
+            result.issues.push_back({line_num, "duplicate_sequence_region",
+                                     "##sequence-region appears more than once for " + seqid});
+            continue;
+        }
         result.sequence_regions[seqid] = Region{seqid, start, end};
     }
     if (gff_version_count == 0) {

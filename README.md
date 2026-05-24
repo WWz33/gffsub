@@ -280,7 +280,7 @@ Run `--qc` before feeding annotations into a graph-aware workflow.
 ./gffsub annotation.gff3 --qc
 ```
 
-Current checks report invalid `##gff-version` directives, invalid column counts, invalid attribute syntax, duplicate attribute tags, invalid seqids, invalid feature types, duplicate IDs, invalid `##sequence-region` directives, non-positive coordinates, invalid ranges, invalid score values, features outside `##sequence-region` bounds, invalid strand or phase column values, invalid CDS phases, missing parents, and child features outside parent coordinates. Output is TSV so it can be filtered with standard command-line tools.
+Current checks report invalid `##gff-version` directives, invalid column counts, invalid attribute syntax, duplicate attribute tags, invalid seqids, invalid feature types, duplicate IDs, invalid or duplicate `##sequence-region` directives, non-positive coordinates, invalid ranges, invalid score values, features outside `##sequence-region` bounds, invalid strand or phase column values, invalid CDS phases, missing parents, and child features outside parent coordinates. Output is TSV so it can be filtered with standard command-line tools.
 
 ## CLI Parameters
 
@@ -379,7 +379,7 @@ The output is GFF3 records overlapping the expanded window.
 gffsub qc <input.gff3>
 ```
 
-The same workflow can be written at top level with `gffsub <input.gff3> --qc`. QC writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `invalid_gff_version`, `invalid_column_count`, `invalid_attribute_syntax`, `duplicate_attribute_tag`, `invalid_seqid`, `invalid_feature_type`, `duplicate_id`, `invalid_sequence_region`, `invalid_coordinate`, `invalid_range`, `invalid_score`, `outside_sequence_region`, `invalid_strand`, `invalid_phase`, `invalid_cds_phase`, `missing_parent`, and `child_outside_parent`.
+The same workflow can be written at top level with `gffsub <input.gff3> --qc`. QC writes a TSV table with `severity`, `code`, `line_idx`, `id`, and `message`. Current check codes are `invalid_gff_version`, `invalid_column_count`, `invalid_attribute_syntax`, `duplicate_attribute_tag`, `invalid_seqid`, `invalid_feature_type`, `duplicate_id`, `invalid_sequence_region`, `duplicate_sequence_region`, `invalid_coordinate`, `invalid_range`, `invalid_score`, `outside_sequence_region`, `invalid_strand`, `invalid_phase`, `invalid_cds_phase`, `missing_parent`, and `child_outside_parent`.
 
 ## Output Formats
 

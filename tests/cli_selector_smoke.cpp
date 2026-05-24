@@ -34,6 +34,7 @@ static bool write_qc_annotation(const std::string& path) {
     out << "##gff-version 3\n"
         << "##sequence-region chr1 1 1000\n"
         << "##sequence-region chr_bad 100 1\n"
+        << "##sequence-region chr1 1 1200\n"
         << "##gff-version 3\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
         << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
@@ -692,6 +693,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "invalid_gff_version") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
+        require_contains("selector_qc_top.tsv", "duplicate_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_syntax") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_attribute_tag") != 0 ||
