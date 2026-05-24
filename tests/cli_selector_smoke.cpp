@@ -91,8 +91,10 @@ static void cleanup_outputs() {
     std::remove("selector_query_id_list.gff3");
     std::remove("selector_query_id_list_verbose.gff3");
     std::remove("selector_id_list_children.gff3");
+    std::remove("selector_id_list_children_alias.gff3");
     std::remove("selector_id_list_children_verbose.gff3");
     std::remove("selector_query_id_list_children.gff3");
+    std::remove("selector_query_id_list_children_alias.gff3");
     std::remove("selector_query_id_list_children_verbose.gff3");
     std::remove("selector_name.gff3");
     std::remove("selector_query_name.gff3");
@@ -109,7 +111,9 @@ static void cleanup_outputs() {
     std::remove("selector_query_parent.gff3");
     std::remove("selector_query_parent_attr.gff3");
     std::remove("selector_children.gff3");
+    std::remove("selector_children_alias.gff3");
     std::remove("selector_query_children.gff3");
+    std::remove("selector_query_children_alias.gff3");
     std::remove("selector_query_children_short.gff3");
     std::remove("selector_children_short.gff3");
     std::remove("selector_children_type.gff3");
@@ -148,6 +152,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_query_help.txt", "--ids FILE") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --ids") != 0 ||
         require_contains("selector_query_help.txt", "--where KEY=VALUE") != 0 ||
+        require_contains("selector_query_help.txt", "--children") != 0 ||
         require_contains("selector_query_help.txt", "--summary FMT") != 0 ||
         require_contains("selector_query_help.txt", "Verbose alias for --summary") != 0) {
         return 1;
@@ -210,12 +215,16 @@ int main(int argc, char* argv[]) {
         require_contains("selector_id_list.gff3", "ID=gene0002") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --ids " + id_list + " --include-children > selector_id_list_children.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --ids " + id_list + " --children > selector_id_list_children.gff3") != 0 ||
+        run_command(exe + " " + gff + " --ids " + id_list + " --include-children > selector_id_list_children_alias.gff3") != 0 ||
         run_command(exe + " " + gff + " --id-list " + id_list + " --include-children > selector_id_list_children_verbose.gff3") != 0 ||
-        run_command(exe + " query " + gff + " --ids " + id_list + " --include-children > selector_query_id_list_children.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --ids " + id_list + " --children > selector_query_id_list_children.gff3") != 0 ||
+        run_command(exe + " query " + gff + " --ids " + id_list + " --include-children > selector_query_id_list_children_alias.gff3") != 0 ||
         run_command(exe + " query " + gff + " --id-list " + id_list + " --include-children > selector_query_id_list_children_verbose.gff3") != 0 ||
+        compare_files("selector_id_list_children.gff3", "selector_id_list_children_alias.gff3") != 0 ||
         compare_files("selector_id_list_children.gff3", "selector_id_list_children_verbose.gff3") != 0 ||
         compare_files("selector_id_list_children.gff3", "selector_query_id_list_children.gff3") != 0 ||
+        compare_files("selector_query_id_list_children.gff3", "selector_query_id_list_children_alias.gff3") != 0 ||
         compare_files("selector_query_id_list_children.gff3", "selector_query_id_list_children_verbose.gff3") != 0 ||
         require_contains("selector_id_list_children.gff3", "ID=tx1") != 0 ||
         require_contains("selector_id_list_children.gff3", "ID=exon1") != 0) {
@@ -285,15 +294,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --include-children > selector_children.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --id gene0001 --children > selector_children.gff3") != 0 ||
         require_contains("selector_children.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_children.gff3", "ID=tx1") != 0 ||
         require_contains("selector_children.gff3", "ID=exon1") != 0 ||
         require_not_contains("selector_children.gff3", "ID=gene0002") != 0) {
         return 1;
     }
-    if (run_command(exe + " query " + gff + " --id gene0001 --include-children > selector_query_children.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --id gene0001 --include-children > selector_children_alias.gff3") != 0 ||
+        compare_files("selector_children.gff3", "selector_children_alias.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --id gene0001 --children > selector_query_children.gff3") != 0 ||
         compare_files("selector_children.gff3", "selector_query_children.gff3") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --id gene0001 --include-children > selector_query_children_alias.gff3") != 0 ||
+        compare_files("selector_children.gff3", "selector_query_children_alias.gff3") != 0) {
         return 1;
     }
     if (run_command(exe + " query " + gff + " --id gene0001 -C > selector_query_children_short.gff3") != 0 ||

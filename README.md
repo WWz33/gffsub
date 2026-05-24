@@ -176,7 +176,7 @@ Non-region selectors use these column-9 keys:
 | Batch exact feature lookup | `--ids genes.txt` | `ID` values, one per line |
 | Gene lookup | `--name ABC1` | gene records by `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, or full `Dbxref` value |
 | Any exact attribute filter | `--where Parent=gene0001` | any column-9 `KEY=VALUE`, including `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession`, or `Parent_Accession` |
-| Include matched descendants | `-C`, `--include-children` | child records linked by `Parent` |
+| Include matched descendants | `-C`, `--children` | child records linked by `Parent`; `--include-children` is a verbose alias |
 | Print selected attributes | `--out-attrs ID,Name,Parent` | prints selected column-9 keys after records are matched |
 
 Use `--out-attrs` when the records are already selected and you want selected column-9 attributes added to TSV/JSON summary output:
@@ -240,7 +240,7 @@ gffsub <input.gff3> [options]
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. This is the top-level selector for batch exact-ID extraction. `--id-list` is a verbose alias. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. This is the top-level selector for common gene naming keys. |
 | `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. This is the top-level selector for exact column-9 `KEY=VALUE` matches. `--attr` is a compatibility alias. |
-| `-C`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. |
+| `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, or `--where`. `--include-children` is a verbose alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Print selected column-9 attributes as extra TSV/JSON fields. Combine only with query-style selectors. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. Combine only with query-style selectors. `--summary-format` is a verbose alias. |
@@ -278,7 +278,7 @@ Most default GFF3 and summary workflows can be written without the `query` subco
 | `--where`, `--attr` | `KEY=VALUE` | Query exact attribute matches. This option can be repeated. `--attr` is a compatibility alias. |
 | `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | Append selected attribute values as extra TSV/JSON fields. |
 | `--attrs` | `KEY1,KEY2,...` | Deprecated compatibility alias for `--out-attrs`. |
-| `-C`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. |
+| `-C`, `--children`, `--include-children` | flag | Include descendants of matched records, such as transcript, exon, CDS, and UTR features. `--include-children` is a verbose alias. |
 | `--summary`, `--summary-format` | `tsv`, `json` | Print summary rows instead of GFF3 records. `--summary-format` is a verbose alias. |
 | `-h`, `--help` | flag | Show help for query mode. |
 

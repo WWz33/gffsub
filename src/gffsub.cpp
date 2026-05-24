@@ -31,7 +31,7 @@ static void usage(const char* prog) {
         << "  --where KEY=VALUE, --attr KEY=VALUE\n"
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Top-level selector for exact column-9 KEY=VALUE matches. --attr is a compatibility alias.\n"
-        << "  -C, --include-children\n"
+        << "  -C, --children, --include-children\n"
         << "      Include descendants of records matched by --id, --ids, --name, or --where.\n"
         << "  --out-attrs KEYS, --output-attrs KEYS\n"
         << "      Output selected attributes as TSV/JSON fields. Implies query summary output.\n"
@@ -123,7 +123,8 @@ static void query_usage(const char* prog) {
         << "  --out-attrs KEYS        Output selected attributes as extra TSV/JSON fields.\n"
         << "  --output-attrs KEYS     Verbose alias for --out-attrs.\n"
         << "  --attrs KEYS            Deprecated alias for --out-attrs.\n"
-        << "  -C, --include-children  Include descendants of matched IDs.\n"
+        << "  -C, --children           Include descendants of matched IDs.\n"
+        << "  --include-children       Verbose alias for --children.\n"
         << "  --summary FMT           Output query summary instead of GFF3. Choices: tsv, json.\n"
         << "  --summary-format FMT    Verbose alias for --summary.\n"
         << "  -h, --help              Display this help message.\n"
@@ -519,7 +520,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
                 std::cerr << "Error: " << arg << " expects tsv or json\n";
                 return 1;
             }
-        } else if (arg == "-C" || arg == "--include-children") {
+        } else if (arg == "-C" || arg == "--children" || arg == "--include-children") {
             include_children = true;
         } else if (arg == "-h" || arg == "--help") {
             query_usage(prog);
@@ -862,6 +863,7 @@ int main(int argc, char* argv[]) {
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
         {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
         {"qc",            no_argument,       nullptr, OPT_QC},
+        {"children",      no_argument,       nullptr, 'C'},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
@@ -1052,7 +1054,7 @@ int main(int argc, char* argv[]) {
             query_args.push_back(key + "=" + value);
         }
         if (include_children) {
-            query_args.push_back("--include-children");
+            query_args.push_back("--children");
         }
         if (!summary_format.empty()) {
             query_args.push_back("--summary");
