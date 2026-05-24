@@ -98,4 +98,12 @@ void filter_by_strand(GffData& data, char strand) {
     }
 }
 
+void filter_by_phase(GffData& data, char phase) {
+    for (auto& rec : data) {
+        if (rec.kept && rec.phase != phase) {
+            rec.kept = false;
+        }
+    }
+}
+
 }  // namespace gffsub

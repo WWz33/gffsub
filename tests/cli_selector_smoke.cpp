@@ -14,6 +14,9 @@ static bool write_test_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t100\t400\t.\t+\t.\tID=gene0001;Name=ABC1;gene_id=G1;locus_tag=Locus1;Alias=ABC-1,LegacyABC;Dbxref=GeneID:123\n"
         << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
         << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=tx1\n"
+        << "chr1\tsrc\tCDS\t150\t170\t.\t+\t0\tID=cds1;Parent=tx1\n"
+        << "chr1\tsrc\tCDS\t200\t220\t.\t+\t1\tID=cds2;Parent=tx1\n"
+        << "chr1\tsrc\tCDS\t230\t250\t.\t+\t2\tID=cds3;Parent=tx1\n"
         << "chr1\tsrc\tgene\t600\t700\t.\t-\t.\tID=gene0002;Name=XYZ1\n"
         << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n"
         << "chr2\tother\texon\t250\t280\t.\t.\t.\tID=exon2\n";
@@ -132,6 +135,11 @@ static void cleanup_outputs() {
     std::remove("selector_strand_gene.gff3");
     std::remove("selector_strand_bad.out");
     std::remove("selector_strand_bad.err");
+    std::remove("selector_phase_zero.gff3");
+    std::remove("selector_phase_dot.gff3");
+    std::remove("selector_phase_cds.gff3");
+    std::remove("selector_phase_bad.out");
+    std::remove("selector_phase_bad.err");
     std::remove("selector_help.txt");
     std::remove("selector_bed_short.bed");
     std::remove("selector_bed_format.bed");
@@ -186,6 +194,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--seqid SEQID") != 0 ||
         require_contains("selector_help.txt", "--source SOURCE") != 0 ||
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
+        require_contains("selector_help.txt", "--phase PHASE") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
         return 1;
     }
@@ -405,6 +414,28 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " " + gff + " --strand forward > selector_strand_bad.out 2> selector_strand_bad.err") == 0 ||
         require_contains("selector_strand_bad.err", "Error: --strand expects one of +, -, ., ?") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --phase 0 > selector_phase_zero.gff3") != 0 ||
+        require_contains("selector_phase_zero.gff3", "ID=cds1") != 0 ||
+        require_not_contains("selector_phase_zero.gff3", "ID=cds2") != 0 ||
+        require_not_contains("selector_phase_zero.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --phase . > selector_phase_dot.gff3") != 0 ||
+        require_contains("selector_phase_dot.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_phase_dot.gff3", "ID=exon2") != 0 ||
+        require_not_contains("selector_phase_dot.gff3", "ID=cds1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --phase 1 -f CDS > selector_phase_cds.gff3") != 0 ||
+        require_contains("selector_phase_cds.gff3", "ID=cds2") != 0 ||
+        require_not_contains("selector_phase_cds.gff3", "ID=cds1") != 0 ||
+        require_not_contains("selector_phase_cds.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --phase 3 > selector_phase_bad.out 2> selector_phase_bad.err") == 0 ||
+        require_contains("selector_phase_bad.err", "Error: --phase expects one of 0, 1, 2, .") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " -r chr1:100-400 -t bed > selector_bed_short.bed") != 0 ||
