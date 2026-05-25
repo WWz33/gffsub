@@ -1622,6 +1622,14 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         if (const auto error = percent_encoding_error(rec.attr_raw)) {
             print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id, *error);
         }
+        if (const auto error = percent_encoding_error(rec.source)) {
+            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id,
+                         "source " + *error);
+        }
+        if (const auto error = percent_encoding_error(rec.type)) {
+            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id,
+                         "feature type " + *error);
+        }
         if (const auto error = attribute_escape_error(rec.attr_raw)) {
             print_qc_row(std::cout, "error", "invalid_attribute_escape", rec.line_idx, id, *error);
         }
