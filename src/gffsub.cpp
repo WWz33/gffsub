@@ -1011,10 +1011,10 @@ static DirectiveParseResult parse_directives(const std::string& path) {
         std::istringstream fields{line};
         std::string directive;
         std::string seqid;
-        int64_t start = 0;
-        int64_t end = 0;
+        std::string start_text;
+        std::string end_text;
         std::string extra;
-        if (!(fields >> directive >> seqid >> start >> end) || (fields >> extra)) {
+        if (!(fields >> directive >> seqid >> start_text >> end_text) || (fields >> extra)) {
             result.issues.push_back({line_num, "invalid_sequence_region",
                                      "malformed ##sequence-region directive"});
             continue;
@@ -1022,6 +1022,13 @@ static DirectiveParseResult parse_directives(const std::string& path) {
         if (const auto error = seqid_syntax_error(seqid)) {
             result.issues.push_back({line_num, "invalid_sequence_region",
                                      "invalid ##sequence-region seqid " + seqid + ": " + *error});
+            continue;
+        }
+        int64_t start = 0;
+        int64_t end = 0;
+        if (!parse_positive_int64(start_text, start) || !parse_positive_int64(end_text, end)) {
+            result.issues.push_back({line_num, "invalid_sequence_region",
+                                     "invalid ##sequence-region coordinates for " + seqid});
             continue;
         }
         if (start < 1 || end < 1 || start > end) {

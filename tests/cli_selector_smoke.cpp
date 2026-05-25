@@ -34,6 +34,7 @@ static bool write_qc_annotation(const std::string& path) {
     out << "##gff-version 3\n"
         << "##sequence-region chr1 1 1000\n"
         << "##sequence-region chr_bad 100 1\n"
+        << "##sequence-region chr_signed +1 500\n"
         << "##sequence-region chr1 1 1200\n"
         << "##sequence-region chr2 1 500\n"
         << "##sequence-region chr#bad 1 500\n"
@@ -747,6 +748,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "##gff-version must declare exactly one version beginning with 3") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid ##sequence-region coordinates for chr_signed") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid ##sequence-region seqid chr#bad") != 0 ||
         require_contains("selector_qc_top.tsv", "malformed ##sequence-region directive") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_sequence_region") != 0 ||
