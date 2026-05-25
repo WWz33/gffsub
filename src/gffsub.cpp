@@ -561,6 +561,9 @@ static std::optional<std::string> attribute_syntax_error(std::string_view attrs)
     if (attrs == ".") {
         return std::nullopt;
     }
+    if (attrs.empty()) {
+        return "attributes field must be . or semicolon-separated tag=value fields";
+    }
 
     size_t pos = 0;
     while (pos <= attrs.size()) {
