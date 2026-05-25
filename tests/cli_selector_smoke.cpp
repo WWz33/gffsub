@@ -64,6 +64,8 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tmRNA\t500\t600\t.\t+\t.\tID=orphan_tx;Parent=missing_gene\n"
         << "chr1\tsrc\tmRNA\t610\t620\t.\t+\t.\tID=extra_column_child;Parent=missing_extra_parent\textra\n"
         << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
+        << "chr1\tsrc\tgene\t720\t730\t.\t\t.\tID=bad_empty_strand\n"
+        << "chr1\tsrc\tgene\t731\t740\t.\t+\t\tID=bad_empty_phase\n"
         << "chr1\tsrc\tgene\t900\t950\t.\t+\tx\tID=bad_phase\n"
         << "chr1\tsrc\texon\t700\t710\t.\t+\t1\tID=bad_non_cds_phase\n"
         << "chr2\tsrc\tgene\t490\t510\t.\t+\t.\tID=outside_region\n"
@@ -763,7 +765,9 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "missing_parent") != 0 ||
         require_contains("selector_qc_top.tsv", "Parent missing_extra_parent was not found") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||
+        require_contains("selector_qc_top.tsv", "strand field must be +, -, ., or ?") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_phase") != 0 ||
+        require_contains("selector_qc_top.tsv", "phase field must be ., 0, 1, or 2") != 0 ||
         require_contains("selector_qc_top.tsv", "non-CDS phase 1 must be .") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_cds_phase") != 0) {
         return 1;

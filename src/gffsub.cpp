@@ -1083,6 +1083,14 @@ static QcParseResult parse_qc_records(const std::string& path) {
             rec.score = std::nullopt;
         }
 
+        if (cols[6].empty()) {
+            result.issues.push_back({line_num, "invalid_strand",
+                                     "strand field must be +, -, ., or ?"});
+        }
+        if (cols[7].empty()) {
+            result.issues.push_back({line_num, "invalid_phase",
+                                     "phase field must be ., 0, 1, or 2"});
+        }
         rec.strand = cols[6].empty() ? '.' : cols[6][0];
         rec.phase = cols[7].empty() ? '.' : cols[7][0];
         rec.attr_raw = cols[8];
