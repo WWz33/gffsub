@@ -48,6 +48,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tpolypeptide\t450\t480\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
         << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\n"
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
+        << "chr1\t\tgene\t181\t190\t.\t+\t.\tID=bad_empty_source\n"
         << "chr1\tsrc\tgene\tabc\t180\t.\t+\t.\tID=bad_coordinate_text\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
         << "chr1\tsrc\tgene\t181\t190\t.\t+\t.\tID=bad_attr_equals;Note=A=B\n"
@@ -735,6 +736,8 @@ int main(int argc, char* argv[]) {
         require_contains("selector_qc_top.tsv", "malformed ##sequence-region directive") != 0 ||
         require_contains("selector_qc_top.tsv", "duplicate_sequence_region") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
+        require_contains("selector_qc_top.tsv", "invalid_source") != 0 ||
+        require_contains("selector_qc_top.tsv", "source field must not be empty; use . when source is unknown") != 0 ||
         require_contains("selector_qc_top.tsv", "attribute tag Name must not contain comma-separated values") != 0 ||
         require_contains("selector_qc_top.tsv", "invalid_attribute_syntax") != 0 ||
         require_contains("selector_qc_top.tsv", "attributes must be semicolon-separated tag=value fields") != 0 ||

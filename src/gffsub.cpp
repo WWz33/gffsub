@@ -192,6 +192,7 @@ static void qc_usage(const char* prog) {
         << "  invalid_attribute_value  Empty tag=value attribute value.\n"
         << "  invalid_attribute_escape  Unescaped ampersand or double quote in attributes.\n"
         << "  invalid_dbxref    Malformed Dbxref attribute.\n"
+        << "  invalid_source    Empty source column; use . when source is unknown.\n"
         << "  missing_derives_from  Derives_from points to an absent ID.\n"
         << "  invalid_range     start greater than end.\n"
         << "  invalid_gap       Malformed Gap attribute.\n"
@@ -1070,6 +1071,11 @@ static QcParseResult parse_qc_records(const std::string& path) {
         rec.type = cols[2];
         rec.line_idx = static_cast<int>(result.data.size());
         rec.kept = true;
+
+        if (cols[1].empty()) {
+            result.issues.push_back({line_num, "invalid_source",
+                                     "source field must not be empty; use . when source is unknown"});
+        }
 
         if (!parse_qc_int64(cols[3], rec.start) || !parse_qc_int64(cols[4], rec.end)) {
             result.issues.push_back({line_num, "invalid_coordinate",
