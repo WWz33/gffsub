@@ -517,8 +517,10 @@ static std::optional<std::string> raw_attr_value(std::string_view attrs, std::st
     return std::nullopt;
 }
 
+static bool is_digits(std::string_view value);
+
 static bool parse_qc_int64(std::string_view value, int64_t& out) {
-    if (value.empty()) {
+    if (!is_digits(value)) {
         return false;
     }
     try {

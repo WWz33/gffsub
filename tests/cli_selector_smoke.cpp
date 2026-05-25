@@ -50,6 +50,7 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
         << "chr1\t\tgene\t181\t190\t.\t+\t.\tID=bad_empty_source\n"
         << "chr1\tsrc\tgene\tabc\t180\t.\t+\t.\tID=bad_coordinate_text\n"
+        << "chr1\tsrc\tgene\t+180\t190\t.\t+\t.\tID=bad_coordinate_sign\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
         << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\t\n"
         << "chr1\tsrc\tgene\t181\t190\t.\t+\t.\tID=bad_attr_equals;Note=A=B\n"
@@ -88,6 +89,17 @@ static bool write_qc_annotation(const std::string& path) {
         << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n"
         << ">chr1\n"
         << "chr1\tsrc\tmRNA\t800\t810\t.\t+\t.\tID=fasta_feature;Parent=fasta_parent\n";
+    return true;
+}
+
+static bool write_qc_digit_coordinate_annotation(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) {
+        return false;
+    }
+
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t+180\t190\t.\t+\t.\tID=bad_coordinate_sign\n";
     return true;
 }
 
@@ -248,6 +260,8 @@ static void cleanup_outputs() {
     std::remove("selector_window_command_short.gff3");
     std::remove("selector_qc_top.tsv");
     std::remove("selector_qc_command.tsv");
+    std::remove("selector_qc_digit_coordinate.gff3");
+    std::remove("selector_qc_digit_coordinate.tsv");
     std::remove("selector_query_help.txt");
     std::remove("selector_window_help.txt");
     std::remove("selector_qc_help.txt");
@@ -778,6 +792,16 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (require_not_contains("selector_qc_top.tsv", "fasta_parent") != 0) {
+        return 1;
+    }
+    const std::string qc_digit_coordinate_gff{"selector_qc_digit_coordinate.gff3"};
+    if (!write_qc_digit_coordinate_annotation(qc_digit_coordinate_gff)) {
+        std::cerr << "cannot write digit coordinate QC test annotation\n";
+        return 1;
+    }
+    if (run_command(exe + " " + qc_digit_coordinate_gff + " --qc > selector_qc_digit_coordinate.tsv") != 0 ||
+        require_contains("selector_qc_digit_coordinate.tsv", "invalid_coordinate") != 0 ||
+        require_contains("selector_qc_digit_coordinate.tsv", "start and end must be integer 1-based coordinates") != 0) {
         return 1;
     }
 
