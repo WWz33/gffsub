@@ -1,0 +1,12 @@
+{
+  "id": "scenario-driven-readme-i18n",
+  "title": "Refactor bioinformatics README around user scenarios",
+  "status": "in_progress",
+  "complexity": "M",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "Archive task",
+  "createdAt": "2026-05-27T00:00:00Z",
+  "branch": "main"
+}
