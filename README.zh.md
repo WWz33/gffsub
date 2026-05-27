@@ -2,114 +2,50 @@
 
 <!-- README-I18N:START -->
 
-[English](./README.md) | **汉语**
+[English](./README.md) | **中文**
 
 <!-- README-I18N:END -->
 
-`gffsub` 是一个 C++17 编写的小型命令行工具，用于提取、查询、汇总和检查 GFF3/GTF 风格的基因组注释文件。它面向日常注释处理场景：按区域取子集、用多种 ID 找基因、提取基因上下游窗口、保留最长转录本，或在下游流程前快速做 QC。
+`gffsub` 是一个面向日常基因组注释处理的命令行工具，适用于 GFF3/GTF 风格文件。它可以帮助你按区域提取注释、从标识符恢复完整 gene model、构建上下游窗口、保留代表性转录本，并在下游 pipeline 前快速运行 QC。
 
-## 从你的任务开始
+当普通区间过滤不够用，而你需要理解 GFF3 语义的行为时，可以使用 `gffsub`：例如第 9 列属性查询、`Parent`/child 遍历、gene model 提取，以及注释文件专用的质量检查。
+
+## 从任务开始
 
 | 我想要... | 使用 |
 |----------|------|
-| 提取某个基因组区间内的 feature | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
-| 提取某个染色体或 contig | `gffsub annotation.gff3 --seqid chr1` |
+| 提取某个基因组区间内的 gene | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
+| 提取某条染色体或 contig 上的记录 | `gffsub annotation.gff3 --seqid chr1` |
 | 提取某个注释来源的记录 | `gffsub annotation.gff3 --source Gnomon` |
-| 提取某个 score 的记录 | `gffsub annotation.gff3 --score 42.5` |
-| 提取某条链上的记录 | `gffsub annotation.gff3 --strand -` |
-| 提取某个 phase 的记录 | `gffsub annotation.gff3 --phase 0 -f CDS` |
-| 用 BED 区间作为输入 | `gffsub annotation.gff3 -b regions.bed -f exon` |
-| 按精确 ID 提取一个 feature | `gffsub annotation.gff3 --id GeneA` |
+| 按 score 列过滤记录 | `gffsub annotation.gff3 --score 42.5` |
+| 按 strand 列过滤记录 | `gffsub annotation.gff3 --strand -` |
+| 按 phase 列过滤 CDS 记录 | `gffsub annotation.gff3 --phase 0 -f CDS` |
+| 使用 BED 区间作为输入 | `gffsub annotation.gff3 -b regions.bed -f exon` |
+| 按精确 `ID` 查找一个 feature | `gffsub annotation.gff3 --id GeneA` |
 | 批量提取精确 ID | `gffsub annotation.gff3 --ids genes.txt` |
-| 按 name 找一个基因或 feature | `gffsub annotation.gff3 --name GeneA` |
-| 按属性值提取 feature | `gffsub annotation.gff3 --where biotype=protein_coding` |
+| 按常见命名键查找基因 | `gffsub annotation.gff3 --name GeneA` |
+| 按任意精确属性值查找记录 | `gffsub annotation.gff3 --where biotype=protein_coding` |
 | 查找离某个区间最近的基因 | `gffsub annotation.gff3 --nearest chr1:1000-2000` |
-| 批量提取 ID，并带上子 feature | `gffsub annotation.gff3 --ids genes.txt -C` |
-| 提取一个 feature 及其父级 | `gffsub annotation.gff3 --id ExonA --parents` |
-| 从任意 feature 提取完整 gene model | `gffsub annotation.gff3 --id ExonA --model` |
+| 包含匹配记录的后代 | `gffsub annotation.gff3 --id GeneA -C` |
+| 包含匹配记录的祖先 | `gffsub annotation.gff3 --id ExonA --parents` |
+| 从任意 feature 恢复完整 gene model | `gffsub annotation.gff3 --id ExonA --model` |
 | 输出适合 pipeline 读取的 summary | `gffsub annotation.gff3 --id GeneA --summary tsv` |
 | 提取指定属性值 | `gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent` |
-| 提取基因上下游背景区域 | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
-| 每个基因只保留最长转录本 | `gffsub annotation.gff3 --longest` |
-| 检查注释 graph 问题 | `gffsub annotation.gff3 --qc` |
+| 提取上下游背景区域 | `gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware` |
+| 每个基因保留最长转录本 | `gffsub annotation.gff3 --longest` |
+| 检查注释语法和 graph 问题 | `gffsub annotation.gff3 --qc` |
 
-## 简化命令速查
+## 支持的输入和输出
 
-这些是常见工作流的最短写法：
+| 类型 | 支持内容 |
+|------|----------|
+| 注释输入 | GFF3/GTF 风格 feature records |
+| 区间输入 | `CHR:START-END` 字符串和 BED 文件 |
+| 标识符输入 | 可重复的 `--id` 值，或 `--ids` 指定的一行一个 ID 文件 |
+| 注释输出 | `gff3`, `gtf` (= `gtf2`), `gtf2`, `gtf3`, `bed` |
+| 表格输出 | TSV/JSON summary 和 TSV QC report |
 
-```bash
-# 按区间取子集
-gffsub annotation.gff3 -r chr1:1-100000
-
-# 按第 1 列 seqid 取子集
-gffsub annotation.gff3 --seqid chr1
-
-# 按第 2 列 source 取子集
-gffsub annotation.gff3 --source Gnomon
-
-# 按第 6 列 score 取子集
-gffsub annotation.gff3 --score 42.5
-
-# 按第 7 列 strand 取子集
-gffsub annotation.gff3 --strand -
-
-# 按第 8 列 phase 取子集
-gffsub annotation.gff3 --phase 0
-
-# 按区间取子集，并限制 feature 类型
-gffsub annotation.gff3 -r chr1:1-100000 -f gene
-
-# 用 BED 区间取子集
-gffsub annotation.gff3 -b regions.bed
-
-# 转为 BED 输出
-gffsub annotation.gff3 -r chr1:1-100000 -t bed
-
-# 写入文件
-gffsub annotation.gff3 -r chr1:1-100000 -o subset.gff3
-
-# 每个基因保留最长转录本
-gffsub annotation.gff3 -L
-
-# 提取一个精确 ID
-gffsub annotation.gff3 --id GeneA
-
-# 查询一个名称或基因查找键
-gffsub annotation.gff3 --name ABC1
-
-# 提取精确属性匹配
-gffsub annotation.gff3 --where biotype=protein_coding
-
-# 查找离 1-based 闭合区间最近的基因
-gffsub annotation.gff3 --nearest chr1:1000-2000
-
-# 批量提取 ID
-gffsub annotation.gff3 --ids genes.txt
-
-# 提取 ID 及其后代 feature
-gffsub annotation.gff3 --id GeneA -C
-
-# 提取 ID 及其祖先 feature
-gffsub annotation.gff3 --id ExonA --parents
-
-# 提取包含该 ID 的完整 gene model
-gffsub annotation.gff3 --id ExonA --model
-
-# 提取一个区间
-gffsub annotation.gff3 --region chr1:1-100000
-
-# 查询并输出 summary
-gffsub annotation.gff3 --id GeneA --summary tsv
-
-# 查询并提取指定属性
-gffsub annotation.gff3 --id GeneA --out-attrs ID,Name,Parent
-
-# 提取上下游窗口
-gffsub annotation.gff3 --id GeneA --up 2000 --down 500
-
-# 输出 QC 表
-gffsub annotation.gff3 --qc
-```
+`gffsub` 处理的是注释记录。它不会把序列 FASTA 或变异 VCF 内容作为主输入来处理。
 
 ## 安装
 
@@ -133,34 +69,20 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-## 场景：按区域提取 Feature
+## 场景：按基因组上下文提取注释
 
-当你已经知道目标区间，或手里有 BED 文件时，使用经典模式。
+当问题从坐标区间、染色体/contig、source 列或 BED 文件开始时，使用这类过滤方式。
 
 ```bash
-# 提取 1-based 闭合 GFF 区间内的基因
 ./gffsub annotation.gff3 -r chr1:1-100000 -f gene
-
-# 提取某个第 1 列 seqid 下的全部记录
 ./gffsub annotation.gff3 --seqid chr1
-
-# 提取某个第 2 列 source 下的全部记录
 ./gffsub annotation.gff3 --source Gnomon
-
-# 提取某个第 6 列 score 下的全部记录
 ./gffsub annotation.gff3 --score 42.5
-
-# 提取某个第 7 列 strand 下的全部记录
 ./gffsub annotation.gff3 --strand -
-
-# 提取某个第 8 列 phase 下的全部记录
-./gffsub annotation.gff3 --phase 0
-
-# 提取与 BED 区间重叠的 exon
+./gffsub annotation.gff3 --phase 0 -f CDS
 ./gffsub annotation.gff3 -b regions.bed -f exon
-
-# 将重叠 feature 转为 BED 输出
 ./gffsub annotation.gff3 -r chr1:1-100000 -t bed
+./gffsub annotation.gff3 -r chr1:1-100000 -o subset.gff3
 ```
 
 坐标规则是显式的：
@@ -171,73 +93,75 @@ ctest --test-dir build --output-on-failure
 | `CHR:START-END` regions | 1-based 闭合区间 |
 | BED input/output | 0-based 半开区间 |
 
-## 场景：查找基因和 Gene Model
+选项会在当前记录集合上继续过滤。例如，`-r chr1:1-100000 -f gene -t bed` 会先保留与区间重叠的记录，再限制为 `gene`，最后输出 BED 坐标。
 
-当问题从标识符、名称、属性或区间开始时，优先使用顶层 selector 写法。
+## 场景：查找基因并恢复 Gene Model
+
+当问题从 feature ID、基因名、属性或附近 locus 开始时，使用 selector 选项。
 
 ```bash
-# 精确 feature ID
 ./gffsub annotation.gff3 --id Glyma.01G000100
-
-# 按 ID、Name、gene_id、locus_tag、Alias 或完整 Dbxref 值查基因
+./gffsub annotation.gff3 --ids genes.txt
 ./gffsub annotation.gff3 --name ABC1
-
-# 属性选择器
 ./gffsub annotation.gff3 --where biotype=protein_coding
-
-# 查找离 1-based 闭合区间最近的基因
+./gffsub annotation.gff3 --where Dbxref=GeneID:123
 ./gffsub annotation.gff3 --nearest chr1:1000-2000
-
-# 包含 transcript、exon、CDS、UTR 等后代记录
 ./gffsub annotation.gff3 --id Glyma.01G000100 -C
-
-# 包含通过 Parent 连接的祖先记录
 ./gffsub annotation.gff3 --id ExonA --parents
-
-# 返回包含该 feature 的完整 gene model
 ./gffsub annotation.gff3 --id ExonA --model
 ```
 
-在批处理流程中，可以输出 summary，而不是原始 GFF3：
+`--nearest` 会在同一 seqid 上查找距离 1-based 闭合区间最近的 gene。与区间重叠的 gene 距离为 `0`；并列时按输入文件顺序。
+
+在批处理 pipeline 中，可以输出 summary，而不是原始 GFF3：
 
 ```bash
 ./gffsub annotation.gff3 --ids genes.txt --summary tsv
 ./gffsub annotation.gff3 --id GeneA --summary json
+./gffsub annotation.gff3 --id gene0001 --out-attrs ID,Name,Alias,Dbxref
 ```
 
-summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向、feature 类型、parent ID、child 数量、transcript 数量、exon 数量、CDS 长度和状态。
+Summary 字段包括 `query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length` 和 `status`。如果使用 `--out-attrs`，选中的第 9 列键会追加为 TSV 列，或在 JSON 中输出到 `attrs` 下。
 
-非 region 查询常用这些第 9 列属性键：
+### 搜索和输出中的属性键
+
+GFF3 在第 9 列用分号分隔的 `KEY=VALUE` 对保存记录属性：
+
+```gff3
+chr1	src	gene	100	400	.	+	.	ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123
+```
+
+使用 `--id` 做精确 `ID` 查询，使用 `--name` 在常见基因命名键中查找，使用 `--where KEY=VALUE` 做任意精确属性值过滤。
 
 | 任务 | 命令 | 使用的键 |
 |------|------|----------|
 | 精确 feature 查询 | `--id gene0001` | `ID` |
 | 批量精确 feature 查询 | `--ids genes.txt` | 每行一个 `ID` 值 |
-| 基因名称查询 | `--name ABC1` | gene 记录上的 `ID`、`gene_id`、`Name`、`locus_tag`、`Alias` 或完整 `Dbxref` 值 |
-| 任意精确属性过滤 | `--where Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`、`Name`、`Alias`、`Parent`、`Dbxref`、`Accession` 或 `Parent_Accession` |
-| 最近基因查询 | `--nearest chr1:1000-2000` | 同一 seqid 上距离 1-based 闭合区间最近的 gene；与区间重叠的 gene 距离为 0；并列时按输入文件顺序 |
-| 包含匹配记录后代 | `-C`, `--children` | 通过 `Parent` 连接的 child 记录；从 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配记录出发；`--include-children` 是较长兼容别名 |
-| 包含匹配记录祖先 | `--parents` | 沿 `Parent` 链向上找到的 parent 记录；从 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配记录出发；`--include-parents` 是较长兼容别名 |
-| 提取完整 gene model | `--model`, `--gene-model` | 从 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配的记录出发，返回所属 gene 及其后代记录 |
-| 打印指定属性 | `--out-attrs ID,Name,Parent` | 记录匹配后，将指定第 9 列键输出为 summary 字段 |
+| 基因查询 | `--name ABC1` | gene 记录中的 `ID`, `gene_id`, `Name`, `locus_tag`, `Alias` 或完整 `Dbxref` 值 |
+| 任意精确属性过滤 | `--where Parent=gene0001` | 任意第 9 列 `KEY=VALUE`，包括 `ID`, `Name`, `Alias`, `Parent`, `Dbxref`, `Accession` 或 `Parent_Accession` |
+| 最近基因查询 | `--nearest chr1:1000-2000` | 同一 seqid 上距离 1-based 闭合区间最近的 gene |
+| 包含匹配记录后代 | `-C`, `--children` | 通过 `Parent` 连接的 child 记录；`--include-children` 是较长别名 |
+| 包含匹配记录祖先 | `--parents` | 沿 `Parent` 链向上找到的 parent 记录；`--include-parents` 是较长别名 |
+| 提取完整 gene model | `--model`, `--gene-model` | 所属 gene 以及 transcript/exon/CDS/UTR 后代 |
+| 打印指定属性 | `--out-attrs ID,Name,Parent` | 记录匹配后选择的第 9 列键 |
 
-## 场景：提取上下游窗口
+`--attr KEY=VALUE` 是 `--where KEY=VALUE` 的兼容别名。`--output-attrs` 是 `--out-attrs` 的较长别名。`--attrs` 保留为已弃用的兼容别名。
 
-当你需要某个基因或 feature 周围的局部注释背景时，优先使用顶层 window 参数。
+## 场景：提取上游或下游窗口
+
+当你需要某个基因或 feature 周围的局部注释上下文时使用 window 选项，例如启动子区域查看或邻近 feature 审查。
 
 ```bash
-# Genomic expansion：按参考序列左右扩展
+./gffsub annotation.gff3 --id GeneA --upstream 2000 --downstream 500
 ./gffsub annotation.gff3 --id GeneA --up 2000 --down 500
-
-# Biological upstream/downstream：按 strand 解释上下游
 ./gffsub annotation.gff3 --id GeneA --up 2000 --down 500 --strand-aware
 ```
 
 不加 `--strand-aware` 时，upstream 表示更小的基因组坐标，downstream 表示更大的基因组坐标。加上 `--strand-aware` 后，上下游按 feature 的链方向解释。
 
-## 场景：每个基因只保留一个转录本
+## 场景：每个基因保留一个转录本
 
-当下游工具要求每个基因只有一个代表转录本时，使用 `--longest`。
+当下游工具要求每个基因只有一个代表性转录本时，使用 `--longest`。
 
 ```bash
 ./gffsub annotation.gff3 --longest
@@ -246,19 +170,30 @@ summary 字段包括 query ID、matched ID、匹配字段、坐标、链方向�
 
 最长 isoform 逻辑遵循本项目现有的 AGAT 风格规则：如果基因存在 CDS isoform，则比较 CDS 长度；否则比较 exon 长度。
 
-## 场景：检查注释质量
+## 场景：在 Pipeline 前检查注释质量
 
-在把注释送入 graph-aware 工作流前，可以先运行 `--qc`。
+在把注释送入 graph-aware workflow、基于 ID 的提取或格式转换前，可以先运行 `--qc`。
 
 ```bash
 ./gffsub annotation.gff3 --qc
 ```
 
-当前检查会报告非法 `##gff-version` directive、非法列数、非法属性语法、空属性值、重复属性 tag、非法逗号分隔属性值、未转义的 ampersand 或双引号、非法 seqid（包括 SO seqid 字符集之外的未转义字符）、非法 feature type、重复 ID、非法或重复的 `##sequence-region` directive（包括 directive seqid 非法）、非正坐标、非法坐标范围、非法 score 值、feature 超出 `##sequence-region` 边界、非法 strand 或 phase 列值、非法 CDS phase、非法 `Dbxref`、`Gap`、`Is_circular`、`Ontology_term`、`Target` 或 percent-encoding 属性格式、Parent 重复、Parent 环、缺失 `Derives_from` 或 Parent 引用，以及 child feature 超出 parent 坐标范围。输出为 TSV，便于用常规命令行工具继续过滤。
+QC 输出 TSV 表，字段为 `severity`, `code`, `line_idx`, `id` 和 `message`。
 
-## CLI 参数
+| 检查类别 | Codes |
+|----------|-------|
+| Header 和记录形状 | `invalid_gff_version`, `invalid_column_count` |
+| Attributes | `invalid_attribute_syntax`, `invalid_attribute_value`, `invalid_attribute_escape`, `duplicate_attribute_tag`, `invalid_attribute_multivalue`, `invalid_percent_encoding` |
+| GFF3 核心列 | `invalid_seqid`, `invalid_source`, `invalid_feature_type`, `invalid_coordinate`, `invalid_range`, `invalid_score`, `invalid_strand`, `invalid_phase`, `invalid_cds_phase` |
+| Sequence-region directives | `invalid_sequence_region`, `duplicate_sequence_region`, `outside_sequence_region` |
+| Feature graph | `duplicate_id`, `duplicate_parent`, `parent_cycle`, `missing_derives_from`, `missing_parent`, `child_outside_parent` |
+| Structured attributes | `invalid_dbxref`, `invalid_gap`, `invalid_is_circular`, `invalid_ontology_term`, `invalid_target` |
 
-`gffsub` 以顶层入口为主：常用 GFF3 工作流从 `gffsub <input.gff3> [options]` 开始。`query`、`window` 和 `qc` 子命令作为兼容和进阶入口保留，并共享同一套输出语义。
+在严格 GFF3 QC 中，attribute 列必须是 `.` 或以分号分隔的 `tag=value` 字段；每个 `tag=value` 属性都必须有非空值；作为属性内容出现的 ampersand 和双引号必须分别 URL-escape 为 `%26` 和 `%22`；逗号分隔多值只接受 `Parent`, `Alias`, `Note`, `Dbxref` 和 `Ontology_term`；未知 source 列应写成 `.`，不要留空。带 `Is_circular=true` 的 `region` feature 可以让同一 seqid 上的 feature 越过其 `##sequence-region` 终点。
+
+## CLI 参考
+
+`gffsub` 以顶层入口为主：常用 GFF3 工作流从 `gffsub <input.gff3> [options]` 开始。`query`, `window` 和 `qc` 子命令保留为兼容的进阶入口，并共享同一套输出语义。
 
 ### 顶层模式
 
@@ -269,91 +204,50 @@ gffsub <input.gff3> [options]
 | 参数 | 值 | 含义 |
 |------|----|------|
 | `<input.gff3>` | 文件 | 输入 GFF3/GTF 风格注释文件。 |
-| `--id` | ID | 保留精确 feature `ID`。该参数可以重复使用。这是精确 ID 提取的顶层 selector。 |
-| `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。这是批量精确 ID 提取的顶层 selector。`--id-list` 是较长兼容别名。 |
-| `--name` | key | 保留一个按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值找到的基因。这是常见基因命名键的顶层 selector。 |
-| `--where`, `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该参数可以重复使用。这是精确第 9 列 `KEY=VALUE` 匹配的顶层 selector。`--attr` 是兼容别名。 |
-| `-C`, `--children`, `--include-children` | 标志 | 包含由 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配记录的后代。`--include-children` 是较长兼容别名。 |
-| `--parents`, `--include-parents` | 标志 | 包含由 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配记录的祖先。`--include-parents` 是较长兼容别名。 |
-| `--model`, `--gene-model` | 标志 | 包含由 `--id`、`--ids`、`--name`、`--where` 或 `--nearest` 匹配记录所属的完整 gene model；输出 gene 以及 transcript/exon/CDS/UTR 等后代。`--gene-model` 是较长兼容别名。 |
-| `--nearest`, `--nearest-gene` | `CHR:START-END` | 保留同一 seqid 上离 1-based 闭合区间最近的 gene；并列时按输入文件顺序。`--nearest-gene` 是较长兼容别名。 |
-| `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值作为额外 TSV/JSON 字段输出；只与 query-style selector 组合。 |
-| `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
-| `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录；只与 query-style selector 组合。`--summary-format` 是较长兼容别名。 |
+| `--id` | ID | 保留精确 feature `ID`。该选项可以重复使用。 |
+| `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。`--id-list` 是较长别名。 |
+| `--name` | key | 保留一个按 `ID`, `Name`, `gene_id`, `locus_tag`, `Alias` 或完整 `Dbxref` 值找到的基因。 |
+| `--where`, `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该选项可以重复使用。 |
+| `-C`, `--children`, `--include-children` | 标志 | 包含由 `--id`, `--ids`, `--name`, `--where` 或 `--nearest` 匹配记录的后代。 |
+| `--parents`, `--include-parents` | 标志 | 包含由 `--id`, `--ids`, `--name`, `--where` 或 `--nearest` 匹配记录的祖先。 |
+| `--model`, `--gene-model` | 标志 | 包含匹配记录所属的完整 gene model。 |
+| `--nearest`, `--nearest-gene` | `CHR:START-END` | 保留同一 seqid 上离 1-based 闭合区间最近的 gene。 |
+| `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定第 9 列属性作为额外 TSV/JSON 字段输出。只与 query-style selector 组合。 |
+| `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的已弃用兼容别名。 |
+| `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。只与 query-style selector 组合。 |
 | `--up`, `--upstream` | 整数 | 与 `--id` 配合，提取与目标上游扩展窗口重叠的记录。 |
 | `--down`, `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |
 | `--qc` | 标志 | 运行注释 QC。 |
-| `--seqid` | seqid | 只保留第 1 列 GFF3 seqid 精确等于该值的记录。 |
-| `--source` | source | 只保留第 2 列 GFF3 source 精确等于该值的记录。 |
-| `--score` | 数字, `.` | 只保留第 6 列 GFF3 score 匹配该数值，或第 6 列为 `.` 的记录。 |
-| `--strand` | `+`, `-`, `.`, `?` | 只保留第 7 列 GFF3 strand 精确等于该值的记录。这是过滤器；`--strand-aware` 只改变 window 上下游解释。 |
-| `--phase` | `0`, `1`, `2`, `.` | 只保留第 8 列 GFF3 phase 精确等于该值的记录。对 CDS 记录，GFF3 phase 通常是 `0`、`1` 或 `2`；`.` 会匹配第 8 列为 `.` 的任何记录。 |
+| `--seqid` | seqid | 保留第 1 列 GFF3 seqid 精确等于该值的记录。 |
+| `--source` | source | 保留第 2 列 GFF3 source 精确等于该值的记录。 |
+| `--score` | number, `.` | 保留第 6 列 GFF3 score 匹配该数值，或 score 列为 `.` 的记录。 |
+| `--strand` | `+`, `-`, `.`, `?` | 保留第 7 列 GFF3 strand 精确等于该值的记录。 |
+| `--phase` | `0`, `1`, `2`, `.` | 保留第 8 列 GFF3 phase 精确等于该值的记录。 |
 | `-r`, `--region` | `CHR:START-END` | 保留与 1-based 闭合区间重叠的 feature。 |
 | `-b`, `--bed` | 文件 | 保留与 BED 区间重叠的 feature；BED 按 0-based 半开区间读取。 |
-| `-f`, `--feature`, `--type` | 类型 | 只保留第三列等于该类型的记录，例如 `gene`、`mRNA`、`transcript`、`exon` 或 `CDS`。 |
-| `-L`, `--longest` | 标志 | 每个基因只保留最长转录本；存在 CDS isoform 时按 CDS 长度比较，否则按 exon 长度比较。 |
-| `-@`, `--threads` | 整数 | 设置 `--longest` 使用的线程数；超过 256 会被限制为 256。需要固定资源使用时建议显式设置。 |
-| `-t`, `--format`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 会按 `gtf2` 处理。默认输出 `gff3`。`--output-format` 是较长兼容别名。 |
+| `-f`, `--feature`, `--type` | 类型 | 只保留第三列匹配该 feature type 的记录，例如 `gene`, `mRNA`, `transcript`, `exon` 或 `CDS`。 |
+| `-L`, `--longest` | 标志 | 每个基因保留最长 transcript isoform。 |
+| `-@`, `--threads` | 整数 | 设置 `--longest` 使用的线程数；超过 256 会被限制为 256。 |
+| `-t`, `--format`, `--output-format` | `gff3`, `gtf`, `gtf2`, `gtf3`, `bed` | 选择输出格式。`gtf` 按 `gtf2` 处理；默认是 `gff3`。 |
 | `-o`, `--output` | 文件 | 写入文件，而不是 stdout。 |
 | `-h`, `--help` | 标志 | 显示顶层模式帮助。 |
 
-参数可以组合。例如 `-r chr1:1-100000 -f gene -t bed` 会先按区间过滤，再按 feature 类型过滤，最后输出 BED 坐标。
-
-### Query 兼容模式
+### 兼容子命令
 
 ```bash
 gffsub query <input.gff3> [options]
-```
-
-大多数默认 GFF3 和 summary 工作流都可以不写 `query` 子命令。该兼容模式保留给已有脚本和显式 query 风格命令行。
-
-| 参数 | 值 | 含义 |
-|------|----|------|
-| `<input.gff3>` | 文件 | 输入注释文件。 |
-| `--id` | ID | 按精确 feature `ID` 查询。该参数可以重复使用。 |
-| `--name` | key | 按 `ID`、`Name`、`gene_id`、`locus_tag`、`Alias` 或完整 `Dbxref` 值查找基因。 |
-| `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。`--id-list` 是较长兼容别名。 |
-| `--region` | `CHR:START-END` | 查询与 1-based 闭合区间重叠的 feature。 |
-| `--nearest`, `--nearest-gene` | `CHR:START-END` | 查询同一 seqid 上离 1-based 闭合区间最近的 gene；并列时按输入文件顺序。`--nearest-gene` 是较长兼容别名。 |
-| `--type` | 类型 | 将查询输出限制为一个 feature 类型。 |
-| `--where`, `--attr` | `KEY=VALUE` | 按精确属性值查询。该参数可以重复使用。`--attr` 是兼容别名。 |
-| `--out-attrs`, `--output-attrs` | `KEY1,KEY2,...` | 将指定属性值追加为额外 TSV/JSON 字段。 |
-| `--attrs` | `KEY1,KEY2,...` | `--out-attrs` 的兼容别名，已不推荐使用。 |
-| `-C`, `--children`, `--include-children` | 标志 | 包含匹配记录的后代，例如 transcript、exon、CDS 和 UTR feature。`--include-children` 是较长兼容别名。 |
-| `--parents`, `--include-parents` | 标志 | 沿 GFF3 `Parent` 链向上包含匹配记录的祖先。`--include-parents` 是较长兼容别名。 |
-| `--model`, `--gene-model` | 标志 | 包含匹配记录所属的完整 gene model。`--gene-model` 是较长兼容别名。 |
-| `--summary`, `--summary-format` | `tsv`, `json` | 输出 summary 行，而不是 GFF3 记录。`--summary-format` 是较长兼容别名。 |
-| `-h`, `--help` | 标志 | 显示 query 模式帮助。 |
-
-使用 `--summary` 时，summary 字段为 `query_id`、`matched_id`、`matched_by`、`seqid`、`start`、`end`、`strand`、`type`、`parent_id`、`child_count`、`transcript_count`、`exon_count`、`cds_length` 和 `status`。如果使用 `--out-attrs`，这些属性键会追加为额外 TSV 列，或在 JSON 中输出为 `attrs` 对象。不加 `--summary` 时，`--out-attrs` 默认输出 TSV。
-
-### Window 兼容模式
-
-```bash
 gffsub window <input.gff3> --id ID [options]
-```
-
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --id ID --up N --down N`。
-
-| 参数 | 值 | 含义 |
-|------|----|------|
-| `<input.gff3>` | 文件 | 输入注释文件。 |
-| `--id` | ID 或基因查找键 | 必填目标。命令会先查精确 `ID`，再做基因查找。 |
-| `--up`, `--upstream` | 整数 | 加到目标上游的碱基数；必须非负。默认 `0`。 |
-| `--down`, `--downstream` | 整数 | 加到目标下游的碱基数；必须非负。默认 `0`。 |
-| `--strand-aware` | 标志 | 按 feature 链方向解释 biological upstream/downstream。不加时，upstream 表示更小的基因组坐标，downstream 表示更大的基因组坐标。 |
-| `-h`, `--help` | 标志 | 显示 window 模式帮助。 |
-
-输出为与扩展窗口重叠的 GFF3 记录。
-
-### QC 兼容模式
-
-```bash
 gffsub qc <input.gff3>
 ```
 
-同一工作流也可以写成顶层形式：`gffsub <input.gff3> --qc`。QC 输出 TSV 表，字段为 `severity`、`code`、`line_idx`、`id` 和 `message`。当前检查代码包括 `invalid_gff_version`、`invalid_column_count`、`invalid_attribute_syntax`、`invalid_attribute_value`、`invalid_attribute_escape`、`duplicate_attribute_tag`、`invalid_attribute_multivalue`、`invalid_seqid`、`invalid_feature_type`、`duplicate_id`、`invalid_sequence_region`、`duplicate_sequence_region`、`invalid_coordinate`、`invalid_range`、`invalid_score`、`outside_sequence_region`、`invalid_strand`、`invalid_phase`、`invalid_cds_phase`、`invalid_dbxref`、`invalid_gap`、`invalid_is_circular`、`invalid_ontology_term`、`invalid_percent_encoding`、`invalid_target`、`duplicate_parent`、`parent_cycle`、`missing_derives_from`、`missing_parent` 和 `child_outside_parent`。在严格 GFF3 QC 中，每个 `tag=value` 属性都必须有非空 value，属性内容里的 ampersand 和双引号必须分别写成 `%26` 和 `%22`，逗号分隔多值只接受 `Parent`、`Alias`、`Note`、`Dbxref` 和 `Ontology_term`；其他属性值里的字面逗号应做 URL escape。带 `Is_circular=true` 的 `region` feature 可以让同一 seqid 上的 feature 越过其 `##sequence-region` 终点。
+使用 `query` 表达显式 query-style 命令行，使用 `window` 兼容旧的上下游窗口脚本，使用 `qc` 作为 `--qc` 的子命令形式。多数工作流都可以用上面的顶层选项完成。
+
+兼容说明：
+
+- `query` 接受上面的 selector 选项，也支持用 `--type` 按 feature type 限制查询输出。
+- `window` 必须提供 `--id`；命令会先尝试精确 `ID`，再做基因查找。`--up` 和 `--down` 默认是 `0`，且必须为非负整数。
+- `qc` 等价于顶层 `--qc`，并输出 QC 场景中描述的同一组 TSV 字段。
 
 ## 输出格式
 
