@@ -1,4 +1,5 @@
 #include "gff3.hpp"
+#include "gtf_parser.hpp"
 #include <fstream>
 
 namespace gffsub {
@@ -26,18 +27,9 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
     return std::nullopt;
 }
 
-static std::optional<std::string> extract_quoted_value(const std::string& attrs, const char* key) {
-    size_t pos = attrs.find(key);
-    if (pos == std::string::npos) return std::nullopt;
-    size_t q1 = attrs.find('"', pos);
-    if (q1 == std::string::npos) return std::nullopt;
-    size_t q2 = attrs.find('"', q1 + 1);
-    if (q2 == std::string::npos) return std::nullopt;
-    return attrs.substr(q1 + 1, q2 - q1 - 1);
-}
-
 static std::vector<std::string> split_line(const std::string& line, char delimiter) {
     std::vector<std::string> cols;
+    cols.reserve(delimiter == '\t' ? 9 : 4);
     size_t start = 0;
     while (true) {
         auto pos = line.find(delimiter, start);
@@ -91,12 +83,7 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
 
                 if (format == InputFormat::GTF) {
-                    if (!rec.gene_id) {
-                        rec.gene_id = extract_quoted_value(cols[8], "gene_id");
-                    }
-                    if (!rec.transcript_id) {
-                        rec.transcript_id = extract_quoted_value(cols[8], "transcript_id");
-                    }
+                    apply_gtf_attributes(rec);
                 }
             } catch (const std::exception&) {
                 return -1;
