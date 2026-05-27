@@ -699,6 +699,17 @@ static std::optional<std::string> percent_encoding_error(std::string_view attrs)
     return std::nullopt;
 }
 
+static void print_percent_encoding_qc(std::ostream& out,
+                                      std::string_view value,
+                                      std::string_view field,
+                                      int line_idx,
+                                      const std::string& id) {
+    if (const auto error = percent_encoding_error(value)) {
+        const auto message = field.empty() ? *error : std::string{field} + " " + *error;
+        print_qc_row(out, "error", "invalid_percent_encoding", line_idx, id, message);
+    }
+}
+
 static std::optional<std::string> attribute_escape_error(std::string_view attrs) {
     if (attrs.find('&') != std::string_view::npos) {
         return "ampersand in attributes must be percent-escaped as %26";
@@ -1619,17 +1630,9 @@ static int run_qc(int argc, char* argv[], const char* prog) {
         const std::string id = record_id(rec);
         const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
         const auto attrs = parse_attributes(rec.attr_raw);
-        if (const auto error = percent_encoding_error(rec.attr_raw)) {
-            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id, *error);
-        }
-        if (const auto error = percent_encoding_error(rec.source)) {
-            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id,
-                         "source " + *error);
-        }
-        if (const auto error = percent_encoding_error(rec.type)) {
-            print_qc_row(std::cout, "error", "invalid_percent_encoding", rec.line_idx, id,
-                         "feature type " + *error);
-        }
+        print_percent_encoding_qc(std::cout, rec.attr_raw, "", rec.line_idx, id);
+        print_percent_encoding_qc(std::cout, rec.source, "source", rec.line_idx, id);
+        print_percent_encoding_qc(std::cout, rec.type, "feature type", rec.line_idx, id);
         if (const auto error = attribute_escape_error(rec.attr_raw)) {
             print_qc_row(std::cout, "error", "invalid_attribute_escape", rec.line_idx, id, *error);
         }
