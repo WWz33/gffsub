@@ -17,7 +17,7 @@ static bool write_test_annotation(const std::string& path) {
         << "chr1\tsrc\tCDS\t150\t170\t.\t+\t0\tID=cds1;Parent=tx1\n"
         << "chr1\tsrc\tCDS\t200\t220\t.\t+\t1\tID=cds2;Parent=tx1\n"
         << "chr1\tsrc\tCDS\t230\t250\t.\t+\t2\tID=cds3;Parent=tx1\n"
-        << "chr1\tsrc\tgene\t600\t700\t.\t-\t.\tID=gene0002;Name=XYZ1\n"
+        << "chr1\tsrc\tgene\t600\t700\t.\t-\t.\tID=gene0002;Name=XYZ1;biotype=protein_coding;Note=transposon-like\n"
         << "chr2\tother\tgene\t100\t200\t.\t+\t.\tID=gene0003;Name=CHR2\n"
         << "chr2\tother\texon\t250\t280\t.\t.\t.\tID=exon2\n"
         << "chr2\tother\tmRNA\t300\t380\t.\t+\t.\tID=orphan_tx\n"
@@ -157,10 +157,29 @@ static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
     std::remove("cli_selector_qc.gff3");
     std::remove("cli_selector_ids.txt");
+    std::remove("cli_selector_patterns.txt");
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
     std::remove("selector_attr_id.gff3");
     std::remove("selector_where_id.gff3");
+    std::remove("selector_grep_id.gff3");
+    std::remove("selector_grep_regex_id.gff3");
+    std::remove("selector_grep_regex_seqid.gff3");
+    std::remove("selector_grep_file.gff3");
+    std::remove("selector_grep_invert.gff3");
+    std::remove("selector_grep_ignore_case.gff3");
+    std::remove("selector_include_expr_biotype.gff3");
+    std::remove("selector_include_expr_logic.gff3");
+    std::remove("selector_include_expr_quoted_regex.gff3");
+    std::remove("selector_include_expr_numeric.gff3");
+    std::remove("selector_include_expr_score.gff3");
+    std::remove("selector_exclude_expr_note.gff3");
+    std::remove("selector_expr_bad.out");
+    std::remove("selector_expr_bad.err");
+    std::remove("selector_grep_bad.out");
+    std::remove("selector_grep_bad.err");
+    std::remove("selector_invert_bad.out");
+    std::remove("selector_invert_bad.err");
     std::remove("selector_id_list.gff3");
     std::remove("selector_id_list_verbose.gff3");
     std::remove("selector_query_id_list.gff3");
@@ -277,6 +296,7 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string exe = std::string{"\""} + argv[1] + "\"";
+    const std::string exe_raw = argv[1];
     const std::string gff{"cli_selector_smoke.gff3"};
     if (!write_test_annotation(gff)) {
         std::cerr << "cannot write test annotation\n";
@@ -314,6 +334,12 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--score SCORE") != 0 ||
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--phase PHASE") != 0 ||
+        require_contains("selector_help.txt", "--grep FIELD:PATTERN") != 0 ||
+        require_contains("selector_help.txt", "--grep-regex FIELD:REGEX") != 0 ||
+        require_contains("selector_help.txt", "--grep-file FILE --grep-field FIELD") != 0 ||
+        require_contains("selector_help.txt", "--include-expr EXPR") != 0 ||
+        require_contains("selector_help.txt", "--exclude-expr EXPR") != 0 ||
+        require_contains("selector_help.txt", "Invert --grep/--grep-regex/--grep-file matches") != 0 ||
         require_contains("selector_help.txt", "--model") != 0 ||
         require_contains("selector_help.txt", "--nearest REGION") != 0 ||
         require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
@@ -337,6 +363,107 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " " + gff + " --where ID=gene0001 > selector_where_id.gff3") != 0 ||
         compare_files("selector_id.gff3", "selector_where_id.gff3") != 0) {
+        return 1;
+    }
+
+    if (run_command(exe_raw + " " + gff + " --grep ID:gene000 > selector_grep_id.gff3") != 0 ||
+        require_contains("selector_grep_id.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_grep_id.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_grep_id.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_grep_id.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " --grep-regex ID:gene000[12] > selector_grep_regex_id.gff3") != 0 ||
+        require_contains("selector_grep_regex_id.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_grep_regex_id.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_grep_regex_id.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_grep_regex_id.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " --grep-regex seqid:chr[0-9]+ -f gene > selector_grep_regex_seqid.gff3") != 0 ||
+        require_contains("selector_grep_regex_seqid.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_grep_regex_seqid.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_grep_regex_seqid.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_grep_regex_seqid.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    {
+        std::ofstream patterns{"cli_selector_patterns.txt"};
+        if (!patterns.is_open()) {
+            std::cerr << "cannot write grep pattern list\n";
+            return 1;
+        }
+        patterns << "gene0001\n"
+                 << "gene0003\n";
+    }
+    if (run_command(exe_raw + " " + gff + " --grep-file cli_selector_patterns.txt --grep-field ID > selector_grep_file.gff3") != 0 ||
+        require_contains("selector_grep_file.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_grep_file.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_grep_file.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_grep_file.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " --grep ID:gene000 -v > selector_grep_invert.gff3") != 0 ||
+        require_contains("selector_grep_invert.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_grep_invert.gff3", "ID=exon1") != 0 ||
+        require_not_contains("selector_grep_invert.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " --grep name:abc1 --ignore-case > selector_grep_ignore_case.gff3") != 0 ||
+        require_contains("selector_grep_ignore_case.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_grep_ignore_case.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_grep_ignore_case.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I \"type==gene && attr.biotype==protein_coding\" > selector_include_expr_biotype.gff3") != 0 ||
+        require_contains("selector_include_expr_biotype.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_include_expr_biotype.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_include_expr_biotype.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I \"(type==gene && attr.biotype==protein_coding) || !seqid==chr1\" > selector_include_expr_logic.gff3") != 0 ||
+        require_contains("selector_include_expr_logic.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_include_expr_logic.gff3", "ID=gene0003") != 0 ||
+        require_contains("selector_include_expr_logic.gff3", "ID=exon2") != 0 ||
+        require_not_contains("selector_include_expr_logic.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_include_expr_logic.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I \"attr.ID~\\\"gene000[13]\\\"\" > selector_include_expr_quoted_regex.gff3") != 0 ||
+        require_contains("selector_include_expr_quoted_regex.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_include_expr_quoted_regex.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_include_expr_quoted_regex.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_include_expr_quoted_regex.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I \"type==gene && length>=101\" > selector_include_expr_numeric.gff3") != 0 ||
+        require_contains("selector_include_expr_numeric.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_include_expr_numeric.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_include_expr_numeric.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_include_expr_numeric.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I \"score==42.5\" > selector_include_expr_score.gff3") != 0 ||
+        require_contains("selector_include_expr_score.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_include_expr_score.gff3", "ID=gene0001") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -E \"attr.Note~transposon|retroelement\" -f gene > selector_exclude_expr_note.gff3") != 0 ||
+        require_contains("selector_exclude_expr_note.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_exclude_expr_note.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_exclude_expr_note.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -I type > selector_expr_bad.out 2> selector_expr_bad.err") == 0 ||
+        require_contains("selector_expr_bad.err", "Error: invalid include expression") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " --grep-regex ID:[ > selector_grep_bad.out 2> selector_grep_bad.err") == 0 ||
+        require_contains("selector_grep_bad.err", "Error: invalid regex in --grep-regex") != 0) {
+        return 1;
+    }
+    if (run_command(exe_raw + " " + gff + " -v > selector_invert_bad.out 2> selector_invert_bad.err") == 0 ||
+        require_contains("selector_invert_bad.err", "Error: --invert-match requires --grep, --grep-regex, or --grep-file") != 0) {
         return 1;
     }
 

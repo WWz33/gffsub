@@ -25,6 +25,10 @@ Use it when a plain interval filter is not enough and you need GFF3-aware behavi
 | Extract many exact IDs | `gffsub annotation.gff3 --ids genes.txt` |
 | Find a gene by common naming keys | `gffsub annotation.gff3 --name GeneA` |
 | Find records by any exact attribute value | `gffsub annotation.gff3 --where biotype=protein_coding` |
+| Grep a field or attribute with a pattern file | `gffsub annotation.gff3 --grep-file genes.txt --grep-field ID` |
+| Grep a field or attribute with regex | `gffsub annotation.gff3 --grep-regex 'ID:^Glyma\.01G'` |
+| Combine semantic filters in an expression | `gffsub annotation.gff3 -I 'type=="gene" && attr.biotype=="protein_coding"'` |
+| Exclude records by a semantic expression | `gffsub annotation.gff3 -E 'attr.Note~"transposon|retroelement"'` |
 | Find the nearest gene to a region | `gffsub annotation.gff3 --nearest chr1:1000-2000` |
 | Include descendants of matched records | `gffsub annotation.gff3 --id GeneA -C` |
 | Include ancestors of matched records | `gffsub annotation.gff3 --id ExonA --parents` |
@@ -42,6 +46,7 @@ Use it when a plain interval filter is not enough and you need GFF3-aware behavi
 | Annotation input | GFF3/GTF-style feature records |
 | Region input | `CHR:START-END` strings and BED files |
 | Identifier input | repeated `--id` values or one-ID-per-line files with `--ids` |
+| Pattern input | one-pattern-per-line files with `--grep-file` and `--grep-field` |
 | Annotation output | `gff3`, `gtf` (= `gtf2`), `gtf2`, `gtf3`, `bed` |
 | Tabular output | TSV/JSON summaries and TSV QC reports |
 
@@ -147,6 +152,24 @@ Use `--id` for exact `ID` lookup, `--name` for gene lookup across common naming 
 
 `--attr KEY=VALUE` is a compatibility alias for `--where KEY=VALUE`. `--output-attrs` is a verbose alias for `--out-attrs`. `--attrs` remains as a deprecated compatibility alias.
 
+### Grep And Expression Filters
+
+`gffsub` subtracts records by GFF semantics: columns, attributes, IDs, `Parent`/child links, gene models, transcript structure, and QC status. For field-level filtering, use grep-style patterns for quick tasks and expression filters when the logic needs to be explicit.
+
+```bash
+./gffsub annotation.gff3 --grep ID:Glyma.01G
+./gffsub annotation.gff3 --grep-file genes.txt --grep-field ID
+./gffsub annotation.gff3 --grep-regex 'ID:^Glyma\.01G'
+./gffsub annotation.gff3 --grep-regex 'seqid:^chr[0-9]+$' -f gene
+./gffsub annotation.gff3 -I 'type=="gene" && attr.biotype=="protein_coding"'
+./gffsub annotation.gff3 -I '(type=="gene" && length>=1000) || attr.ID~"^Glyma\.01G"'
+./gffsub annotation.gff3 -E 'attr.Note~"transposon|retroelement"'
+```
+
+Grep fields can be core GFF columns (`seqid`, `source`, `type`, `start`, `end`, `score`, `strand`, `phase`, `length`, `attrs`) or attributes (`ID`, `Name`, `Parent`, `Alias`, `Dbxref`, `Note`, `biotype`, `gene_id`, `transcript_id`, `locus_tag`, or `attr.KEY`). `--grep` does substring matching, `--grep-regex` uses ECMAScript regular expressions, `--grep-file` reads one pattern per non-empty line, `-v` inverts grep matches, and `--ignore-case` applies to grep and expression string matches.
+
+Expression filters use the same field names and support `==`, `!=`, `~`, `!~`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`, and parentheses. Missing values compare as `.`.
+
 ## Scenario: Extract Upstream Or Downstream Windows
 
 Use window options when you need local annotation context around a gene or feature, such as promoter inspection or neighboring-feature review.
@@ -208,6 +231,15 @@ gffsub <input.gff3> [options]
 | `--ids`, `--id-list` | file | Read one exact feature ID per non-empty line. `--id-list` is a verbose alias. |
 | `--name` | key | Keep one gene found by `ID`, `Name`, `gene_id`, `locus_tag`, `Alias`, or full `Dbxref` value. |
 | `--where`, `--attr` | `KEY=VALUE` | Keep features with an exact GFF3 attribute value. This option can be repeated. |
+| `--grep` | `FIELD:PATTERN` | Keep records whose field or attribute contains `PATTERN`. This option can be repeated. |
+| `--grep-regex` | `FIELD:REGEX` | Keep records whose field or attribute matches an ECMAScript regular expression. This option can be repeated. |
+| `--grep-file` | file | Read one grep pattern per non-empty line. Combine with `--grep-field`. |
+| `--grep-field` | field | Field used by `--grep-file`, such as `ID`, `Name`, `seqid`, `type`, or `attr.KEY`. |
+| `--grep-file-regex` | flag | Treat `--grep-file` lines as regular expressions instead of substring patterns. |
+| `-I`, `--include-expr` | expression | Keep records matching a GFF semantic expression. This option can be repeated. |
+| `-E`, `--exclude-expr` | expression | Drop records matching a GFF semantic expression. This option can be repeated. |
+| `-v`, `--invert-match` | flag | Invert `--grep`, `--grep-regex`, or `--grep-file` matches. |
+| `--ignore-case` | flag | Apply case-insensitive matching to grep and expression string/regex matches. |
 | `-C`, `--children`, `--include-children` | flag | Include descendants of records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`. |
 | `--parents`, `--include-parents` | flag | Include ancestors of records matched by `--id`, `--ids`, `--name`, `--where`, or `--nearest`. |
 | `--model`, `--gene-model` | flag | Include the full gene model containing matched records. |

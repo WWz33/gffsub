@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <optional>
+#include <regex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -33,6 +34,20 @@ static void usage(const char* prog) {
         << "  --where KEY=VALUE, --attr KEY=VALUE\n"
         << "      Extract features by an exact GFF3 attribute value. May be repeated.\n"
         << "      Top-level selector for exact column-9 KEY=VALUE matches. --attr is a compatibility alias.\n"
+        << "  --grep FIELD:PATTERN\n"
+        << "      Keep records whose GFF field or attribute contains PATTERN. May be repeated.\n"
+        << "  --grep-regex FIELD:REGEX\n"
+        << "      Keep records whose GFF field or attribute matches REGEX. May be repeated.\n"
+        << "  --grep-file FILE --grep-field FIELD\n"
+        << "      Keep records matching one non-empty pattern per file line against FIELD.\n"
+        << "  -I, --include-expr EXPR\n"
+        << "      Keep records matching a GFF expression, such as type==\"gene\" && attr.biotype==\"protein_coding\".\n"
+        << "  -E, --exclude-expr EXPR\n"
+        << "      Drop records matching a GFF expression, such as attr.Note~\"transposon|retroelement\".\n"
+        << "  -v, --invert-match\n"
+        << "      Invert --grep/--grep-regex/--grep-file matches.\n"
+        << "  --ignore-case\n"
+        << "      Match grep and expression strings case-insensitively.\n"
         << "  -C, --children, --include-children\n"
         << "      Include descendants of records matched by --id, --ids, --name, --where, or --nearest.\n"
         << "  --parents, --include-parents\n"
@@ -122,6 +137,10 @@ static void usage(const char* prog) {
         << "  " << prog << " annotation.gff3 --qc\n"
         << "  " << prog << " annotation.gff3 --name ABC1\n"
         << "  " << prog << " annotation.gff3 --where biotype=protein_coding\n"
+        << "  " << prog << " annotation.gff3 --grep-file genes.txt --grep-field ID\n"
+        << "  " << prog << " annotation.gff3 --grep-regex 'ID:^Glyma\\\\.01G'\n"
+        << "  " << prog << " annotation.gff3 -I 'type==\"gene\" && attr.biotype==\"protein_coding\"'\n"
+        << "  " << prog << " annotation.gff3 -E 'attr.Note~\"transposon|retroelement\"'\n"
         << "  " << prog << " annotation.gff3 --seqid chr1 -f gene\n"
         << "  " << prog << " annotation.gff3 --source Gnomon -f mRNA\n"
         << "  " << prog << " annotation.gff3 --score 42.5\n"
@@ -236,6 +255,248 @@ static std::string record_id(const GffRecord& rec) {
     if (rec.gene_id) return *rec.gene_id;
     if (rec.transcript_id) return *rec.transcript_id;
     return "";
+}
+
+static std::string join_values(const std::vector<std::string>& values);
+
+struct GrepFilter {
+    std::string field;
+    std::string pattern;
+    bool use_regex = false;
+    bool ignore_case = false;
+    std::optional<std::regex> compiled;
+};
+
+enum class ExprOp {
+    Equal,
+    NotEqual,
+    Regex,
+    NotRegex,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual
+};
+
+struct ExprFilter {
+    std::string field;
+    ExprOp op;
+    std::string value;
+    bool ignore_case = false;
+    std::optional<std::regex> compiled;
+};
+
+struct ExprNode {
+    enum class Kind {
+        Predicate,
+        Not,
+        And,
+        Or
+    };
+
+    Kind kind = Kind::Predicate;
+    ExprFilter predicate;
+    std::vector<ExprNode> children;
+};
+
+static std::optional<std::pair<std::string, std::string>> parse_field_pattern(std::string_view value) {
+    const auto colon = value.find(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 == value.size()) {
+        return std::nullopt;
+    }
+    return std::pair<std::string, std::string>{std::string{value.substr(0, colon)}, std::string{value.substr(colon + 1)}};
+}
+
+static bool is_supported_filter_field(std::string_view field) {
+    if (field == "seqid" || field == "source" || field == "type" || field == "start" ||
+        field == "end" || field == "length" || field == "score" || field == "strand" ||
+        field == "phase" || field == "attrs" || field == "attributes") {
+        return true;
+    }
+    if (field.rfind("attr.", 0) == 0 && field.size() > 5) {
+        return true;
+    }
+    return field == "ID" || field == "id" || field == "Name" || field == "name" ||
+           field == "Parent" || field == "parent" || field == "Alias" || field == "alias" ||
+           field == "Dbxref" || field == "dbxref" || field == "Note" || field == "note" ||
+           field == "biotype" ||
+           field == "gene_id" || field == "transcript_id" || field == "locus_tag";
+}
+
+static std::optional<std::string> record_field_value(const GffRecord& rec, std::string_view field) {
+    if (field == "seqid") return rec.seqid;
+    if (field == "source") return rec.source;
+    if (field == "type") return rec.type;
+    if (field == "start") return std::to_string(rec.start);
+    if (field == "end") return std::to_string(rec.end);
+    if (field == "length") return std::to_string(rec.end - rec.start + 1);
+    if (field == "score") return rec.score ? std::to_string(*rec.score) : ".";
+    if (field == "strand") return std::string(1, rec.strand);
+    if (field == "phase") return std::string(1, rec.phase);
+    if (field == "attrs") return rec.attr_raw;
+    if (field == "attributes") return rec.attr_raw;
+
+    std::string attr_key;
+    if (field.rfind("attr.", 0) == 0) {
+        attr_key = std::string{field.substr(5)};
+    } else if (field == "ID" || field == "id") {
+        attr_key = "ID";
+    } else if (field == "Name" || field == "name") {
+        attr_key = "Name";
+    } else if (field == "Parent" || field == "parent") {
+        attr_key = "Parent";
+    } else if (field == "Alias" || field == "alias") {
+        attr_key = "Alias";
+    } else if (field == "Dbxref" || field == "dbxref") {
+        attr_key = "Dbxref";
+    } else if (field == "Note" || field == "note") {
+        attr_key = "Note";
+    } else if (field == "biotype" ||
+               field == "gene_id" || field == "transcript_id" || field == "locus_tag") {
+        attr_key = std::string{field};
+    } else {
+        return std::nullopt;
+    }
+
+    const auto attrs = parse_attributes(rec.attr_raw);
+    const auto it = attrs.find(attr_key);
+    if (it == attrs.end()) {
+        return ".";
+    }
+    return join_values(it->second);
+}
+
+static bool parse_number(std::string_view value, double& out) {
+    if (value == "." || value.empty()) {
+        return false;
+    }
+    try {
+        size_t parsed = 0;
+        out = std::stod(std::string{value}, &parsed);
+        return parsed == value.size() && std::isfinite(out);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+static bool is_numeric_filter_field(std::string_view field) {
+    return field == "start" || field == "end" || field == "length" || field == "score";
+}
+
+static std::string lowercase_copy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+static bool field_matches_grep(const GffRecord& rec, const GrepFilter& filter) {
+    const auto value = record_field_value(rec, filter.field);
+    if (!value) {
+        return false;
+    }
+    if (filter.use_regex) {
+        return filter.compiled && std::regex_search(*value, *filter.compiled);
+    }
+    if (filter.ignore_case) {
+        return lowercase_copy(*value).find(lowercase_copy(filter.pattern)) != std::string::npos;
+    }
+    return value->find(filter.pattern) != std::string::npos;
+}
+
+static bool field_matches_expr(const GffRecord& rec, const ExprFilter& filter) {
+    const auto value = record_field_value(rec, filter.field);
+    if (!value) {
+        return false;
+    }
+    const auto comparable_value = filter.ignore_case ? lowercase_copy(*value) : *value;
+    const auto comparable_filter = filter.ignore_case ? lowercase_copy(filter.value) : filter.value;
+    switch (filter.op) {
+        case ExprOp::Equal:
+        case ExprOp::NotEqual: {
+            if (is_numeric_filter_field(filter.field)) {
+                double lhs = 0.0;
+                double rhs = 0.0;
+                const bool numeric_match = parse_number(*value, lhs) && parse_number(filter.value, rhs) && lhs == rhs;
+                return filter.op == ExprOp::Equal ? numeric_match : !numeric_match;
+            }
+            return filter.op == ExprOp::Equal ? comparable_value == comparable_filter : comparable_value != comparable_filter;
+        }
+        case ExprOp::Regex: return filter.compiled && std::regex_search(*value, *filter.compiled);
+        case ExprOp::NotRegex: return filter.compiled && !std::regex_search(*value, *filter.compiled);
+        case ExprOp::Less:
+        case ExprOp::LessEqual:
+        case ExprOp::Greater:
+        case ExprOp::GreaterEqual: {
+            double lhs = 0.0;
+            double rhs = 0.0;
+            if (!parse_number(*value, lhs) || !parse_number(filter.value, rhs)) {
+                return false;
+            }
+            if (filter.op == ExprOp::Less) return lhs < rhs;
+            if (filter.op == ExprOp::LessEqual) return lhs <= rhs;
+            if (filter.op == ExprOp::Greater) return lhs > rhs;
+            return lhs >= rhs;
+        }
+    }
+    return false;
+}
+
+static bool expr_node_matches(const GffRecord& rec, const ExprNode& node) {
+    switch (node.kind) {
+        case ExprNode::Kind::Predicate:
+            return field_matches_expr(rec, node.predicate);
+        case ExprNode::Kind::Not:
+            return node.children.empty() || !expr_node_matches(rec, node.children.front());
+        case ExprNode::Kind::And:
+            for (const auto& child : node.children) {
+                if (!expr_node_matches(rec, child)) {
+                    return false;
+                }
+            }
+            return true;
+        case ExprNode::Kind::Or:
+            for (const auto& child : node.children) {
+                if (expr_node_matches(rec, child)) {
+                    return true;
+                }
+            }
+            return false;
+    }
+    return false;
+}
+
+static void filter_by_grep(GffData& data, const std::vector<GrepFilter>& filters, bool invert) {
+    for (auto& rec : data) {
+        if (!rec.kept) {
+            continue;
+        }
+        bool matched = filters.empty();
+        for (const auto& filter : filters) {
+            if (field_matches_grep(rec, filter)) {
+                matched = true;
+                break;
+            }
+        }
+        if (invert ? matched : !matched) {
+            rec.kept = false;
+        }
+    }
+}
+
+static void filter_by_expr(GffData& data, const std::vector<ExprNode>& filters, bool include) {
+    for (auto& rec : data) {
+        if (!rec.kept) {
+            continue;
+        }
+        for (const auto& filter : filters) {
+            const bool matched = expr_node_matches(rec, filter);
+            if ((include && !matched) || (!include && matched)) {
+                rec.kept = false;
+                break;
+            }
+        }
+    }
 }
 
 static void add_feature_counts(SummaryRow& row, const std::vector<GffRecord>& records) {
@@ -357,6 +618,312 @@ static std::vector<std::string> split_attr_keys(std::string_view keys) {
         pos = comma + 1;
     }
     return result;
+}
+
+static std::string unquote_expr_value(std::string value) {
+    value = trim_copy(value);
+    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        std::string out;
+        out.reserve(value.size() - 2);
+        for (size_t i = 1; i + 1 < value.size(); ++i) {
+            if (value[i] == '\\' && i + 2 < value.size()) {
+                const char next = value[i + 1];
+                if (next == '"' || next == '\\') {
+                    out.push_back(next);
+                    ++i;
+                    continue;
+                }
+            }
+            out.push_back(value[i]);
+        }
+        return out;
+    }
+    return value;
+}
+
+static bool parse_expr_condition(std::string_view condition, ExprFilter& out, std::string& error) {
+    const std::pair<std::string_view, ExprOp> ops[] = {
+        {"!~", ExprOp::NotRegex},
+        {"==", ExprOp::Equal},
+        {"!=", ExprOp::NotEqual},
+        {"<=", ExprOp::LessEqual},
+        {">=", ExprOp::GreaterEqual},
+        {"~", ExprOp::Regex},
+        {"<", ExprOp::Less},
+        {">", ExprOp::Greater}
+    };
+
+    bool in_quotes = false;
+    bool escaped = false;
+    for (size_t i = 0; i < condition.size(); ++i) {
+        const char ch = condition[i];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (ch == '\\') {
+            escaped = true;
+            continue;
+        }
+        if (ch == '"') {
+            in_quotes = !in_quotes;
+            continue;
+        }
+        if (in_quotes) {
+            continue;
+        }
+        for (const auto& [token, op] : ops) {
+            if (condition.substr(i, token.size()) == token) {
+                out.field = trim_copy(condition.substr(0, i));
+                out.op = op;
+                out.value = unquote_expr_value(std::string{condition.substr(i + token.size())});
+                if (out.field.empty() || out.value.empty()) {
+                    error = "empty field or value in expression condition " + std::string{condition};
+                    return false;
+                }
+                return true;
+            }
+        }
+    }
+    error = "expected operator ==, !=, ~, !~, <, <=, >, or >= in expression condition " + std::string{condition};
+    return false;
+}
+
+class ExprParser {
+public:
+    explicit ExprParser(std::string_view expr) : expr_(expr) {}
+
+    bool parse(ExprNode& out, std::string& error) {
+        skip_space();
+        if (!parse_or(out, error)) {
+            return false;
+        }
+        skip_space();
+        if (pos_ != expr_.size()) {
+            error = "unexpected token near " + std::string{expr_.substr(pos_)};
+            return false;
+        }
+        return true;
+    }
+
+private:
+    std::string_view expr_;
+    size_t pos_ = 0;
+
+    void skip_space() {
+        while (pos_ < expr_.size() && std::isspace(static_cast<unsigned char>(expr_[pos_]))) {
+            ++pos_;
+        }
+    }
+
+    bool consume(std::string_view token) {
+        skip_space();
+        if (expr_.substr(pos_, token.size()) == token) {
+            pos_ += token.size();
+            return true;
+        }
+        return false;
+    }
+
+    bool parse_or(ExprNode& out, std::string& error) {
+        ExprNode first;
+        if (!parse_and(first, error)) {
+            return false;
+        }
+        std::vector<ExprNode> nodes;
+        nodes.push_back(std::move(first));
+        while (consume("||")) {
+            ExprNode next;
+            if (!parse_and(next, error)) {
+                return false;
+            }
+            nodes.push_back(std::move(next));
+        }
+        if (nodes.size() == 1) {
+            out = std::move(nodes.front());
+        } else {
+            out.kind = ExprNode::Kind::Or;
+            out.children = std::move(nodes);
+        }
+        return true;
+    }
+
+    bool parse_and(ExprNode& out, std::string& error) {
+        ExprNode first;
+        if (!parse_unary(first, error)) {
+            return false;
+        }
+        std::vector<ExprNode> nodes;
+        nodes.push_back(std::move(first));
+        while (consume("&&")) {
+            ExprNode next;
+            if (!parse_unary(next, error)) {
+                return false;
+            }
+            nodes.push_back(std::move(next));
+        }
+        if (nodes.size() == 1) {
+            out = std::move(nodes.front());
+        } else {
+            out.kind = ExprNode::Kind::And;
+            out.children = std::move(nodes);
+        }
+        return true;
+    }
+
+    bool parse_unary(ExprNode& out, std::string& error) {
+        skip_space();
+        if (pos_ < expr_.size() && expr_[pos_] == '!' && expr_.substr(pos_, 2) != "!=" && expr_.substr(pos_, 2) != "!~") {
+            ++pos_;
+            ExprNode child;
+            if (!parse_unary(child, error)) {
+                return false;
+            }
+            out.kind = ExprNode::Kind::Not;
+            out.children.push_back(std::move(child));
+            return true;
+        }
+        return parse_primary(out, error);
+    }
+
+    bool parse_primary(ExprNode& out, std::string& error) {
+        skip_space();
+        if (pos_ >= expr_.size()) {
+            error = "unexpected end of expression";
+            return false;
+        }
+        if (expr_[pos_] == '(') {
+            ++pos_;
+            if (!parse_or(out, error)) {
+                return false;
+            }
+            if (!consume(")")) {
+                error = "missing closing )";
+                return false;
+            }
+            return true;
+        }
+
+        const size_t start = pos_;
+        bool in_quotes = false;
+        bool escaped = false;
+        while (pos_ < expr_.size()) {
+            const char ch = expr_[pos_];
+            if (escaped) {
+                escaped = false;
+                ++pos_;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                ++pos_;
+                continue;
+            }
+            if (ch == '"') {
+                in_quotes = !in_quotes;
+                ++pos_;
+                continue;
+            }
+            if (!in_quotes && ch == ')') {
+                break;
+            }
+            if (!in_quotes && pos_ + 1 < expr_.size() &&
+                ((expr_[pos_] == '&' && expr_[pos_ + 1] == '&') ||
+                 (expr_[pos_] == '|' && expr_[pos_ + 1] == '|'))) {
+                break;
+            }
+            ++pos_;
+        }
+
+        const auto condition = trim_copy(expr_.substr(start, pos_ - start));
+        if (condition.empty()) {
+            error = "empty condition in expression";
+            return false;
+        }
+        ExprFilter filter;
+        if (!parse_expr_condition(condition, filter, error)) {
+            return false;
+        }
+        out.kind = ExprNode::Kind::Predicate;
+        out.predicate = std::move(filter);
+        return true;
+    }
+};
+
+static bool parse_expr_filters(std::string_view expr, std::vector<ExprNode>& out, std::string& error) {
+    ExprNode node;
+    ExprParser parser{expr};
+    if (!parser.parse(node, error)) {
+        return false;
+    }
+    out.push_back(std::move(node));
+    return true;
+}
+
+static bool compile_filter_regexes(std::vector<GrepFilter>& grep_filters,
+                                   std::vector<ExprNode>& include_filters,
+                                   std::vector<ExprNode>& exclude_filters,
+                                   bool ignore_case,
+                                   std::string& error) {
+    const auto flags = ignore_case ? (std::regex::ECMAScript | std::regex::icase) : std::regex::ECMAScript;
+    for (auto& filter : grep_filters) {
+        if (!is_supported_filter_field(filter.field)) {
+            error = "unknown filter field " + filter.field;
+            return false;
+        }
+        filter.ignore_case = ignore_case;
+        if (!filter.use_regex) {
+            continue;
+        }
+        try {
+            filter.compiled.emplace(filter.pattern, flags);
+        } catch (const std::regex_error&) {
+            error = "invalid regex in --grep-regex for " + filter.field + ":" + filter.pattern;
+            return false;
+        }
+    }
+
+    auto compile_expr_predicate = [&](ExprFilter& filter) {
+        if (!is_supported_filter_field(filter.field)) {
+            error = "unknown expression field " + filter.field;
+            return false;
+        }
+        filter.ignore_case = ignore_case;
+        if (filter.op != ExprOp::Regex && filter.op != ExprOp::NotRegex) {
+            return true;
+        }
+        try {
+            filter.compiled.emplace(filter.value, flags);
+        } catch (const std::regex_error&) {
+            error = "invalid regex in expression for " + filter.field + "~" + filter.value;
+            return false;
+        }
+        return true;
+    };
+
+    auto compile_expr_node = [&](auto&& self, ExprNode& node) -> bool {
+        if (node.kind == ExprNode::Kind::Predicate) {
+            return compile_expr_predicate(node.predicate);
+        }
+        for (auto& child : node.children) {
+            if (!self(self, child)) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    for (auto& filter : include_filters) {
+        if (!compile_expr_node(compile_expr_node, filter)) {
+            return false;
+        }
+    }
+    for (auto& filter : exclude_filters) {
+        if (!compile_expr_node(compile_expr_node, filter)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static std::optional<char> parse_strand_filter(std::string_view value) {
@@ -1769,6 +2336,14 @@ int main(int argc, char* argv[]) {
     std::string id_list_file;
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
+    std::vector<GrepFilter> grep_filters;
+    std::string grep_file;
+    std::string grep_field;
+    bool grep_file_regex = false;
+    std::vector<ExprNode> include_expr_filters;
+    std::vector<ExprNode> exclude_expr_filters;
+    bool invert_grep = false;
+    bool ignore_case = false;
     bool include_children = false;
     bool include_parents = false;
     bool include_model = false;
@@ -1811,7 +2386,16 @@ int main(int argc, char* argv[]) {
         OPT_SOURCE,
         OPT_SCORE,
         OPT_STRAND_FILTER,
-        OPT_PHASE
+        OPT_PHASE,
+        OPT_GREP,
+        OPT_GREP_REGEX,
+        OPT_GREP_FILE,
+        OPT_GREP_FIELD,
+        OPT_GREP_FILE_REGEX,
+        OPT_INCLUDE_EXPR,
+        OPT_EXCLUDE_EXPR,
+        OPT_INVERT_MATCH,
+        OPT_IGNORE_CASE
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
@@ -1820,6 +2404,15 @@ int main(int argc, char* argv[]) {
         {"name",          required_argument, nullptr, OPT_NAME},
         {"where",         required_argument, nullptr, OPT_ATTR},
         {"attr",          required_argument, nullptr, OPT_ATTR},
+        {"grep",          required_argument, nullptr, OPT_GREP},
+        {"grep-regex",    required_argument, nullptr, OPT_GREP_REGEX},
+        {"grep-file",     required_argument, nullptr, OPT_GREP_FILE},
+        {"grep-field",    required_argument, nullptr, OPT_GREP_FIELD},
+        {"grep-file-regex", no_argument,     nullptr, OPT_GREP_FILE_REGEX},
+        {"include-expr",  required_argument, nullptr, OPT_INCLUDE_EXPR},
+        {"exclude-expr",  required_argument, nullptr, OPT_EXCLUDE_EXPR},
+        {"invert-match",  no_argument,       nullptr, OPT_INVERT_MATCH},
+        {"ignore-case",   no_argument,       nullptr, OPT_IGNORE_CASE},
         {"output-attrs",  required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"out-attrs",     required_argument, nullptr, OPT_OUTPUT_ATTRS},
         {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
@@ -1859,7 +2452,7 @@ int main(int argc, char* argv[]) {
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:hI:E:v", long_options, &option_index)) != -1) {
         switch (opt) {
             case OPT_ID: ids.emplace_back(optarg); break;
             case OPT_ID_LIST: id_list_file = optarg; break;
@@ -1874,6 +2467,54 @@ int main(int argc, char* argv[]) {
                 attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));
                 break;
             }
+            case OPT_GREP:
+            case OPT_GREP_REGEX: {
+                const auto parsed = parse_field_pattern(optarg);
+                if (!parsed) {
+                    std::cerr << "Error: --" << long_options[option_index].name << " expects FIELD:PATTERN\n";
+                    return 1;
+                }
+                GrepFilter filter;
+                filter.field = parsed->first;
+                filter.pattern = parsed->second;
+                filter.use_regex = opt == OPT_GREP_REGEX;
+                grep_filters.push_back(std::move(filter));
+                break;
+            }
+            case OPT_GREP_FILE:
+                grep_file = optarg;
+                break;
+            case OPT_GREP_FIELD:
+                grep_field = optarg;
+                break;
+            case OPT_GREP_FILE_REGEX:
+                grep_file_regex = true;
+                break;
+            case OPT_INCLUDE_EXPR:
+            case 'I': {
+                std::string error;
+                if (!parse_expr_filters(optarg, include_expr_filters, error)) {
+                    std::cerr << "Error: invalid include expression: " << error << '\n';
+                    return 1;
+                }
+                break;
+            }
+            case OPT_EXCLUDE_EXPR:
+            case 'E': {
+                std::string error;
+                if (!parse_expr_filters(optarg, exclude_expr_filters, error)) {
+                    std::cerr << "Error: invalid exclude expression: " << error << '\n';
+                    return 1;
+                }
+                break;
+            }
+            case OPT_INVERT_MATCH:
+            case 'v':
+                invert_grep = true;
+                break;
+            case OPT_IGNORE_CASE:
+                ignore_case = true;
+                break;
             case OPT_OUTPUT_ATTRS: {
                 const auto keys = split_attr_keys(optarg);
                 if (keys.empty()) {
@@ -1954,6 +2595,44 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (!grep_file.empty()) {
+        if (grep_field.empty()) {
+            std::cerr << "Error: --grep-file requires --grep-field\n";
+            return 1;
+        }
+        std::ifstream in{grep_file};
+        if (!in.is_open()) {
+            std::cerr << "Error: cannot open " << grep_file << '\n';
+            return 1;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+            const auto pattern = trim_copy(line);
+            if (pattern.empty()) {
+                continue;
+            }
+            GrepFilter filter;
+            filter.field = grep_field;
+            filter.pattern = pattern;
+            filter.use_regex = grep_file_regex;
+            grep_filters.push_back(std::move(filter));
+        }
+    } else if (!grep_field.empty() || grep_file_regex) {
+        std::cerr << "Error: --grep-field and --grep-file-regex require --grep-file\n";
+        return 1;
+    }
+    if (invert_grep && grep_filters.empty()) {
+        std::cerr << "Error: --invert-match requires --grep, --grep-regex, or --grep-file\n";
+        return 1;
+    }
+    {
+        std::string error;
+        if (!compile_filter_regexes(grep_filters, include_expr_filters, exclude_expr_filters, ignore_case, error)) {
+            std::cerr << "Error: " << error << '\n';
+            return 1;
+        }
+    }
+
     const bool has_query_style_selector = !ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty();
     if ((include_children || include_parents || include_model) && !has_query_style_selector) {
         std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest\n";
@@ -1984,6 +2663,7 @@ int main(int argc, char* argv[]) {
         if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
             strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
+            !grep_filters.empty() || !grep_file.empty() || !grep_field.empty() || grep_file_regex || !include_expr_filters.empty() || !exclude_expr_filters.empty() || invert_grep || ignore_case ||
             output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: --qc only supports the input file\n";
             return 1;
@@ -2001,7 +2681,9 @@ int main(int argc, char* argv[]) {
         }
         if (!id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty() || include_children || include_parents || include_model ||
             !output_attrs.empty() || !summary_format.empty() || !region_str.empty() || !bed_file.empty() ||
-            !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest || output_format != "gff3" || !output_file.empty()) {
+            !seqid_filter.empty() || !source_filter.empty() || score_filter || strand_filter || phase_filter || !feature.empty() || do_longest ||
+            !grep_filters.empty() || !grep_file.empty() || !grep_field.empty() || grep_file_regex || !include_expr_filters.empty() || !exclude_expr_filters.empty() || invert_grep || ignore_case ||
+            output_format != "gff3" || !output_file.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
@@ -2028,6 +2710,7 @@ int main(int argc, char* argv[]) {
     }
 
     const bool can_dispatch_summary_to_query = seqid_filter.empty() && source_filter.empty() && !score_filter && !strand_filter && !phase_filter && bed_file.empty() && !do_longest && !threads_set &&
+                                               grep_filters.empty() && grep_file.empty() && grep_field.empty() && !grep_file_regex && include_expr_filters.empty() && exclude_expr_filters.empty() && !invert_grep && !ignore_case &&
                                                output_format == "gff3" && output_file.empty();
     const bool can_dispatch_default_selector_to_query = can_dispatch_summary_to_query && region_str.empty();
 
@@ -2224,6 +2907,18 @@ int main(int argc, char* argv[]) {
 
     if (phase_filter) {
         filter_by_phase(data, *phase_filter);
+    }
+
+    if (!grep_filters.empty()) {
+        filter_by_grep(data, grep_filters, invert_grep);
+    }
+
+    if (!include_expr_filters.empty()) {
+        filter_by_expr(data, include_expr_filters, true);
+    }
+
+    if (!exclude_expr_filters.empty()) {
+        filter_by_expr(data, exclude_expr_filters, false);
     }
 
     // Apply feature filters

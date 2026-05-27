@@ -25,6 +25,10 @@
 | 批量提取精确 ID | `gffsub annotation.gff3 --ids genes.txt` |
 | 按常见命名键查找基因 | `gffsub annotation.gff3 --name GeneA` |
 | 按任意精确属性值查找记录 | `gffsub annotation.gff3 --where biotype=protein_coding` |
+| 用模式文件搜索字段或属性 | `gffsub annotation.gff3 --grep-file genes.txt --grep-field ID` |
+| 用正则搜索字段或属性 | `gffsub annotation.gff3 --grep-regex 'ID:^Glyma\.01G'` |
+| 用表达式组合语义过滤 | `gffsub annotation.gff3 -I 'type=="gene" && attr.biotype=="protein_coding"'` |
+| 用表达式排除记录 | `gffsub annotation.gff3 -E 'attr.Note~"transposon|retroelement"'` |
 | 查找离某个区间最近的基因 | `gffsub annotation.gff3 --nearest chr1:1000-2000` |
 | 包含匹配记录的后代 | `gffsub annotation.gff3 --id GeneA -C` |
 | 包含匹配记录的祖先 | `gffsub annotation.gff3 --id ExonA --parents` |
@@ -42,6 +46,7 @@
 | 注释输入 | GFF3/GTF 风格 feature records |
 | 区间输入 | `CHR:START-END` 字符串和 BED 文件 |
 | 标识符输入 | 可重复的 `--id` 值，或 `--ids` 指定的一行一个 ID 文件 |
+| 模式输入 | `--grep-file` 与 `--grep-field` 指定的一行一个 pattern 文件 |
 | 注释输出 | `gff3`, `gtf` (= `gtf2`), `gtf2`, `gtf3`, `bed` |
 | 表格输出 | TSV/JSON summary 和 TSV QC report |
 
@@ -147,6 +152,24 @@ chr1	src	gene	100	400	.	+	.	ID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123
 
 `--attr KEY=VALUE` 是 `--where KEY=VALUE` 的兼容别名。`--output-attrs` 是 `--out-attrs` 的较长别名。`--attrs` 保留为已弃用的兼容别名。
 
+### Grep 和表达式过滤
+
+`gffsub` 按 GFF 语义 subtract 记录：列、属性、ID、`Parent`/child 关系、gene model、转录本结构和 QC 状态。字段级过滤可以用 grep 风格模式快速完成；逻辑更复杂时，用表达式把筛选条件写清楚。
+
+```bash
+./gffsub annotation.gff3 --grep ID:Glyma.01G
+./gffsub annotation.gff3 --grep-file genes.txt --grep-field ID
+./gffsub annotation.gff3 --grep-regex 'ID:^Glyma\.01G'
+./gffsub annotation.gff3 --grep-regex 'seqid:^chr[0-9]+$' -f gene
+./gffsub annotation.gff3 -I 'type=="gene" && attr.biotype=="protein_coding"'
+./gffsub annotation.gff3 -I '(type=="gene" && length>=1000) || attr.ID~"^Glyma\.01G"'
+./gffsub annotation.gff3 -E 'attr.Note~"transposon|retroelement"'
+```
+
+Grep 字段可以是 GFF 核心列（`seqid`, `source`, `type`, `start`, `end`, `score`, `strand`, `phase`, `length`, `attrs`），也可以是属性（`ID`, `Name`, `Parent`, `Alias`, `Dbxref`, `Note`, `biotype`, `gene_id`, `transcript_id`, `locus_tag` 或 `attr.KEY`）。`--grep` 做子串匹配，`--grep-regex` 使用 ECMAScript 正则，`--grep-file` 读取每个非空行作为一个 pattern，`-v` 反选 grep 结果，`--ignore-case` 对 grep 和表达式中的字符串/正则匹配生效。
+
+表达式过滤使用同一组字段名，支持 `==`, `!=`, `~`, `!~`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!` 和括号。缺失值按 `.` 比较。
+
 ## 场景：提取上游或下游窗口
 
 当你需要某个基因或 feature 周围的局部注释上下文时使用 window 选项，例如启动子区域查看或邻近 feature 审查。
@@ -208,6 +231,15 @@ gffsub <input.gff3> [options]
 | `--ids`, `--id-list` | 文件 | 每个非空行读取一个精确 feature ID。`--id-list` 是较长别名。 |
 | `--name` | key | 保留一个按 `ID`, `Name`, `gene_id`, `locus_tag`, `Alias` 或完整 `Dbxref` 值找到的基因。 |
 | `--where`, `--attr` | `KEY=VALUE` | 保留精确 GFF3 属性值匹配的 feature。该选项可以重复使用。 |
+| `--grep` | `FIELD:PATTERN` | 保留字段或属性中包含 `PATTERN` 的记录。该选项可以重复使用。 |
+| `--grep-regex` | `FIELD:REGEX` | 保留字段或属性匹配 ECMAScript 正则的记录。该选项可以重复使用。 |
+| `--grep-file` | 文件 | 每个非空行读取一个 grep pattern。与 `--grep-field` 组合使用。 |
+| `--grep-field` | 字段 | `--grep-file` 使用的字段，例如 `ID`, `Name`, `seqid`, `type` 或 `attr.KEY`。 |
+| `--grep-file-regex` | 标志 | 将 `--grep-file` 中的每行按正则表达式处理，而不是子串 pattern。 |
+| `-I`, `--include-expr` | 表达式 | 保留匹配 GFF 语义表达式的记录。该选项可以重复使用。 |
+| `-E`, `--exclude-expr` | 表达式 | 删除匹配 GFF 语义表达式的记录。该选项可以重复使用。 |
+| `-v`, `--invert-match` | 标志 | 反转 `--grep`, `--grep-regex` 或 `--grep-file` 的匹配结果。 |
+| `--ignore-case` | 标志 | 对 grep 和表达式中的字符串/正则匹配启用大小写不敏感。 |
 | `-C`, `--children`, `--include-children` | 标志 | 包含由 `--id`, `--ids`, `--name`, `--where` 或 `--nearest` 匹配记录的后代。 |
 | `--parents`, `--include-parents` | 标志 | 包含由 `--id`, `--ids`, `--name`, `--where` 或 `--nearest` 匹配记录的祖先。 |
 | `--model`, `--gene-model` | 标志 | 包含匹配记录所属的完整 gene model。 |
