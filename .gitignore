@@ -26,3 +26,6 @@ test.gff
 
 # Local agent workflow state
 .ccg/
+.codex/
+.omx/
+openspec/
