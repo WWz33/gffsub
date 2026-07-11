@@ -70,8 +70,9 @@ static void usage(const char* prog) {
         << "      Run annotation QC.\n"
         << "\n"
         << "Input/Region Options:\n"
-        << "  --seqid SEQID\n"
-        << "      Extract features whose first column exactly matches SEQID.\n"
+        << "  --seqid SEQID[,SEQID,...]\n"
+        << "      Keep features on the listed seqids (comma-separated).\n"
+        << "      Prefix with ^ to exclude instead: --seqid ^ChrUn,ChrSy\n"
         << "\n"
         << "  --source SOURCE\n"
         << "      Extract features whose second column exactly matches SOURCE.\n"
@@ -1466,7 +1467,21 @@ int main(int argc, char* argv[]) {
     }
 
     if (!seqid_filter.empty()) {
-        filter_by_seqid(data, seqid_filter);
+        bool seqid_exclude = false;
+        std::string_view sv = seqid_filter;
+        if (sv.front() == '^') {
+            seqid_exclude = true;
+            sv.remove_prefix(1);
+        }
+        std::unordered_set<std::string> seqids;
+        size_t pos = 0;
+        while (pos < sv.size()) {
+            auto comma = sv.find(',', pos);
+            if (comma == std::string_view::npos) comma = sv.size();
+            if (comma > pos) seqids.emplace(sv.substr(pos, comma - pos));
+            pos = comma + 1;
+        }
+        filter_by_seqid(data, seqids, seqid_exclude);
     }
 
     if (!source_filter.empty()) {

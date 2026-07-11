@@ -74,9 +74,11 @@ void filter_by_feature(GffData& data, std::string_view feature_type) {
     }
 }
 
-void filter_by_seqid(GffData& data, std::string_view seqid) {
+void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude) {
     for (auto& rec : data) {
-        if (rec.kept && rec.seqid != seqid) {
+        if (!rec.kept) continue;
+        bool found = seqids.count(rec.seqid) > 0;
+        if (exclude ? found : !found) {
             rec.kept = false;
         }
     }

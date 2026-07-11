@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace gffsub {
@@ -38,7 +39,7 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
 void filter_by_feature(GffData& data, std::string_view feature_type);
-void filter_by_seqid(GffData& data, std::string_view seqid);
+void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude);
 void filter_by_source(GffData& data, std::string_view source);
 void filter_by_score(GffData& data, std::optional<double> score);
 void filter_by_strand(GffData& data, char strand);

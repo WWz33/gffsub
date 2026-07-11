@@ -15,7 +15,8 @@
 | 我想要... | 使用 |
 |----------|------|
 | 提取某个基因组区间内的 gene | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
-| 提取某条染色体或 contig 上的记录 | `gffsub annotation.gff3 --seqid chr1` |
+| 提取一条或多条染色体上的记录 | `gffsub annotation.gff3 --seqid chr1,chr2` |
+| 排除指定染色体 | `gffsub annotation.gff3 --seqid ^chrUn,chrSy` |
 | 提取某个注释来源的记录 | `gffsub annotation.gff3 --source Gnomon` |
 | 按 score 列过滤记录 | `gffsub annotation.gff3 --score 42.5` |
 | 按 strand 列过滤记录 | `gffsub annotation.gff3 --strand -` |
@@ -81,6 +82,8 @@ ctest --test-dir build --output-on-failure
 ```bash
 ./gffsub annotation.gff3 -r chr1:1-100000 -f gene
 ./gffsub annotation.gff3 --seqid chr1
+./gffsub annotation.gff3 --seqid chr1,chr2,chr3
+./gffsub annotation.gff3 --seqid ^chrUn,chrSy
 ./gffsub annotation.gff3 --source Gnomon
 ./gffsub annotation.gff3 --score 42.5
 ./gffsub annotation.gff3 --strand -
@@ -251,7 +254,7 @@ gffsub <input.gff3> [options]
 | `--down`, `--downstream` | 整数 | 与 `--id` 配合，提取与目标下游扩展窗口重叠的记录。 |
 | `--strand-aware` | 标志 | 窗口提取时，按 feature 链方向解释 biological upstream/downstream。 |
 | `--qc` | 标志 | 运行注释 QC。 |
-| `--seqid` | seqid | 保留第 1 列 GFF3 seqid 精确等于该值的记录。 |
+| `--seqid` | seqid[,seqid,...] | 保留列出的 seqid 上的记录（逗号分隔）。前缀 `^` 表示排除。 |
 | `--source` | source | 保留第 2 列 GFF3 source 精确等于该值的记录。 |
 | `--score` | number, `.` | 保留第 6 列 GFF3 score 匹配该数值，或 score 列为 `.` 的记录。 |
 | `--strand` | `+`, `-`, `.`, `?` | 保留第 7 列 GFF3 strand 精确等于该值的记录。 |

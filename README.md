@@ -15,7 +15,8 @@ Use it when a plain interval filter is not enough and you need GFF3-aware behavi
 | I want to... | Use this |
 |-------------|----------|
 | Extract genes in a genomic interval | `gffsub annotation.gff3 -r chr1:1-100000 -f gene` |
-| Extract records from one chromosome or contig | `gffsub annotation.gff3 --seqid chr1` |
+| Extract records from one or more chromosomes | `gffsub annotation.gff3 --seqid chr1,chr2` |
+| Exclude specific chromosomes | `gffsub annotation.gff3 --seqid ^chrUn,chrSy` |
 | Extract records from one annotation source | `gffsub annotation.gff3 --source Gnomon` |
 | Filter records by score | `gffsub annotation.gff3 --score 42.5` |
 | Filter records by strand | `gffsub annotation.gff3 --strand -` |
@@ -81,6 +82,8 @@ Use this mode when your question starts from a coordinate interval, chromosome/c
 ```bash
 ./gffsub annotation.gff3 -r chr1:1-100000 -f gene
 ./gffsub annotation.gff3 --seqid chr1
+./gffsub annotation.gff3 --seqid chr1,chr2,chr3
+./gffsub annotation.gff3 --seqid ^chrUn,chrSy
 ./gffsub annotation.gff3 --source Gnomon
 ./gffsub annotation.gff3 --score 42.5
 ./gffsub annotation.gff3 --strand -
@@ -251,7 +254,7 @@ gffsub <input.gff3> [options]
 | `--down`, `--downstream` | integer | With `--id`, extract records overlapping the downstream-expanded target window. |
 | `--strand-aware` | flag | With window extraction, interpret upstream/downstream biologically by feature strand. |
 | `--qc` | flag | Run annotation QC. |
-| `--seqid` | seqid | Keep records whose first GFF3 column exactly matches the value. |
+| `--seqid` | seqid[,seqid,...] | Keep records on the listed seqids (comma-separated). Prefix with `^` to exclude instead. |
 | `--source` | source | Keep records whose second GFF3 column exactly matches the value. |
 | `--score` | number, `.` | Keep records whose sixth GFF3 column matches the numeric score, or whose score column is `.`. |
 | `--strand` | `+`, `-`, `.`, `?` | Keep records whose seventh GFF3 column exactly matches the value. |
