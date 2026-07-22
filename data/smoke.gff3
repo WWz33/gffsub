@@ -1,0 +1,4 @@
+##gff-version 3
+chr1	.	gene	1	100	.	+	.	ID=GeneA;Name=GeneA
+chr1	.	mRNA	1	100	.	+	.	ID=mRNA1;Parent=GeneA
+chr1	.	exon	1	100	.	+	.	ID=exon1;Parent=mRNA1

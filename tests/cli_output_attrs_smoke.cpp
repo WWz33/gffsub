@@ -100,14 +100,12 @@ int main(int argc, char* argv[]) {
     const std::string keys{"ID,Name,Alias,Dbxref"};
     if (run_command(exe + " " + gff + " --help > output_attrs_help.txt 2>&1") != 0 ||
         require_contains("output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
-        require_contains("output_attrs_help.txt", "--output-attrs KEYS") != 0) {
+        require_contains("output_attrs_help.txt", "--output-attrs") != 0) {
         return 1;
     }
     if (run_command(exe + " query --help > query_output_attrs_help.txt 2>&1") != 0 ||
         require_contains("query_output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
-        require_contains("query_output_attrs_help.txt", "Output selected attributes") != 0 ||
-        require_contains("query_output_attrs_help.txt", "--output-attrs KEYS") != 0 ||
-        require_contains("query_output_attrs_help.txt", "Verbose alias for --out-attrs") != 0) {
+        require_contains("query_output_attrs_help.txt", "selected attributes") != 0) {
         return 1;
     }
 

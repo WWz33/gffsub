@@ -45,7 +45,7 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
             // Find mRNAs for this gene using index
             auto mRNA_it = gene_to_mRNAs.find(*gene.id);
             if (mRNA_it == gene_to_mRNAs.end()) {
-                // Orphan gene with no mRNA children - mark as not kept (AGAT behavior)
+                // gene with no mRNA children is dropped
                 data.records[gene_idx].kept = false;
                 continue;
             }

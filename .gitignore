@@ -1,5 +1,6 @@
 # Build artifacts
 gffsub
+*_smoke
 *.o
 *.a
 *.so
@@ -27,5 +28,9 @@ test.gff
 # Local agent workflow state
 .ccg/
 .codex/
+.codegraph/
 .omx/
+.serena/
 openspec/
+CLAUDE.md
+

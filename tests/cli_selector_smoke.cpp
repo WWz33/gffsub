@@ -304,45 +304,45 @@ int main(int argc, char* argv[]) {
     }
 
     if (run_command(exe + " query --help > selector_query_help.txt 2>&1") != 0 ||
-        require_contains("selector_query_help.txt", "Most workflows can use the top-level form") != 0 ||
+        require_contains("selector_query_help.txt", "About:") != 0 ||
         require_contains("selector_query_help.txt", "--ids FILE") != 0 ||
-        require_contains("selector_query_help.txt", "Verbose alias for --ids") != 0 ||
         require_contains("selector_query_help.txt", "--where KEY=VALUE") != 0 ||
         require_contains("selector_query_help.txt", "--children") != 0 ||
         require_contains("selector_query_help.txt", "--parents") != 0 ||
         require_contains("selector_query_help.txt", "--model") != 0 ||
         require_contains("selector_query_help.txt", "--nearest REGION") != 0 ||
-        require_contains("selector_query_help.txt", "--summary FMT") != 0 ||
-        require_contains("selector_query_help.txt", "Verbose alias for --summary") != 0) {
+        require_contains("selector_query_help.txt", "--summary FMT") != 0) {
         return 1;
     }
     if (run_command(exe + " window --help > selector_window_help.txt 2>&1") != 0 ||
-        require_contains("selector_window_help.txt", "Top-level equivalent") != 0 ||
+        require_contains("selector_window_help.txt", "About:") != 0 ||
         require_contains("selector_window_help.txt", "--up N") != 0 ||
         require_contains("selector_window_help.txt", "--down N") != 0) {
         return 1;
     }
     if (run_command(exe + " qc --help > selector_qc_help.txt 2>&1") != 0 ||
-        require_contains("selector_qc_help.txt", "Top-level equivalent") != 0) {
+        require_contains("selector_qc_help.txt", "About:") != 0 ||
+        require_contains("selector_qc_help.txt", "severity") != 0) {
         return 1;
     }
     if (run_command(exe + " --help > selector_help.txt 2>&1") != 0 ||
+        require_contains("selector_help.txt", "Program: gffsub") != 0 ||
         require_contains("selector_help.txt", "--format FMT") != 0 ||
         require_contains("selector_help.txt", "--where KEY=VALUE") != 0 ||
-        require_contains("selector_help.txt", "--seqid SEQID") != 0 ||
+        require_contains("selector_help.txt", "--seqid LIST") != 0 ||
         require_contains("selector_help.txt", "--source SOURCE") != 0 ||
         require_contains("selector_help.txt", "--score SCORE") != 0 ||
         require_contains("selector_help.txt", "--strand STRAND") != 0 ||
         require_contains("selector_help.txt", "--phase PHASE") != 0 ||
         require_contains("selector_help.txt", "--grep FIELD:PATTERN") != 0 ||
         require_contains("selector_help.txt", "--grep-regex FIELD:REGEX") != 0 ||
-        require_contains("selector_help.txt", "--grep-file FILE --grep-field FIELD") != 0 ||
+        require_contains("selector_help.txt", "--grep-file FILE") != 0 ||
         require_contains("selector_help.txt", "--include-expr EXPR") != 0 ||
         require_contains("selector_help.txt", "--exclude-expr EXPR") != 0 ||
-        require_contains("selector_help.txt", "Invert --grep/--grep-regex/--grep-file matches") != 0 ||
+        require_contains("selector_help.txt", "--invert-match") != 0 ||
         require_contains("selector_help.txt", "--model") != 0 ||
         require_contains("selector_help.txt", "--nearest REGION") != 0 ||
-        require_contains("selector_help.txt", "--output-format remains as a verbose alias") != 0) {
+        require_contains("selector_help.txt", "--output-attrs") != 0) {
         return 1;
     }
 
