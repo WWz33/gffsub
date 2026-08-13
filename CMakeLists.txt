@@ -7,8 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(gffsub
     src/gffsub.cpp
     src/selector_filter.cpp
-    src/qc_validate.cpp
-    src/qc_parse.cpp
     src/gtf_parser.cpp
     src/query_summary.cpp
     src/attributes.cpp

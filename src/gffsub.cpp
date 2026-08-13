@@ -1,6 +1,4 @@
 #include "gff3.hpp"
-#include "qc_parse.hpp"
-#include "qc_validate.hpp"
 #include "query_summary.hpp"
 #include "selector_filter.hpp"
 #include <algorithm>
@@ -23,11 +21,11 @@ using namespace gffsub;
 
 static void usage(const char* prog) {
     std::cerr
-        << "Program: gffsub (subset and QC GFF3/GTF annotations)\n"
+        << "Program: gffsub (subset GFF3/GTF annotations)\n"
         << "Version: 0.1\n"
         << "\n"
         << "Usage:   " << prog << " <input.gff3> [options]\n"
-        << "         " << prog << " query|window|qc <input.gff3> [options]\n"
+        << "         " << prog << " query|window <input.gff3> [options]\n"
         << "\n"
         << "Selector options:\n"
         << "  --id ID                      exact feature ID (repeatable)\n"
@@ -51,7 +49,6 @@ static void usage(const char* prog) {
         << "  --summary FMT                summary instead of GFF3: tsv|json\n"
         << "  --up N, --down N             window around --id (bp) [0]\n"
         << "  --strand-aware               window follows feature strand\n"
-        << "  --qc                         write QC report (TSV)\n"
         << "\n"
         << "Input/region options:\n"
         << "  --seqid LIST                 keep seqids (comma-separated); ^LIST excludes\n"
@@ -80,8 +77,7 @@ static void usage(const char* prog) {
         << "\n"
         << "Examples:\n"
         << "  " << prog << " ann.gff3 -r chr1:1-100000 -f gene\n"
-        << "  " << prog << " ann.gff3 --id GeneA -C\n"
-        << "  " << prog << " ann.gff3 --qc\n";
+        << "  " << prog << " ann.gff3 --id GeneA -C\n";
 }
 
 static void query_usage(const char* prog) {
@@ -124,16 +120,6 @@ static void window_usage(const char* prog) {
         << "  " << prog << " window ann.gff3 --id GeneA --up 2000 --down 500\n";
 }
 
-static void qc_usage(const char* prog) {
-    std::cerr
-        << "About:   annotation QC report (TSV)\n"
-        << "Usage:   " << prog << " qc <input.gff3>\n"
-        << "\n"
-        << "Writes columns: severity, code, line_idx, id, message\n"
-        << "\n"
-        << "Example:\n"
-        << "  " << prog << " qc ann.gff3\n";
-}
 
 static bool append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord& rec) {
     if (!seen.insert(rec.line_idx).second) {
@@ -235,29 +221,6 @@ static std::vector<char*> argv_from(std::vector<std::string>& args) {
     return argv;
 }
 
-static void print_qc_row(std::ostream& out,
-                         const char* severity,
-                         const char* code,
-                         int line_idx,
-                         const std::string& id,
-                         const std::string& message) {
-    out << severity << '\t'
-        << code << '\t'
-        << line_idx << '\t'
-        << id << '\t'
-        << message << '\n';
-}
-
-static void print_percent_encoding_qc(std::ostream& out,
-                                      std::string_view value,
-                                      std::string_view field,
-                                      int line_idx,
-                                      const std::string& id) {
-    if (const auto error = percent_encoding_error(value)) {
-        const auto message = field.empty() ? *error : std::string{field} + " " + *error;
-        print_qc_row(out, "error", "invalid_percent_encoding", line_idx, id, message);
-    }
-}
 
 static int run_query(int argc, char* argv[], const char* prog) {
     if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
@@ -619,189 +582,6 @@ static int run_window(int argc, char* argv[], const char* prog) {
     return 0;
 }
 
-static int run_qc(int argc, char* argv[], const char* prog) {
-    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
-        qc_usage(prog);
-        return 0;
-    }
-
-    if (argc != 2) {
-        qc_usage(prog);
-        return 1;
-    }
-
-    const std::string input_file = argv[1];
-    const auto qc_parse = parse_qc_records(input_file);
-    if (!qc_parse.opened) {
-        std::cerr << "Error: cannot parse " << input_file << '\n';
-        return 1;
-    }
-    const auto& data = qc_parse.data;
-    const auto directive_result = parse_directives(input_file);
-
-    std::unordered_map<std::string, const GffRecord*> by_id;
-    std::unordered_map<std::string, std::vector<const GffRecord*>> records_by_id;
-    std::unordered_map<std::string, std::vector<std::string>> parents_by_id;
-    std::unordered_set<std::string> circular_seqids;
-    for (const auto& rec : data.records) {
-        const auto attrs = parse_attributes(rec.attr_raw);
-        if (rec.type == "region" && has_circular_true(attrs)) {
-            circular_seqids.insert(rec.seqid);
-        }
-        if (rec.id) {
-            records_by_id[*rec.id].push_back(&rec);
-            by_id.emplace(*rec.id, &rec);
-
-            const auto parent_it = attrs.find("Parent");
-            if (parent_it != attrs.end()) {
-                parents_by_id.emplace(*rec.id, parent_it->second);
-            }
-        }
-    }
-    const auto parent_cycle_ids = find_parent_cycle_ids(parents_by_id);
-
-    std::cout << "severity\tcode\tline_idx\tid\tmessage\n";
-
-    for (const auto& [id, records] : records_by_id) {
-        if (records.size() > 1 && !allowed_discontinuous_id(records)) {
-            print_qc_row(std::cout, "error", "duplicate_id", -1, id, "ID appears more than once");
-        }
-    }
-    for (const auto& issue : directive_result.issues) {
-        print_qc_row(std::cout, "error", issue.code.c_str(), issue.line_idx, ".", issue.message);
-    }
-    for (const auto& issue : qc_parse.issues) {
-        print_qc_row(std::cout, "error", issue.code.c_str(), issue.line_idx, ".", issue.message);
-    }
-
-    for (const auto& rec : data.records) {
-        const std::string id = record_id(rec);
-        const bool has_valid_coordinates = rec.start >= 1 && rec.end >= 1 && rec.start <= rec.end;
-        const auto attrs = parse_attributes(rec.attr_raw);
-        print_percent_encoding_qc(std::cout, rec.attr_raw, "", rec.line_idx, id);
-        print_percent_encoding_qc(std::cout, rec.source, "source", rec.line_idx, id);
-        print_percent_encoding_qc(std::cout, rec.type, "feature type", rec.line_idx, id);
-        if (const auto error = attribute_escape_error(rec.attr_raw)) {
-            print_qc_row(std::cout, "error", "invalid_attribute_escape", rec.line_idx, id, *error);
-        }
-        if (const auto error = seqid_syntax_error(rec.seqid)) {
-            print_qc_row(std::cout, "error", "invalid_seqid", rec.line_idx, id, *error);
-        }
-        if (const auto error = feature_type_syntax_error(rec.type)) {
-            print_qc_row(std::cout, "error", "invalid_feature_type", rec.line_idx, id, *error);
-        }
-        if (rec.start < 1 || rec.end < 1) {
-            print_qc_row(std::cout, "error", "invalid_coordinate", rec.line_idx, id,
-                         "start and end must be positive 1-based coordinates");
-        }
-        if (rec.start > rec.end) {
-            print_qc_row(std::cout, "error", "invalid_range", rec.line_idx, id, "start is greater than end");
-        }
-        if (rec.score && !std::isfinite(*rec.score)) {
-            print_qc_row(std::cout, "error", "invalid_score", rec.line_idx, id,
-                         "score must be a finite floating point number or .");
-        }
-        const auto sequence_region_it = directive_result.sequence_regions.find(rec.seqid);
-        if (has_valid_coordinates && sequence_region_it != directive_result.sequence_regions.end()) {
-            const auto& sequence_region = sequence_region_it->second;
-            const bool outside_end = rec.end > sequence_region.end && circular_seqids.find(rec.seqid) == circular_seqids.end();
-            if (rec.start < sequence_region.start || outside_end) {
-                print_qc_row(std::cout, "error", "outside_sequence_region", rec.line_idx, id,
-                             "feature is outside ##sequence-region " + rec.seqid);
-            }
-        }
-        if (rec.strand != '+' && rec.strand != '-' && rec.strand != '.' && rec.strand != '?') {
-            print_qc_row(std::cout, "error", "invalid_strand", rec.line_idx, id,
-                         std::string{"strand "} + rec.strand + " must be +, -, ., or ?");
-        }
-        if (rec.type != "CDS" && rec.phase != '.') {
-            print_qc_row(std::cout, "error", "invalid_phase", rec.line_idx, id,
-                         std::string{"non-CDS phase "} + rec.phase + " must be .");
-        }
-        if (rec.type == "CDS" && rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
-            print_qc_row(std::cout, "error", "invalid_cds_phase", rec.line_idx, id,
-                         std::string{"CDS phase "} + rec.phase + " must be 0, 1, or 2");
-        }
-        if (has_invalid_is_circular(attrs)) {
-            print_qc_row(std::cout, "error", "invalid_is_circular", rec.line_idx, id,
-                         "Is_circular value must be true");
-        }
-
-        const auto target_it = attrs.find("Target");
-        if (target_it != attrs.end()) {
-            for (const auto& target : target_it->second) {
-                if (const auto error = target_attribute_error(target)) {
-                    print_qc_row(std::cout, "error", "invalid_target", rec.line_idx, id, *error);
-                }
-            }
-        }
-        const auto gap_it = attrs.find("Gap");
-        if (gap_it != attrs.end()) {
-            for (const auto& gap : gap_it->second) {
-                if (const auto error = gap_attribute_error(gap)) {
-                    print_qc_row(std::cout, "error", "invalid_gap", rec.line_idx, id, *error);
-                }
-            }
-        }
-        const auto dbxref_it = attrs.find("Dbxref");
-        if (dbxref_it != attrs.end()) {
-            for (const auto& dbxref : dbxref_it->second) {
-                if (const auto error = database_accession_error("Dbxref", dbxref)) {
-                    print_qc_row(std::cout, "error", "invalid_dbxref", rec.line_idx, id, *error);
-                }
-            }
-        }
-        const auto ontology_term_it = attrs.find("Ontology_term");
-        if (ontology_term_it != attrs.end()) {
-            for (const auto& ontology_term : ontology_term_it->second) {
-                if (const auto error = database_accession_error("Ontology_term", ontology_term)) {
-                    print_qc_row(std::cout, "error", "invalid_ontology_term", rec.line_idx, id, *error);
-                }
-            }
-        }
-        const auto derives_it = attrs.find("Derives_from");
-        if (derives_it != attrs.end()) {
-            for (const auto& source_id : derives_it->second) {
-                if (by_id.find(source_id) == by_id.end()) {
-                    print_qc_row(std::cout, "error", "missing_derives_from", rec.line_idx, id,
-                                 "Derives_from " + source_id + " was not found");
-                }
-            }
-        }
-
-        const auto parent_it = attrs.find("Parent");
-        if (rec.id && parent_cycle_ids.find(*rec.id) != parent_cycle_ids.end()) {
-            print_qc_row(std::cout, "error", "parent_cycle", rec.line_idx, id,
-                         "Parent relationships contain a cycle");
-        }
-        if (parent_it == attrs.end()) {
-            continue;
-        }
-        std::unordered_set<std::string> seen_parents;
-        for (const auto& parent_id : parent_it->second) {
-            if (!seen_parents.insert(parent_id).second) {
-                print_qc_row(std::cout, "error", "duplicate_parent", rec.line_idx, id,
-                             "Parent " + parent_id + " appears more than once");
-                continue;
-            }
-            const auto parent_record_it = by_id.find(parent_id);
-            if (parent_record_it == by_id.end()) {
-                print_qc_row(std::cout, "error", "missing_parent", rec.line_idx, id,
-                             "Parent " + parent_id + " was not found");
-                continue;
-            }
-
-            const auto& parent = *parent_record_it->second;
-            if (rec.seqid != parent.seqid || rec.start < parent.start || rec.end > parent.end) {
-                print_qc_row(std::cout, "warning", "child_outside_parent", rec.line_idx, id,
-                             "child is outside Parent " + parent_id);
-            }
-        }
-    }
-
-    return 0;
-}
-
 int main(int argc, char* argv[]) {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
@@ -811,9 +591,6 @@ int main(int argc, char* argv[]) {
     }
     if (argc > 1 && std::string(argv[1]) == "window") {
         return run_window(argc - 1, argv + 1, argv[0]);
-    }
-    if (argc > 1 && std::string(argv[1]) == "qc") {
-        return run_qc(argc - 1, argv + 1, argv[0]);
     }
 
     std::vector<std::string> ids;
@@ -836,7 +613,6 @@ int main(int argc, char* argv[]) {
     std::string upstream_arg;
     std::string downstream_arg;
     bool strand_aware = false;
-    bool do_qc = false;
     std::string region_str;
     std::string nearest_region_str;
     std::string seqid_filter;
@@ -865,7 +641,6 @@ int main(int argc, char* argv[]) {
         OPT_UPSTREAM,
         OPT_DOWNSTREAM,
         OPT_STRAND_AWARE,
-        OPT_QC,
         OPT_SEQID,
         OPT_SOURCE,
         OPT_SCORE,
@@ -913,7 +688,6 @@ int main(int argc, char* argv[]) {
         {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
         {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
         {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
-        {"qc",            no_argument,       nullptr, OPT_QC},
         {"seqid",         required_argument, nullptr, OPT_SEQID},
         {"source",        required_argument, nullptr, OPT_SOURCE},
         {"score",         required_argument, nullptr, OPT_SCORE},
@@ -1022,7 +796,6 @@ int main(int argc, char* argv[]) {
             case OPT_UPSTREAM: upstream_arg = optarg; break;
             case OPT_DOWNSTREAM: downstream_arg = optarg; break;
             case OPT_STRAND_AWARE: strand_aware = true; break;
-            case OPT_QC: do_qc = true; break;
             case OPT_SEQID: seqid_filter = optarg; break;
             case OPT_SOURCE: source_filter = optarg; break;
             case OPT_SCORE: {
@@ -1142,21 +915,6 @@ int main(int argc, char* argv[]) {
     }
 
     std::string input_file = argv[optind];
-
-    if (do_qc) {
-        if (!ids.empty() || !id_list_file.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty() || include_children || include_parents || include_model ||
-            !output_attrs.empty() || !summary_format.empty() || !upstream_arg.empty() || !downstream_arg.empty() ||
-            strand_aware || score_filter || strand_filter || phase_filter || !region_str.empty() || !seqid_filter.empty() || !source_filter.empty() || !bed_file.empty() || !feature.empty() || do_longest ||
-            !grep_filters.empty() || !grep_file.empty() || !grep_field.empty() || grep_file_regex || !include_expr_filters.empty() || !exclude_expr_filters.empty() || invert_grep || ignore_case ||
-            output_format != "gff3" || !output_file.empty()) {
-            std::cerr << "Error: --qc only supports the input file\n";
-            return 1;
-        }
-
-        std::vector<std::string> qc_args{"qc", input_file};
-        auto qc_argv = argv_from(qc_args);
-        return run_qc(static_cast<int>(qc_argv.size()), qc_argv.data(), argv[0]);
-    }
 
     if (!upstream_arg.empty() || !downstream_arg.empty() || strand_aware) {
         if (ids.size() != 1) {

@@ -25,87 +25,6 @@ static bool write_test_annotation(const std::string& path) {
     return true;
 }
 
-static bool write_qc_annotation(const std::string& path) {
-    std::ofstream out{path};
-    if (!out.is_open()) {
-        return false;
-    }
-
-    out << "##gff-version 3\n"
-        << "##sequence-region chr1 1 1000\n"
-        << "##sequence-region chr_bad 100 1\n"
-        << "##sequence-region chr_signed +1 500\n"
-        << "##sequence-region chr1 1 1200\n"
-        << "##sequence-region chr2 1 500\n"
-        << "##sequence-region chr#bad 1 500\n"
-        << "##sequence-region chr_extra 1 500 extra\n"
-        << "##gff-version 3 extra\n"
-        << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=dup_gene\n"
-        << "chr1\tsrc\tgene\t300\t400\t.\t+\t.\tID=dup_gene\n"
-        << "chr1\tsrc\tmRNA\t410\t480\t.\t+\t.\tID=disc_tx;Parent=disc_gene\n"
-        << "chr1\tsrc\tCDS\t410\t430\t.\t+\t0\tID=disc_cds;Parent=disc_tx\n"
-        << "chr1\tsrc\tCDS\t450\t480\t.\t+\t2\tID=disc_cds;Parent=disc_tx\n"
-        << "chr1\tsrc\tpolypeptide\t410\t430\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
-        << "chr1\tsrc\tpolypeptide\t450\t480\t.\t+\t.\tID=disc_poly;Derives_from=disc_tx\n"
-        << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\n"
-        << "chr1\tsrc\tgene\t150\t180\tnan\t+\t.\tID=bad_score\n"
-        << "chr1\t\tgene\t181\t190\t.\t+\t.\tID=bad_empty_source\n"
-        << "chr1\tsrc\tgene\tabc\t180\t.\t+\t.\tID=bad_coordinate_text\n"
-        << "chr1\tsrc\tgene\t+180\t190\t.\t+\t.\tID=bad_coordinate_sign\n"
-        << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\tID\n"
-        << "chr1\tsrc\tgene\t180\t190\t.\t+\t.\t\n"
-        << "chr1\tsrc\tgene\t181\t190\t.\t+\t.\tID=bad_attr_equals;Note=A=B\n"
-        << "chr1\tsrc\tgene\t190\t195\t.\t+\t.\tID=dup_attr;Name=A;Name=B\n"
-        << "chr1\tsrc\tgene\t196\t198\t.\t+\t.\tID=bad_multivalue;Name=A,B\n"
-        << "chr1\tsrc\tgene\t199\t199\t.\t+\t.\tID=bad_empty_attr;Name=\n"
-        << "chr1\tsrc\tgene\t201\t205\t.\t+\t.\tID=bad_empty_list_item;Alias=A,\n"
-        << "bad seq\tsrc\tgene\t200\t210\t.\t+\t.\tID=bad_seqid\n"
-        << "chr#bad\tsrc\tgene\t211\t215\t.\t+\t.\tID=bad_seqid_char\n"
-        << "chr1\tsrc\t.\t220\t230\t.\t+\t.\tID=bad_type\n"
-        << "chr1\tsrc\tSO:abc\t240\t250\t.\t+\t.\tID=bad_so_type\n"
-        << "chr1\tsrc\tSO:123\t251\t255\t.\t+\t.\tID=bad_so_width\n"
-        << "chr1\tsrc\tgene\t0\t50\t.\t+\t.\tID=bad_coordinate\n"
-        << "chr1\tsrc\tmRNA\t500\t600\t.\t+\t.\tID=orphan_tx;Parent=missing_gene\n"
-        << "chr1\tsrc\tmRNA\t610\t620\t.\t+\t.\tID=extra_column_child;Parent=missing_extra_parent\textra\n"
-        << "chr1\tsrc\tgene\t700\t800\t.\tx\t.\tID=bad_strand\n"
-        << "chr1\tsrc\tgene\t720\t730\t.\t\t.\tID=bad_empty_strand\n"
-        << "chr1\tsrc\tgene\t731\t740\t.\t+\t\tID=bad_empty_phase\n"
-        << "chr1\tsrc\tgene\t900\t950\t.\t+\tx\tID=bad_phase\n"
-        << "chr1\tsrc\texon\t700\t710\t.\t+\t1\tID=bad_non_cds_phase\n"
-        << "chr2\tsrc\tgene\t490\t510\t.\t+\t.\tID=outside_region\n"
-        << "chr1\tsrc\tregion\t1\t1200\t.\t+\t.\tID=circular_region;Is_circular=true\n"
-        << "chr1\tsrc\tgene\t1190\t1210\t.\t+\t.\tID=circular_gene\n"
-        << "chr1\tsrc\tregion\t1\t1200\t.\t+\t.\tID=bad_circular;Is_circular=false\n"
-        << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_a;Parent=cycle_b\n"
-        << "chr1\tsrc\tmRNA\t260\t270\t.\t+\t.\tID=cycle_b;Parent=cycle_a\n"
-        << "chr1\tsrc\tmatch_part\t280\t290\t.\t+\t.\tID=bad_target;Target=read1 20 10\n"
-        << "chr1\tsrc\tmatch_part\t300\t320\t.\t+\t.\tID=bad_gap;Gap=M8 X3\n"
-        << "chr1\tsrc\tpolypeptide\t330\t360\t.\t+\t.\tID=bad_derives;Derives_from=missing_transcript\n"
-        << "chr1\tsrc\tgene\t370\t380\t.\t+\t.\tID=bad_dbxref;Dbxref=GeneID\n"
-        << "chr1\tsrc\tgene\t390\t395\t.\t+\t.\tID=bad_ontology;Ontology_term=SO\n"
-        << "chr1\tsrc\tgene\t396\t398\t.\t+\t.\tID=bad_percent;Note=bad%escape\n"
-        << "chr1\tsrc%zz\tgene\t406\t407\t.\t+\t.\tID=bad_source_percent\n"
-        << "chr1\tsrc\tgene%zz\t408\t409\t.\t+\t.\tID=bad_type_percent\n"
-        << "chr1\tsrc\tgene\t399\t400\t.\t+\t.\tID=bad_escape;Note=A&B\n"
-        << "chr1\tsrc\tgene\t401\t405\t.\t+\t.\tID=bad_quote;Note=A\"B\n"
-        << "chr1\tsrc\texon\t120\t130\t.\t+\t.\tID=dup_parent;Parent=dup_gene,dup_gene\n"
-        << "chr1\tsrc\tCDS\t520\t540\t.\t+\t.\tID=bad_cds_phase;Parent=orphan_tx\n"
-        << ">chr1\n"
-        << "chr1\tsrc\tmRNA\t800\t810\t.\t+\t.\tID=fasta_feature;Parent=fasta_parent\n";
-    return true;
-}
-
-static bool write_qc_digit_coordinate_annotation(const std::string& path) {
-    std::ofstream out{path};
-    if (!out.is_open()) {
-        return false;
-    }
-
-    out << "##gff-version 3\n"
-        << "chr1\tsrc\tgene\t+180\t190\t.\t+\t.\tID=bad_coordinate_sign\n";
-    return true;
-}
-
 static std::string read_file(const std::string& path) {
     std::ifstream in{path};
     std::ostringstream buffer;
@@ -155,7 +74,6 @@ static int compare_files(const std::string& lhs_path, const std::string& rhs_pat
 
 static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
-    std::remove("cli_selector_qc.gff3");
     std::remove("cli_selector_ids.txt");
     std::remove("cli_selector_patterns.txt");
     std::remove("selector_id.gff3");
@@ -280,13 +198,8 @@ static void cleanup_outputs() {
     std::remove("selector_window_top_short.gff3");
     std::remove("selector_window_command.gff3");
     std::remove("selector_window_command_short.gff3");
-    std::remove("selector_qc_top.tsv");
-    std::remove("selector_qc_command.tsv");
-    std::remove("selector_qc_digit_coordinate.gff3");
-    std::remove("selector_qc_digit_coordinate.tsv");
     std::remove("selector_query_help.txt");
     std::remove("selector_window_help.txt");
-    std::remove("selector_qc_help.txt");
 }
 
 int main(int argc, char* argv[]) {
@@ -318,11 +231,6 @@ int main(int argc, char* argv[]) {
         require_contains("selector_window_help.txt", "About:") != 0 ||
         require_contains("selector_window_help.txt", "--up N") != 0 ||
         require_contains("selector_window_help.txt", "--down N") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " qc --help > selector_qc_help.txt 2>&1") != 0 ||
-        require_contains("selector_qc_help.txt", "About:") != 0 ||
-        require_contains("selector_qc_help.txt", "severity") != 0) {
         return 1;
     }
     if (run_command(exe + " --help > selector_help.txt 2>&1") != 0 ||
@@ -859,82 +767,6 @@ int main(int argc, char* argv[]) {
         compare_files("selector_window_top.gff3", "selector_window_top_short.gff3") != 0 ||
         compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0 ||
         compare_files("selector_window_command.gff3", "selector_window_command_short.gff3") != 0) {
-        return 1;
-    }
-
-    const std::string qc_gff{"cli_selector_qc.gff3"};
-    if (!write_qc_annotation(qc_gff)) {
-        std::cerr << "cannot write QC test annotation\n";
-        return 1;
-    }
-    if (run_command(exe + " " + qc_gff + " --qc > selector_qc_top.tsv") != 0 ||
-        run_command(exe + " qc " + qc_gff + " > selector_qc_command.tsv") != 0 ||
-        compare_files("selector_qc_top.tsv", "selector_qc_command.tsv") != 0 ||
-        require_contains("selector_qc_top.tsv", "duplicate_id") != 0 ||
-        require_not_contains("selector_qc_top.tsv", "disc_cds\tID appears more than once") != 0 ||
-        require_not_contains("selector_qc_top.tsv", "disc_poly\tID appears more than once") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_gff_version") != 0 ||
-        require_contains("selector_qc_top.tsv", "##gff-version must declare exactly one version beginning with 3") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_column_count") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_sequence_region") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid ##sequence-region coordinates for chr_signed") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid ##sequence-region seqid chr#bad") != 0 ||
-        require_contains("selector_qc_top.tsv", "malformed ##sequence-region directive") != 0 ||
-        require_contains("selector_qc_top.tsv", "duplicate_sequence_region") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_score") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_source") != 0 ||
-        require_contains("selector_qc_top.tsv", "source field must not be empty; use . when source is unknown") != 0 ||
-        require_contains("selector_qc_top.tsv", "attribute tag Name must not contain comma-separated values") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_attribute_syntax") != 0 ||
-        require_contains("selector_qc_top.tsv", "attributes must be semicolon-separated tag=value fields") != 0 ||
-        require_contains("selector_qc_top.tsv", "attributes field must be . or semicolon-separated tag=value fields") != 0 ||
-        require_contains("selector_qc_top.tsv", "duplicate_attribute_tag") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_attribute_multivalue") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_attribute_value") != 0 ||
-        require_contains("selector_qc_top.tsv", "attribute tag Alias must have a non-empty value") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_seqid") != 0 ||
-        require_contains("selector_qc_top.tsv", "seqid contains unescaped character #") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_feature_type") != 0 ||
-        require_contains("selector_qc_top.tsv", "Sequence Ontology accession must be SO: followed by seven digits") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_coordinate") != 0 ||
-        require_contains("selector_qc_top.tsv", "start and end must be integer 1-based coordinates") != 0 ||
-        require_contains("selector_qc_top.tsv", "outside_sequence_region") != 0 ||
-        require_not_contains("selector_qc_top.tsv", "circular_region\tfeature is outside ##sequence-region") != 0 ||
-        require_not_contains("selector_qc_top.tsv", "circular_gene\tfeature is outside ##sequence-region") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_is_circular") != 0 ||
-        require_contains("selector_qc_top.tsv", "duplicate_parent") != 0 ||
-        require_contains("selector_qc_top.tsv", "parent_cycle") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_target") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_gap") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_dbxref") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_ontology_term") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_percent_encoding") != 0 ||
-        require_contains("selector_qc_top.tsv", "source percent escapes must be % followed by two hex digits") != 0 ||
-        require_contains("selector_qc_top.tsv", "feature type percent escapes must be % followed by two hex digits") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_attribute_escape") != 0 ||
-        require_contains("selector_qc_top.tsv", "double quote in attributes must be percent-escaped as %22") != 0 ||
-        require_contains("selector_qc_top.tsv", "missing_derives_from") != 0 ||
-        require_contains("selector_qc_top.tsv", "missing_parent") != 0 ||
-        require_contains("selector_qc_top.tsv", "Parent missing_extra_parent was not found") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_strand") != 0 ||
-        require_contains("selector_qc_top.tsv", "strand field must be +, -, ., or ?") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_phase") != 0 ||
-        require_contains("selector_qc_top.tsv", "phase field must be ., 0, 1, or 2") != 0 ||
-        require_contains("selector_qc_top.tsv", "non-CDS phase 1 must be .") != 0 ||
-        require_contains("selector_qc_top.tsv", "invalid_cds_phase") != 0) {
-        return 1;
-    }
-    if (require_not_contains("selector_qc_top.tsv", "fasta_parent") != 0) {
-        return 1;
-    }
-    const std::string qc_digit_coordinate_gff{"selector_qc_digit_coordinate.gff3"};
-    if (!write_qc_digit_coordinate_annotation(qc_digit_coordinate_gff)) {
-        std::cerr << "cannot write digit coordinate QC test annotation\n";
-        return 1;
-    }
-    if (run_command(exe + " " + qc_digit_coordinate_gff + " --qc > selector_qc_digit_coordinate.tsv") != 0 ||
-        require_contains("selector_qc_digit_coordinate.tsv", "invalid_coordinate") != 0 ||
-        require_contains("selector_qc_digit_coordinate.tsv", "start and end must be integer 1-based coordinates") != 0) {
         return 1;
     }
 

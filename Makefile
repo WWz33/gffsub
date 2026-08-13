@@ -5,8 +5,6 @@ PREFIX ?= /usr/local
 TARGET = gffsub
 SRCS = src/gffsub.cpp \
        src/selector_filter.cpp \
-       src/qc_validate.cpp \
-       src/qc_parse.cpp \
        src/gtf_parser.cpp \
        src/query_summary.cpp \
        src/attributes.cpp \
@@ -18,8 +16,6 @@ SRCS = src/gffsub.cpp \
        src/annotation_output.cpp
 HDRS = src/gff3.hpp \
        src/annotation.hpp \
-       src/qc_validate.hpp \
-       src/qc_parse.hpp \
        src/gtf_parser.hpp \
        src/query_summary.hpp \
        src/selector_filter.hpp

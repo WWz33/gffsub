@@ -6,7 +6,7 @@
 
 <!-- README-I18N:END -->
 
-GFF3/GTF 注释提取与 QC（区间、ID/属性选择、gene model、最长转录本、QC）。
+GFF3/GTF 注释提取（区间、ID/属性选择、gene model、最长转录本）。
 
 ## Getting Started
 
@@ -21,14 +21,13 @@ printf '%s\n' '##gff-version 3' \
 
 ./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
 ./gffsub data/smoke.gff3 --id GeneA -C
-./gffsub data/smoke.gff3 --qc
 ```
 
 ## Usage
 
 ```text
 gffsub <input.gff3> [options]
-gffsub query|window|qc <input.gff3> [options]
+gffsub query|window <input.gff3> [options]
 ```
 
 完整选项见 `./gffsub -h`（一行一项）。
@@ -51,7 +50,6 @@ gffsub query|window|qc <input.gff3> [options]
 | `-f, --feature` | — | type 列过滤 |
 | `-L, --longest` | 关 | 每基因一条转录本：有 CDS 比 CDS，否则比 exon |
 | `-@, --threads` | 1 | `--longest` 线程数 |
-| `--qc` | 关 | QC 报告（TSV） |
 | `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | 输出文件 |
 
@@ -62,7 +60,6 @@ gffsub query|window|qc <input.gff3> [options]
 | 注释 | GFF3/GTF 风格 feature |
 | GFF/GTF / `-r` | 1-based 闭区间 |
 | BED | 0-based half-open |
-| `--qc` TSV | `severity`, `code`, `line_idx`, `id`, `message` |
 | `--summary` | `tsv` / `json` 行，而非 feature 记录 |
 
 主输入为注释记录（非 FASTA/VCF）。

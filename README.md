@@ -6,7 +6,7 @@
 
 <!-- README-I18N:END -->
 
-Subset and QC GFF3/GTF annotations (regions, ID/attribute selectors, gene models, longest isoform, QC).
+Subset GFF3/GTF annotations (regions, ID/attribute selectors, gene models, longest isoform).
 
 ## Getting Started
 
@@ -20,16 +20,15 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
-./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
-./gffsub data/smoke.gff3 --id GeneA -C
-./gffsub data/smoke.gff3 --qc
+  ./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
+  ./gffsub data/smoke.gff3 --id GeneA -C
 ```
 
 ## Usage
 
 ```text
 gffsub <input.gff3> [options]
-gffsub query|window|qc <input.gff3> [options]
+gffsub query|window <input.gff3> [options]
 ```
 
 See `./gffsub -h` for the full flag list (one line per option).
@@ -52,7 +51,6 @@ See `./gffsub -h` for the full flag list (one line per option).
 | `-f, --feature` | — | type column filter |
 | `-L, --longest` | off | one transcript/gene: CDS length if any CDS, else exon |
 | `-@, --threads` | 1 | threads for `--longest` |
-| `--qc` | off | QC report (TSV) |
 | `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | output file |
 
@@ -63,7 +61,6 @@ See `./gffsub -h` for the full flag list (one line per option).
 | Annotation | GFF3/GTF-style feature records |
 | GFF/GTF / `-r` | 1-based inclusive |
 | BED | 0-based half-open |
-| `--qc` TSV | `severity`, `code`, `line_idx`, `id`, `message` |
 | `--summary` | `tsv` or `json` rows instead of features |
 
 Primary input is annotation records (not FASTA/VCF).
