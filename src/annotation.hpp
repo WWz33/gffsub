@@ -18,6 +18,7 @@ struct GffRecord {
     int64_t start;
     int64_t end;
     std::optional<double> score;
+    std::string score_raw;
     char strand;
     char phase;
     std::string attr_raw;

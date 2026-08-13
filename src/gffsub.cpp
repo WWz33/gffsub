@@ -1034,8 +1034,20 @@ int main(int argc, char* argv[]) {
     GffData data;
     IdIndex idx;
 
+    // Infer input format from extension; GFF3 is the default.
+    InputFormat input_fmt = InputFormat::GFF3;
+    {
+        const auto dot = input_file.rfind('.');
+        if (dot != std::string::npos) {
+            const auto ext = input_file.substr(dot + 1);
+            if (ext == "gtf") {
+                input_fmt = InputFormat::GTF;
+            }
+        }
+    }
+
     // Parse input file
-    if (parse_file(input_file, data, idx, InputFormat::GFF3) != 0) {
+    if (parse_file(input_file, data, idx, input_fmt) != 0) {
         std::cerr << "Error: cannot parse " << input_file << '\n';
         return 1;
     }

@@ -7,22 +7,27 @@ namespace gffsub {
 static std::optional<std::string> extract_attr_value(std::string_view attrs, std::string_view key) {
     size_t pos = 0;
     while (pos < attrs.size()) {
-        size_t key_end = attrs.find('=', pos);
-        if (key_end == std::string_view::npos) {
-            size_t next = attrs.find(';', pos);
-            pos = (next == std::string_view::npos) ? attrs.size() : next + 1;
+        // Find the end of the current tag=value pair (next ';').
+        size_t pair_end = attrs.find(';', pos);
+        if (pair_end == std::string_view::npos) {
+            pair_end = attrs.size();
+        }
+        const auto pair = attrs.substr(pos, pair_end - pos);
+        pos = (pair_end < attrs.size()) ? pair_end + 1 : attrs.size();
+
+        // Skip empty fragments (e.g. from ";;").
+        if (pair.empty()) {
             continue;
         }
 
-        std::string_view found_key = attrs.substr(pos, key_end - pos);
-        size_t val_start = key_end + 1;
-        size_t val_end = attrs.find(';', val_start);
-        if (val_end == std::string_view::npos) val_end = attrs.size();
-
-        if (found_key == key) {
-            return std::string(attrs.substr(val_start, val_end - val_start));
+        const size_t eq = pair.find('=');
+        if (eq == std::string_view::npos || eq == 0 || eq + 1 >= pair.size()) {
+            continue;
         }
-        pos = (val_end < attrs.size()) ? val_end + 1 : attrs.size();
+        const auto found_key = pair.substr(0, eq);
+        if (found_key == key) {
+            return std::string(pair.substr(eq + 1));
+        }
     }
     return std::nullopt;
 }
@@ -73,6 +78,7 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.start = std::stoll(cols[3]);
                 rec.end = std::stoll(cols[4]);
                 rec.score = (cols[5] == ".") ? std::nullopt : std::optional(std::stod(cols[5]));
+                rec.score_raw = cols[5];
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
                 rec.attr_raw = cols[8];
@@ -99,6 +105,7 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.source = "gffsub";
                 rec.type = "region";
                 rec.score = cols.size() > 4 ? std::optional(std::stod(cols[4])) : std::nullopt;
+                rec.score_raw = (cols.size() > 4) ? cols[4] : ".";
                 rec.strand = cols.size() > 5 ? (cols[5][0]) : '.';
                 rec.phase = '.';
                 rec.id = cols.size() > 3 ? std::optional(cols[3]) : std::nullopt;

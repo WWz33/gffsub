@@ -9,7 +9,7 @@ void print_gff3(std::ostream& out, const GffData& data) {
     out << "##gff-version 3\n";
     for (const auto& rec : data) {
         if (!rec.kept) continue;
-        std::string score_str = rec.score ? std::to_string(*rec.score) : ".";
+        const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
         out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << rec.attr_raw << '\n';
@@ -60,7 +60,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
             if (gtf3_types.count(rec.type) == 0) continue;
         }
 
-        std::string score_str = rec.score ? std::to_string(*rec.score) : ".";
+        const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
 
         std::string gene_id_val;
         std::string transcript_id_val;
@@ -87,8 +87,9 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
             }
         }
 
-        if (gene_id_val.empty()) continue;
-
+        // GTF2.2 requires gene_id on every feature line. When it cannot be
+        // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
+        // convention rather than dropping the feature silently.
         std::string gtf_type = rec.type;
         if (rec.type == "mRNA") {
             gtf_type = (fmt == OutputFormat::GTF3) ? "transcript" : "mRNA";
@@ -113,7 +114,7 @@ void print_bed(std::ostream& out, const GffData& data) {
         if (!rec.kept) continue;
 
         std::string name = rec.id ? *rec.id : rec.type;
-        std::string score_str = rec.score ? std::to_string(*rec.score) : "0";
+        const std::string& score_str = (rec.score_raw.empty() || rec.score_raw == ".") ? std::string{"0"} : rec.score_raw;
 
         out << rec.seqid << '\t'
             << (rec.start - 1) << '\t'

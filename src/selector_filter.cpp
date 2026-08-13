@@ -46,7 +46,7 @@ std::optional<std::string> record_field_value(const GffRecord& rec, std::string_
     if (field == "start") return std::to_string(rec.start);
     if (field == "end") return std::to_string(rec.end);
     if (field == "length") return std::to_string(rec.end - rec.start + 1);
-    if (field == "score") return rec.score ? std::to_string(*rec.score) : ".";
+    if (field == "score") return rec.score_raw.empty() ? "." : rec.score_raw;
     if (field == "strand") return std::string(1, rec.strand);
     if (field == "phase") return std::string(1, rec.phase);
     if (field == "attrs") return rec.attr_raw;
