@@ -3,6 +3,7 @@
 #include "annotation.hpp"
 #include "parser.hpp"
 
+#include <cstdio>
 #include <sstream>
 
 namespace gffsub {
@@ -31,14 +32,26 @@ bool contains_record(const std::vector<GffRecord>& records, int line_idx) {
 
 std::string json_escape(const std::string& value) {
     std::ostringstream out;
-    for (const char ch : value) {
+    for (const unsigned char uc : value) {
+        const char ch = static_cast<char>(uc);
         switch (ch) {
             case '\\': out << "\\\\"; break;
             case '"': out << "\\\""; break;
             case '\n': out << "\\n"; break;
             case '\r': out << "\\r"; break;
             case '\t': out << "\\t"; break;
-            default: out << ch; break;
+            case '\b': out << "\\b"; break;
+            case '\f': out << "\\f"; break;
+            default:
+                if (uc < 0x20) {
+                    // RFC 8259: control chars must be \uXXXX escaped
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", uc);
+                    out << buf;
+                } else {
+                    out << ch;
+                }
+                break;
         }
     }
     return out.str();
@@ -187,7 +200,7 @@ void print_summary_json(std::ostream& out,
             << "\"transcript_count\":" << row.transcript_count << ','
             << "\"exon_count\":" << row.exon_count << ','
             << "\"cds_length\":" << row.cds_length << ','
-            << "\"status\":\"" << row.status << "\"";
+            << "\"status\":\"" << json_escape(row.status) << "\"";
         if (!output_attrs.empty()) {
             out << ",\"attrs\":{";
             for (size_t j = 0; j < output_attrs.size(); ++j) {

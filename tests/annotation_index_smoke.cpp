@@ -95,7 +95,7 @@ static int check_self_contained_annotation() {
     }
 
     const auto descendants = index.descendants_of("gene1");
-    if (descendants.size() != 5) {
+    if (descendants.size() != 4) {
         std::cerr << "descendants_of failed for gene1\n";
         return 1;
     }

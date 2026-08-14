@@ -7,6 +7,32 @@
 
 namespace gffsub {
 
+static std::string url_decode(std::string_view input) {
+    std::string out;
+    out.reserve(input.size());
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '%' && i + 2 < input.size()) {
+            auto hex_val = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
+            const int hi = hex_val(input[i + 1]);
+            const int lo = hex_val(input[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                out.push_back(static_cast<char>(hi * 16 + lo));
+                i += 2;
+            } else {
+                out.push_back('%');
+            }
+        } else {
+            out.push_back(input[i]);
+        }
+    }
+    return out;
+}
+
 static std::optional<std::string> extract_attr_value(std::string_view attrs, std::string_view key) {
     size_t pos = 0;
     while (pos < attrs.size()) {
@@ -24,12 +50,13 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
         }
 
         const size_t eq = pair.find('=');
-        if (eq == std::string_view::npos || eq == 0 || eq + 1 >= pair.size()) {
+        if (eq == std::string_view::npos || eq == 0) {
             continue;
         }
         const auto found_key = pair.substr(0, eq);
         if (found_key == key) {
-            return std::string(pair.substr(eq + 1));
+            const auto value = pair.substr(eq + 1);
+            return value.empty() ? std::nullopt : std::optional<std::string>{url_decode(value)};
         }
     }
     return std::nullopt;
@@ -78,8 +105,10 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.type = cols[2];
                 rec.start = std::stoll(cols[3]);
                 rec.end = std::stoll(cols[4]);
-                rec.score = (cols[5] == ".") ? std::nullopt : std::optional(std::stod(cols[5]));
                 rec.score_raw = cols[5];
+                if (cols[5] != ".") {
+                    try { rec.score = std::stod(cols[5]); } catch (...) { rec.score = std::nullopt; }
+                }
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
                 rec.attr_raw = cols[8];
@@ -89,8 +118,53 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.gene_id = extract_attr_value(cols[8], "gene_id");
                 rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
 
+                // GFF3 multi-parent: Parent=tx1,tx2 — rec.parent_id is a single
+                // optional<string>, so keep only the first parent for direct use.
+                // The index builds the full parent list from parse_attributes.
+                if (rec.parent_id) {
+                    const auto comma = rec.parent_id->find(',');
+                    if (comma != std::string::npos) {
+                        *rec.parent_id = rec.parent_id->substr(0, comma);
+                    }
+                }
+
                 if (format == InputFormat::GTF) {
                     apply_gtf_attributes(rec);
+                    // GTF has no ID=/Parent= attributes; synthesize from
+                    // gene_id/transcript_id so the index can build parent/child links.
+                    // Guard against empty-string optionals (e.g. Ensembl transcript_id "").
+                    if (!rec.id || rec.id->empty()) {
+                        if (rec.type == "gene") {
+                            // gene: ID = gene_id
+                            if (rec.gene_id && !rec.gene_id->empty()) {
+                                rec.id = rec.gene_id;
+                            } else {
+                                rec.id = std::nullopt;
+                            }
+                        } else if (rec.type == "transcript" || rec.type == "mRNA") {
+                            // transcript: ID = transcript_id
+                            if (rec.transcript_id && !rec.transcript_id->empty()) {
+                                rec.id = rec.transcript_id;
+                            } else {
+                                rec.id = std::nullopt;
+                            }
+                        } else {
+                            // exon/CDS/etc: no synthesized ID — linked via parent_id only
+                            rec.id = std::nullopt;
+                        }
+                    }
+                    if (!rec.parent_id || rec.parent_id->empty()) {
+                        if (rec.type == "gene") {
+                            rec.parent_id = std::nullopt;
+                        } else if ((rec.type == "transcript" || rec.type == "mRNA") &&
+                                   rec.gene_id && !rec.gene_id->empty()) {
+                            rec.parent_id = rec.gene_id;
+                        } else if (rec.transcript_id && !rec.transcript_id->empty()) {
+                            rec.parent_id = rec.transcript_id;
+                        } else {
+                            rec.parent_id = std::nullopt;
+                        }
+                    }
                 }
             } catch (const std::exception&) {
                 continue;
@@ -105,11 +179,13 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.end = std::stoll(cols[2]);
                 rec.source = "gffsub";
                 rec.type = "region";
-                rec.score = cols.size() > 4 ? std::optional(std::stod(cols[4])) : std::nullopt;
                 rec.score_raw = (cols.size() > 4) ? cols[4] : ".";
-                rec.strand = cols.size() > 5 ? (cols[5][0]) : '.';
+                if (cols.size() > 4 && cols[4] != ".") {
+                    try { rec.score = std::stod(cols[4]); } catch (...) { rec.score = std::nullopt; }
+                }
+                rec.strand = (cols.size() > 5 && !cols[5].empty()) ? cols[5][0] : '.';
                 rec.phase = '.';
-                rec.id = cols.size() > 3 ? std::optional(cols[3]) : std::nullopt;
+                rec.id = (cols.size() > 3 && !cols[3].empty()) ? std::optional<std::string>(cols[3]) : std::nullopt;
                 rec.parent_id = std::nullopt;
                 rec.gene_id = std::nullopt;
                 rec.transcript_id = std::nullopt;

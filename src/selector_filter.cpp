@@ -73,10 +73,18 @@ std::optional<std::string> record_field_value(const GffRecord& rec, std::string_
         return std::nullopt;
     }
 
+    // For GTF input, gene_id/transcript_id/ID/Parent are synthesized by the
+    // parser into rec fields but parse_attributes cannot parse GTF's
+    // key "value"; format. Check the rec fields first.
+    if (attr_key == "gene_id" && rec.gene_id) return *rec.gene_id;
+    if (attr_key == "transcript_id" && rec.transcript_id) return *rec.transcript_id;
+    if (attr_key == "ID" && rec.id) return *rec.id;
+    if (attr_key == "Parent" && rec.parent_id) return *rec.parent_id;
+
     const auto attrs = parse_attributes(rec.attr_raw);
     const auto it = attrs.find(attr_key);
-    if (it == attrs.end()) {
-        return ".";
+    if (it == attrs.end() || it->second.empty()) {
+        return std::nullopt;
     }
     return join_filter_values(it->second);
 }
@@ -122,7 +130,9 @@ bool field_matches_grep(const GffRecord& rec, const GrepFilter& filter) {
 bool field_matches_expr(const GffRecord& rec, const ExprFilter& filter) {
     const auto value = record_field_value(rec, filter.field);
     if (!value) {
-        return false;
+        // Missing attribute: != and !~ should match (missing is not-equal),
+        // all other operators should not match.
+        return filter.op == ExprOp::NotEqual || filter.op == ExprOp::NotRegex;
     }
     const auto comparable_value = filter.ignore_case ? lowercase_copy(*value) : *value;
     const auto comparable_filter = filter.ignore_case ? lowercase_copy(filter.value) : filter.value;

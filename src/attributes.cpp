@@ -1,6 +1,40 @@
 #include "parser.hpp"
 
+#include <string>
+#include <string_view>
+
 namespace gffsub {
+
+namespace {
+
+// URL-decode a GFF3 attribute value per spec: %XX → byte.
+std::string url_decode(std::string_view input) {
+    std::string out;
+    out.reserve(input.size());
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '%' && i + 2 < input.size()) {
+            auto hex_val = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
+            const int hi = hex_val(input[i + 1]);
+            const int lo = hex_val(input[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                out.push_back(static_cast<char>(hi * 16 + lo));
+                i += 2;
+            } else {
+                out.push_back('%');
+            }
+        } else {
+            out.push_back(input[i]);
+        }
+    }
+    return out;
+}
+
+}  // namespace
 
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs) {
     std::unordered_map<std::string, std::vector<std::string>> parsed;
@@ -16,24 +50,28 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
         // Skip empty fragments (e.g. from "key=val;;key2=val2" or leading/trailing ';').
         if (!pair.empty()) {
             const size_t eq = pair.find('=');
-            if (eq != std::string_view::npos && eq != 0 && eq + 1 < pair.size()) {
+            if (eq != std::string_view::npos && eq != 0 && eq + 1 <= pair.size()) {
                 const std::string key{pair.substr(0, eq)};
-                const std::string value{pair.substr(eq + 1)};
-                if (!key.empty() && !value.empty()) {
-                    size_t part_start = 0;
-                    while (part_start <= value.size()) {
-                        size_t part_end = value.find(',', part_start);
-                        if (part_end == std::string::npos) {
-                            part_end = value.size();
+                std::string_view value = pair.substr(eq + 1);
+                if (!key.empty()) {
+                    // URL-decode the value per GFF3 spec.
+                    const std::string decoded = url_decode(value);
+                    if (!decoded.empty()) {
+                        size_t part_start = 0;
+                        while (part_start <= decoded.size()) {
+                            size_t part_end = decoded.find(',', part_start);
+                            if (part_end == std::string::npos) {
+                                part_end = decoded.size();
+                            }
+                            const std::string part = decoded.substr(part_start, part_end - part_start);
+                            if (!part.empty()) {
+                                parsed[key].push_back(part);
+                            }
+                            if (part_end == decoded.size()) {
+                                break;
+                            }
+                            part_start = part_end + 1;
                         }
-                        const std::string part = value.substr(part_start, part_end - part_start);
-                        if (!part.empty()) {
-                            parsed[key].push_back(part);
-                        }
-                        if (part_end == value.size()) {
-                            break;
-                        }
-                        part_start = part_end + 1;
                     }
                 }
             }

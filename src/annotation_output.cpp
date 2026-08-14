@@ -18,16 +18,29 @@ void print_gff3(std::ostream& out, const GffData& data) {
     }
 }
 
-static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val) {
+static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val, bool is_gene) {
+    // GTF2.2: gene_id required on every line. transcript_id only on non-gene features.
+    // Escape quotes and backslashes in values (GTF attributes are quoted strings).
+    auto gtf_escape = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (const char ch : s) {
+            if (ch == '"' || ch == '\\') {
+                out.push_back('\\');
+            }
+            out.push_back(ch);
+        }
+        return out;
+    };
     std::string result;
     result.reserve(64);
     result = "gene_id \"";
-    result += gene_id_val;
-    result += "\"; ";
-    if (!transcript_id_val.empty()) {
-        result += "transcript_id \"";
-        result += transcript_id_val;
-        result += "\"; ";
+    result += gtf_escape(gene_id_val);
+    result += "\";";
+    if (!is_gene) {
+        result += " transcript_id \"";
+        result += gtf_escape(transcript_id_val);
+        result += "\";";
     }
     return result;
 }
@@ -40,10 +53,11 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         out << "##gtf-version 2\n";
     }
 
-    // Build mappings
+    // Build mappings from ALL records (not just kept) so parent mRNAs
+    // filtered out by subset still resolve gene_id for surviving children.
     std::unordered_map<std::string, std::string> mRNA_to_gene;
     for (const auto& rec : data) {
-        if (rec.kept && rec.type == "mRNA" && rec.parent_id && rec.id) {
+        if ((rec.type == "mRNA" || rec.type == "transcript") && rec.parent_id && rec.id) {
             mRNA_to_gene[*rec.id] = *rec.parent_id;
         }
     }
@@ -97,7 +111,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
             gtf_type = (fmt == OutputFormat::GTF3) ? "transcript" : "mRNA";
         }
 
-        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val);
+        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.type == "gene");
 
         out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'

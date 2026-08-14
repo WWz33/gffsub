@@ -176,7 +176,9 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
             try {
-                params.upstream = std::stoll(*value);
+                size_t pos = 0;
+                params.upstream = std::stoll(*value, &pos);
+                if (pos != value->size()) throw std::invalid_argument{""};
             } catch (const std::exception&) {
                 std::cerr << "Error: " << arg << " must be a non-negative integer\n";
                 return 1;
@@ -189,7 +191,9 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
             try {
-                params.downstream = std::stoll(*value);
+                size_t pos = 0;
+                params.downstream = std::stoll(*value, &pos);
+                if (pos != value->size()) throw std::invalid_argument{""};
             } catch (const std::exception&) {
                 std::cerr << "Error: " << arg << " must be a non-negative integer\n";
                 return 1;
@@ -233,11 +237,33 @@ namespace {
 int run_window_from_args(const CliArgs& a) {
     WindowParams wparams;
     wparams.id = a.ids[0];
+    auto parse_window_value = [](const std::string& arg, const char* name) -> std::optional<int64_t> {
+        try {
+            size_t pos = 0;
+            const int64_t v = std::stoll(arg, &pos);
+            if (pos != arg.size()) {
+                std::cerr << "Error: " << name << " must be a non-negative integer\n";
+                return std::nullopt;
+            }
+            if (v < 0) {
+                std::cerr << "Error: " << name << " must be non-negative\n";
+                return std::nullopt;
+            }
+            return v;
+        } catch (const std::exception&) {
+            std::cerr << "Error: " << name << " must be a non-negative integer\n";
+            return std::nullopt;
+        }
+    };
     if (!a.upstream_arg.empty()) {
-        wparams.upstream = std::stoll(a.upstream_arg);
+        auto v = parse_window_value(a.upstream_arg, "--up");
+        if (!v) return 1;
+        wparams.upstream = *v;
     }
     if (!a.downstream_arg.empty()) {
-        wparams.downstream = std::stoll(a.downstream_arg);
+        auto v = parse_window_value(a.downstream_arg, "--down");
+        if (!v) return 1;
+        wparams.downstream = *v;
     }
     wparams.strand_aware = a.strand_aware;
 

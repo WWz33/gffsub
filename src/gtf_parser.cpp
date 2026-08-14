@@ -39,11 +39,32 @@ std::optional<std::string> extract_quoted_value(const std::string& attrs, const 
             continue;
         }
         size_t q1 = q;
-        size_t q2 = attrs.find('"', q1 + 1);
-        if (q2 == std::string::npos) {
+        // Find closing quote, handling escaped quotes (\" -> literal quote in value)
+        size_t q2 = q1 + 1;
+        while (q2 < attrs.size()) {
+            if (attrs[q2] == '\\' && q2 + 1 < attrs.size()) {
+                q2 += 2;  // skip escaped char
+                continue;
+            }
+            if (attrs[q2] == '"') break;
+            ++q2;
+        }
+        if (q2 >= attrs.size()) {
             return std::nullopt;
         }
-        return attrs.substr(q1 + 1, q2 - q1 - 1);
+        // Unescape: remove backslash before quotes
+        std::string value = attrs.substr(q1 + 1, q2 - q1 - 1);
+        std::string unescaped;
+        unescaped.reserve(value.size());
+        for (size_t j = 0; j < value.size(); ++j) {
+            if (value[j] == '\\' && j + 1 < value.size() && value[j + 1] == '"') {
+                unescaped.push_back('"');
+                ++j;
+            } else {
+                unescaped.push_back(value[j]);
+            }
+        }
+        return unescaped;
     }
     return std::nullopt;
 }

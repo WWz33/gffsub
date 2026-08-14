@@ -1,5 +1,5 @@
-#ifndef GTF_PARSER_HPP
-#define GTF_PARSER_HPP
+#ifndef GFFSUB_GTF_PARSER_HPP
+#define GFFSUB_GTF_PARSER_HPP
 
 #include "annotation.hpp"
 
@@ -9,4 +9,4 @@ void apply_gtf_attributes(GffRecord& rec);
 
 }  // namespace gffsub
 
-#endif  // GTF_PARSER_HPP
+#endif  // GFFSUB_GTF_PARSER_HPP
