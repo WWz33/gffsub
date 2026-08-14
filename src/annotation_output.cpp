@@ -1,6 +1,8 @@
-#include "gff3.hpp"
+#include "output.hpp"
+#include "record.hpp"
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace gffsub {

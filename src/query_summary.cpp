@@ -1,6 +1,7 @@
 #include "query_summary.hpp"
 
-#include "gff3.hpp"
+#include "annotation.hpp"
+#include "parser.hpp"
 
 #include <sstream>
 

@@ -1,4 +1,7 @@
-#include "gff3.hpp"
+#include "annotation.hpp"
+#include "parser.hpp"
+#include "record.hpp"
+#include "region.hpp"
 #include "gtf_parser.hpp"
 #include <fstream>
 

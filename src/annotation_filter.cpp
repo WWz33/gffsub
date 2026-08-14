@@ -1,4 +1,6 @@
-#include "gff3.hpp"
+#include "filter.hpp"
+#include "region.hpp"
+#include "record.hpp"
 #include <fstream>
 
 namespace gffsub {

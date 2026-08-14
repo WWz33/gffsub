@@ -1,4 +1,4 @@
-#include "gff3.hpp"
+#include "parser.hpp"
 
 namespace gffsub {
 

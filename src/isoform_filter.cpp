@@ -1,4 +1,5 @@
-#include "gff3.hpp"
+#include "filter.hpp"
+#include "record.hpp"
 #include <algorithm>
 #include <future>
 #include <unordered_map>
@@ -155,10 +156,6 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
     if (!feature_type.empty()) {
         filter_by_feature(data, feature_type);
     }
-}
-
-void filter_longest(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads) {
-    filter_longest_isoform(data, idx, feature_type, num_threads);
 }
 
 }  // namespace gffsub

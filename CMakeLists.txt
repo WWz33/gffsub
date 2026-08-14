@@ -4,8 +4,7 @@ project(gffsub VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(gffsub
-    src/gffsub.cpp
+add_library(gffsub_core STATIC
     src/selector_filter.cpp
     src/gtf_parser.cpp
     src/query_summary.cpp
@@ -16,11 +15,26 @@ add_executable(gffsub
     src/annotation_filter.cpp
     src/isoform_filter.cpp
     src/annotation_output.cpp
+    src/query.cpp
+    src/window.cpp
+    src/subset.cpp
 )
 
-target_include_directories(gffsub PRIVATE
+target_include_directories(gffsub_core PUBLIC
     src
 )
+
+target_compile_options(gffsub_core PRIVATE
+    -Wall -O2
+)
+
+add_executable(gffsub
+    src/gffsub.cpp
+    src/cli.cpp
+    src/cli_usage.cpp
+)
+
+target_link_libraries(gffsub PRIVATE gffsub_core)
 
 target_compile_options(gffsub PRIVATE
     -Wall -O2

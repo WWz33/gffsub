@@ -1,6 +1,5 @@
 #include "selector_filter.hpp"
-
-#include "gff3.hpp"
+#include "parser.hpp"
 
 #include <algorithm>
 #include <cctype>

@@ -1,4 +1,6 @@
-#include "gff3.hpp"
+#include "annotation.hpp"
+#include "parser.hpp"
+#include "region.hpp"
 
 #include <deque>
 #include <algorithm>
