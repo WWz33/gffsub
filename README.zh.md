@@ -6,7 +6,7 @@
 
 <!-- README-I18N:END -->
 
-GFF3/GTF 注释提取（区间、ID/属性选择、gene model、最长转录本）。
+按区间、feature ID、属性或 gene model 提取 GFF3/GTF 注释。选最长转录本，转换格式，输出摘要。
 
 ## Getting Started
 
@@ -30,7 +30,7 @@ gffsub <input.gff3> [options]
 gffsub query|window <input.gff3> [options]
 ```
 
-完整选项见 `./gffsub -h`（一行一项）。
+完整选项见 `./gffsub -h`。
 
 ### 常用选项
 
@@ -62,7 +62,7 @@ gffsub query|window <input.gff3> [options]
 | BED | 0-based half-open |
 | `--summary` | `tsv` / `json` 行，而非 feature 记录 |
 
-主输入为注释记录（非 FASTA/VCF）。
+仅支持注释记录，不支持 FASTA 和 VCF。
 
 ## License
 

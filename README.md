@@ -6,7 +6,7 @@
 
 <!-- README-I18N:END -->
 
-Subset GFF3/GTF annotations (regions, ID/attribute selectors, gene models, longest isoform).
+Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene model. Pick longest isoforms, switch formats, write summaries.
 
 ## Getting Started
 
@@ -20,8 +20,8 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
-  ./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
-  ./gffsub data/smoke.gff3 --id GeneA -C
+./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
+./gffsub data/smoke.gff3 --id GeneA -C
 ```
 
 ## Usage
@@ -31,7 +31,7 @@ gffsub <input.gff3> [options]
 gffsub query|window <input.gff3> [options]
 ```
 
-See `./gffsub -h` for the full flag list (one line per option).
+See `./gffsub -h` for the full flag list.
 
 ### Common options
 
@@ -63,7 +63,7 @@ See `./gffsub -h` for the full flag list (one line per option).
 | BED | 0-based half-open |
 | `--summary` | `tsv` or `json` rows instead of features |
 
-Primary input is annotation records (not FASTA/VCF).
+Annotation records only. FASTA and VCF are not supported.
 
 ## License
 
