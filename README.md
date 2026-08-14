@@ -65,6 +65,22 @@ See `./gffsub -h` for the full flag list.
 
 Annotation records only. FASTA and VCF are not supported.
 
+## Documentation
+
+Full guides in [`docs/`](docs/Home.md):
+
+- [Getting Started](docs/getting-started.md)
+- [Region and BED Filtering](docs/region-bed-filtering.md)
+- [Feature ID and Gene Name Lookup](docs/id-name-lookup.md)
+- [Gene Model Expansion](docs/gene-model-expansion.md)
+- [Attribute Filtering](docs/attribute-filtering.md)
+- [Expression Filtering](docs/expression-filtering.md)
+- [Longest Isoform Selection](docs/longest-isoform.md)
+- [Window Subcommand](docs/window-subcommand.md)
+- [Output Formats](docs/output-formats.md)
+- [Summary Output](docs/summary-output.md)
+- [GTF Input Handling](docs/gtf-input.md)
+
 ## License
 
 MIT License

@@ -64,6 +64,22 @@ gffsub query|window <input.gff3> [options]
 
 仅支持注释记录，不支持 FASTA 和 VCF。
 
+## 文档
+
+完整指南见 [`docs/`](docs/Home.md)：
+
+- [快速开始](docs/getting-started.md)
+- [区域与 BED 筛选](docs/region-bed-filtering.md)
+- [Feature ID 与基因名查找](docs/id-name-lookup.md)
+- [基因模型展开](docs/gene-model-expansion.md)
+- [属性筛选](docs/attribute-filtering.md)
+- [表达式筛选](docs/expression-filtering.zh.md)
+- [最长转录本选择](docs/longest-isoform.md)
+- [Window 子命令](docs/window-subcommand.md)
+- [输出格式](docs/output-formats.md)
+- [摘要输出](docs/summary-output.md)
+- [GTF 输入处理](docs/gtf-input.md)
+
 ## License
 
 MIT License
