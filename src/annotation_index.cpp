@@ -19,6 +19,10 @@ AnnotationIndex AnnotationIndex::from_gff3(const std::string& path) {
     return AnnotationIndex{std::move(data)};
 }
 
+AnnotationIndex AnnotationIndex::from_data(GffData data) {
+    return AnnotationIndex{std::move(data)};
+}
+
 AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
     for (int i = 0; i < static_cast<int>(data_.records.size()); ++i) {
         const auto& rec = data_.records[i];

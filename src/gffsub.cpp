@@ -221,6 +221,26 @@ static std::vector<char*> argv_from(std::vector<std::string>& args) {
     return argv;
 }
 
+static InputFormat infer_input_format(const std::string& path) {
+    const auto dot = path.rfind('.');
+    if (dot != std::string::npos) {
+        const auto ext = path.substr(dot + 1);
+        if (ext == "gtf" || ext == "GTF") {
+            return InputFormat::GTF;
+        }
+    }
+    return InputFormat::GFF3;
+}
+
+static AnnotationIndex load_index(const std::string& path) {
+    GffData data;
+    IdIndex idx;
+    if (parse_file(path, data, idx, infer_input_format(path)) != 0) {
+        throw std::runtime_error("cannot parse file: " + path);
+    }
+    return AnnotationIndex::from_data(std::move(data));
+}
+
 
 static int run_query(int argc, char* argv[], const char* prog) {
     if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
@@ -343,7 +363,7 @@ static int run_query(int argc, char* argv[], const char* prog) {
         }
     }
 
-    gffsub::AnnotationIndex index = gffsub::AnnotationIndex::from_gff3(input_file);
+    gffsub::AnnotationIndex index = load_index(input_file);
     GffData result;
     std::unordered_set<int> seen;
     std::vector<SummaryRow> summary_rows;
@@ -563,7 +583,7 @@ static int run_window(int argc, char* argv[], const char* prog) {
         return 1;
     }
 
-    const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
+    const auto index = load_index(input_file);
     auto target = index.find_by_id(id);
     if (!target) {
         target = index.find_gene(id);
@@ -1035,16 +1055,7 @@ int main(int argc, char* argv[]) {
     IdIndex idx;
 
     // Infer input format from extension; GFF3 is the default.
-    InputFormat input_fmt = InputFormat::GFF3;
-    {
-        const auto dot = input_file.rfind('.');
-        if (dot != std::string::npos) {
-            const auto ext = input_file.substr(dot + 1);
-            if (ext == "gtf") {
-                input_fmt = InputFormat::GTF;
-            }
-        }
-    }
+    const InputFormat input_fmt = infer_input_format(input_file);
 
     // Parse input file
     if (parse_file(input_file, data, idx, input_fmt) != 0) {
@@ -1053,7 +1064,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!ids.empty() || !name.empty() || !attr_filters.empty() || !nearest_region_str.empty()) {
-        const auto index = gffsub::AnnotationIndex::from_gff3(input_file);
+        const auto index = gffsub::AnnotationIndex::from_data(GffData{data});
         std::unordered_set<int> selected_lines;
         auto add_selected = [&](const GffRecord& rec) {
             const bool newly_selected = selected_lines.insert(rec.line_idx).second;

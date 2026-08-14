@@ -53,11 +53,9 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
     if (!file.is_open()) return -1;
 
     std::string line;
-    int line_num = 0;
     bool in_fasta = false;
 
     while (std::getline(file, line)) {
-        line_num++;
         if (in_fasta) continue;
 
         if (line.rfind("##FASTA", 0) == 0) { in_fasta = true; continue; }
@@ -92,7 +90,7 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                     apply_gtf_attributes(rec);
                 }
             } catch (const std::exception&) {
-                return -1;
+                continue;
             }
         } else if (format == InputFormat::BED) {
             auto cols = split_line(line, '\t');
@@ -114,7 +112,7 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.transcript_id = std::nullopt;
                 rec.attr_raw = rec.id ? "ID=" + *rec.id : "";
             } catch (const std::exception&) {
-                return -1;
+                continue;
             }
         }
 

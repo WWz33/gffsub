@@ -139,7 +139,9 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
         }
     } else {
         std::vector<std::future<void>> futures;
-        for (auto& [chrom, gene_indices] : chrom_to_gene_idx) {
+        for (auto& kv : chrom_to_gene_idx) {
+            const std::string& chrom = kv.first;
+            std::vector<int> gene_indices = kv.second;
             auto f = std::async(std::launch::async, [&, chrom, gene_indices]() {
                 process_chromosome(chrom, gene_indices);
             });

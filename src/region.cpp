@@ -21,6 +21,10 @@ std::optional<Region> parse_region(std::string_view region_str) {
         return std::nullopt;
     }
 
+    if (start < 1 || end < 1 || start > end) {
+        return std::nullopt;
+    }
+
     return Region{seqid, start, end};
 }
 

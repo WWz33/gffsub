@@ -71,6 +71,7 @@ public:
 class AnnotationIndex {
 public:
     static AnnotationIndex from_gff3(const std::string& path);
+    static AnnotationIndex from_data(GffData data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     std::optional<GffRecord> find_gene(std::string_view id) const;
