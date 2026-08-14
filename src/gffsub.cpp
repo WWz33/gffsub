@@ -228,6 +228,9 @@ static InputFormat infer_input_format(const std::string& path) {
         if (ext == "gtf" || ext == "GTF") {
             return InputFormat::GTF;
         }
+        if (ext == "bed" || ext == "BED") {
+            return InputFormat::BED;
+        }
     }
     return InputFormat::GFF3;
 }
