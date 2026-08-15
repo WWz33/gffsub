@@ -103,8 +103,15 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.seqid = cols[0];
                 rec.source = cols[1];
                 rec.type = cols[2];
-                rec.start = std::stoll(cols[3]);
-                rec.end = std::stoll(cols[4]);
+                {
+                    // GFF3 requires positive integer coordinates; reject trailing garbage.
+                    size_t pos = 0;
+                    rec.start = std::stoll(cols[3], &pos);
+                    if (pos != cols[3].size()) throw std::invalid_argument{"start"};
+                    pos = 0;
+                    rec.end = std::stoll(cols[4], &pos);
+                    if (pos != cols[4].size()) throw std::invalid_argument{"end"};
+                }
                 rec.score_raw = cols[5];
                 if (cols[5] != ".") {
                     try { rec.score = std::stod(cols[5]); } catch (...) { rec.score = std::nullopt; }
@@ -175,8 +182,15 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
 
             try {
                 rec.seqid = cols[0];
-                rec.start = std::stoll(cols[1]) + 1;
-                rec.end = std::stoll(cols[2]);
+                {
+                    size_t pos = 0;
+                    rec.start = std::stoll(cols[1], &pos);
+                    if (pos != cols[1].size()) throw std::invalid_argument{"start"};
+                    rec.start += 1;
+                    pos = 0;
+                    rec.end = std::stoll(cols[2], &pos);
+                    if (pos != cols[2].size()) throw std::invalid_argument{"end"};
+                }
                 rec.source = "gffsub";
                 rec.type = "region";
                 rec.score_raw = (cols.size() > 4) ? cols[4] : ".";

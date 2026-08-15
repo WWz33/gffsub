@@ -1,4 +1,5 @@
 #include "filter.hpp"
+#include "parser.hpp"
 #include "record.hpp"
 #include <algorithm>
 #include <future>
@@ -31,12 +32,22 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
         }
     }
 
-    // Build isoform -> [child indices] index once
+    // Build isoform -> [child indices] index once, using the full Parent list
+    // (parse_attributes splits Parent=a,b) so shared children link to all parents.
     std::unordered_map<std::string, std::vector<int>> isoform_to_children;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
-        if (rec.parent_id) {
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto parent_it = attrs.find("Parent");
+        if (parent_it != attrs.end()) {
+            for (const auto& parent_id : parent_it->second) {
+                auto& vec = isoform_to_children[parent_id];
+                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                    vec.push_back(i);
+                }
+            }
+        } else if (rec.parent_id) {
             isoform_to_children[*rec.parent_id].push_back(i);
         }
     }
@@ -132,15 +143,25 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
                 for (int iso_idx : isoform_indices) {
                     data.records[iso_idx].kept = (iso_idx == longest_idx);
                 }
-                // Mark children of longest isoform as kept, others as not kept
+                // Drop children of all isoforms, then re-keep children of the
+                // longest. Two-pass so a child shared between the longest and a
+                // dropped isoform (multi-parent Parent=a,b) stays kept.
                 for (int iso_idx : isoform_indices) {
                     const auto& iso = data.records[iso_idx];
                     if (!iso.id) continue;
                     auto child_it = isoform_to_children.find(*iso.id);
                     if (child_it != isoform_to_children.end()) {
-                        bool is_longest = (iso_idx == longest_idx);
                         for (int child_idx : child_it->second) {
-                            data.records[child_idx].kept = is_longest;
+                            data.records[child_idx].kept = false;
+                        }
+                    }
+                }
+                const auto& longest = data.records[longest_idx];
+                if (longest.id) {
+                    auto child_it = isoform_to_children.find(*longest.id);
+                    if (child_it != isoform_to_children.end()) {
+                        for (int child_idx : child_it->second) {
+                            data.records[child_idx].kept = true;
                         }
                     }
                 }

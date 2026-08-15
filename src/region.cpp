@@ -11,12 +11,19 @@ std::optional<Region> parse_region(std::string_view region_str) {
 
     size_t dash = range_part.find('-');
     if (dash == std::string_view::npos) return std::nullopt;
+    // Reject trailing garbage after the range (e.g. "chr1:1-100:300").
+    if (range_part.find('-', dash + 1) != std::string_view::npos) return std::nullopt;
 
     int64_t start = 0;
     int64_t end = 0;
     try {
-        start = std::stoll(std::string(range_part.substr(0, dash)));
-        end = std::stoll(std::string(range_part.substr(dash + 1)));
+        size_t pos = 0;
+        const std::string start_str{range_part.substr(0, dash)};
+        start = std::stoll(start_str, &pos);
+        if (pos != start_str.size()) return std::nullopt;
+        const std::string end_str{range_part.substr(dash + 1)};
+        end = std::stoll(end_str, &pos);
+        if (pos != end_str.size()) return std::nullopt;
     } catch (const std::exception&) {
         return std::nullopt;
     }

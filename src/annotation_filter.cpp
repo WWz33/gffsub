@@ -22,6 +22,7 @@ static std::vector<std::string> split_line(const std::string& line, char delimit
 
 void filter_by_region(GffData& data, const Region& region) {
     for (auto& rec : data) {
+        if (!rec.kept) continue;
         if (rec.seqid != region.seqid || rec.end < region.start || rec.start > region.end) {
             rec.kept = false;
         }
@@ -57,6 +58,7 @@ static std::vector<Region> load_regions(const std::string& filename, bool is_bed
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file) {
     auto regions = load_regions(bed_file, true);
     for (auto& rec : data) {
+        if (!rec.kept) continue;
         bool in_region = false;
         for (const auto& r : regions) {
             if (rec.seqid == r.seqid && rec.end >= r.start && rec.start <= r.end) {

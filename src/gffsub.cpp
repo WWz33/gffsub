@@ -15,6 +15,20 @@
 
 using namespace gffsub;
 
+namespace {
+
+// load_index throws on unreadable files; convert to a clean error + exit.
+std::optional<AnnotationIndex> try_load_index(const std::string& path) {
+    try {
+        return load_index(path);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+        return std::nullopt;
+    }
+}
+
+}  // namespace
+
 // --- query subcommand (gffsub query <file> [opts]) ---
 
 static int run_query_subcommand(int argc, char* argv[], const char* prog) {
@@ -132,8 +146,9 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
         params.ids.insert(params.ids.end(), std::make_move_iterator(ids->begin()), std::make_move_iterator(ids->end()));
     }
 
-    const auto index = load_index(input_file);
-    const auto result = query(index, params);
+    const auto index = try_load_index(input_file);
+    if (!index) return 1;
+    const auto result = query(*index, params);
     print_query_result(std::cout, result, params);
     return 0;
 }
@@ -219,9 +234,10 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
         return 1;
     }
 
-    const auto index = load_index(input_file);
+    const auto index = try_load_index(input_file);
+    if (!index) return 1;
     try {
-        const auto result = window(index, params);
+        const auto result = window(*index, params);
         print_gff3(std::cout, result);
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
@@ -267,9 +283,10 @@ int run_window_from_args(const CliArgs& a) {
     }
     wparams.strand_aware = a.strand_aware;
 
-    const auto index = load_index(a.input_file);
+    const auto index = try_load_index(a.input_file);
+    if (!index) return 1;
     try {
-        const auto result = window(index, wparams);
+        const auto result = window(*index, wparams);
         print_gff3(std::cout, result);
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
@@ -367,8 +384,9 @@ int main(int argc, char* argv[]) {
         auto qparams = build_query_params(a);
         if (!qparams) return 1;
 
-        const auto index = load_index(a.input_file);
-        const auto result = query(index, *qparams);
+        const auto index = try_load_index(a.input_file);
+        if (!index) return 1;
+        const auto result = query(*index, *qparams);
         print_query_result(std::cout, result, *qparams);
         return 0;
     }

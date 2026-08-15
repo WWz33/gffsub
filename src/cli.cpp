@@ -2,6 +2,7 @@
 #include "expr_parser.hpp"
 
 #include <cctype>
+#include <cstring>
 #include <getopt.h>
 #include <fstream>
 #include <iostream>
@@ -99,8 +100,10 @@ std::optional<std::vector<std::string>> load_id_list_file(const std::string& pat
     std::vector<std::string> ids;
     std::string line;
     while (std::getline(in, line)) {
-        if (!line.empty()) {
-            ids.push_back(line);
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const auto id = trim_copy(line);
+        if (!id.empty() && id[0] != '#') {
+            ids.push_back(id);
         }
     }
     return ids;
@@ -342,15 +345,28 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 }
                 break;
             }
-            case 'r': args.region_str = optarg; break;
+            case 'r':
+                args.region_str = optarg;
+                if (!parse_region(optarg)) {
+                    std::cerr << "Error: invalid region format " << optarg << '\n';
+                    return std::nullopt;
+                }
+                break;
             case 'b': args.bed_file = optarg; break;
             case 'f': args.feature = optarg; break;
             case 'L': args.do_longest = true; break;
             case '@': {
                 args.threads_set = true;
+                // stoul accepts a leading '-' and wraps, so reject it explicitly.
+                if (optarg[0] == '-') {
+                    std::cerr << "Error: --threads must be a non-negative integer\n";
+                    return std::nullopt;
+                }
                 size_t t = 0;
                 try {
-                    t = std::stoul(optarg);
+                    size_t pos = 0;
+                    t = std::stoul(optarg, &pos);
+                    if (pos != std::strlen(optarg)) throw std::invalid_argument{""};
                 } catch (const std::exception&) {
                     std::cerr << "Error: --threads must be a non-negative integer\n";
                     return std::nullopt;
