@@ -6,7 +6,8 @@ Syntax: `--where KEY=VALUE` (repeatable)
 
 - Matches GFF3 column-9 attributes exactly
 - For GTF input, gene_id and transcript_id are accessible (synthesized by the parser)
-- Multiple --where flags are AND'd (all must match)
+- Multiple --where flags are OR'd (records matching any condition are kept)
+- Attribute values are URL-decoded before comparison (GFF3 spec): a file value `Note=a%2Cb` is matched by the decoded query form `--where Note=a,b`
 
 Sample data (demo.gff3):
 ```
@@ -19,7 +20,7 @@ chr2	src	gene	200	600	.	-	.	ID=gene02;Name=TP53;biotype=tumor_suppressor
 Commands:
 1. `./gffsub demo.gff3 --where biotype=protein_coding -f gene` — gene with protein_coding biotype
 2. `./gffsub demo.gff3 --where biotype=tumor_suppressor` — all records with that biotype
-3. `./gffsub demo.gff3 --where biotype=protein_coding --where Name=BRCA1` — both must match
+3. `./gffsub demo.gff3 --where biotype=protein_coding --where Name=BRCA1` — either condition may match
 
 ## --grep: substring search
 

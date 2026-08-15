@@ -43,13 +43,7 @@ Command: `./gffsub demo.gff3 --ids ids.txt -C`
 Syntax: `--name NAME`
 
 - Searches gene records by multiple naming keys (not just the ID attribute)
-- Lookup keys (checked in order):
-  1. ID
-  2. Name
-  3. gene_id
-  4. locus_tag
-  5. Alias
-  6. Dbxref
+- Lookup keys: ID, gene_id, Name, locus_tag, Alias, Dbxref (any may match; on collisions the first gene in file order wins)
 - Only matches gene-type features (type == "gene")
 - Returns the gene record; use -C or --model to expand
 

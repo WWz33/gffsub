@@ -34,12 +34,12 @@ Adds selected column-9 attributes as extra columns in the summary output. KEYS i
 | start | column 4 |
 | end | column 5 |
 | strand | column 7 |
-| type | column 9 |
+| type | column 3 (feature type) |
 | parent_id | feature ID of parent |
 | child_count | direct children count |
-| transcript_count | count of child transcripts |
-| exon_count | count of child exons |
-| cds_length | total CDS length |
+| transcript_count | count of transcript-type descendants of the matched feature |
+| exon_count | count of exon descendants of the matched feature |
+| cds_length | total CDS length of the matched feature's subtree |
 | status | found or not_found |
 | (extra) | one per --out-attrs key |
 
@@ -91,8 +91,8 @@ gene01	gene01	ID	chr1	100	1000	+	gene		1	1	2	402	found
 
 ## not_found status
 
-When a query ID does not match any feature, the summary includes a row with status `not_found` and empty fields. This allows batch queries to report missing IDs.
+When a query ID does not match any feature, the summary includes a row with status `not_found`: `matched_by` keeps the lookup key, numeric counts are 0, and the remaining fields are empty. This allows batch queries to report missing IDs.
 
 ## Restrictions
 
---summary and --out-attrs are only valid with query-style selectors (--id, --ids, --name, --where, --grep). They cannot be combined with --seqid, --source, --score, --strand, --phase, --bed, --longest, --threads, --format/--output-format, or --output.
+--summary and --out-attrs are only valid with query-style selectors (--id, --ids, --name, --where, --nearest, query-subcommand --region). They cannot be combined with --grep, -I, -E, --seqid, --source, --score, --strand, --phase, --bed, --longest, --threads, --format/--output-format, or --output.

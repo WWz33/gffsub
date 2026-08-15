@@ -13,8 +13,8 @@ The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two 
    - If the gene has exactly one isoform, keep it and its children unchanged.
    - Otherwise compute a per-gene flag: does any isoform of this gene have a CDS child.
    - For each isoform, compute a span:
-     - When the gene has CDS: sum of CDS lengths. Isoforms without CDS children are skipped, so they cannot be selected.
-     - When the gene has no CDS: sum of exon lengths. Isoforms without exon children fall back to the isoform start-to-end span.
+     - When the gene has CDS: CDS length. Distinct CDS IDs under one transcript are alternative protein variants; the isoform is scored by its LONGEST variant (lines sharing a CDS ID are one discontinuous CDS and are summed). Isoforms without CDS children are skipped, so they cannot be selected.
+     - When the gene has no CDS: sum of exon lengths. Isoforms without exon children are skipped, so they cannot be selected.
    - Keep the isoform with the maximum span. Ties keep the first encountered (strict greater-than comparison).
    - Drop non-kept isoforms and their children. Children of the kept isoform stay.
 4. Threads (via `-@` / `--threads`) parallelize across chromosomes. Each chromosome is processed independently.

@@ -85,6 +85,9 @@ chr1	src	CDS	100	250	.	+	0	gene_id "g1"; transcript_id "t1";
 # longest isoform (auto-detects transcript type)
 ./gffsub demo.gtf --longest
 
-# convert GTF to GFF3 (synthesized ID/Parent appear in output)
+# convert GTF to GFF3: column 9 is rewritten as tag=value with synthesized
+# ID=/Parent= (gene lines get ID=<gene_id>, transcripts ID=<transcript_id>
+# +Parent=<gene_id>, children Parent=<transcript_id>); remaining attributes
+# are converted to key=value form with URL escaping
 ./gffsub demo.gtf --id g1 -C -t gff3
 ```
