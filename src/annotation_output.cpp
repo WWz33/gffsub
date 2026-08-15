@@ -1,4 +1,5 @@
 #include "output.hpp"
+#include "gtf_parser.hpp"
 #include "record.hpp"
 #include <iostream>
 #include <sstream>
@@ -12,9 +13,12 @@ void print_gff3(std::ostream& out, const GffData& data) {
     for (const auto& rec : data) {
         if (!rec.kept) continue;
         const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
+        // GTF attr_raw is `key "value";` which is invalid GFF3 column 9;
+        // rewrite it as tag=value with synthesized ID=/Parent=.
+        const std::string& col9 = (rec.src_fmt == InputFormat::GTF) ? gtf_attrs_to_gff3(rec) : rec.attr_raw;
         out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
-            << rec.strand << '\t' << rec.phase << '\t' << rec.attr_raw << '\n';
+            << rec.strand << '\t' << rec.phase << '\t' << col9 << '\n';
     }
 }
 
@@ -56,9 +60,13 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
     // Build mappings from ALL records (not just kept) so parent mRNAs
     // filtered out by subset still resolve gene_id for surviving children.
     std::unordered_map<std::string, std::string> mRNA_to_gene;
+    std::unordered_set<std::string> gene_ids;
     for (const auto& rec : data) {
         if ((rec.type == "mRNA" || rec.type == "transcript") && rec.parent_id && rec.id) {
             mRNA_to_gene[*rec.id] = *rec.parent_id;
+        }
+        if (rec.type == "gene" && rec.id) {
+            gene_ids.insert(*rec.id);
         }
     }
 
@@ -95,6 +103,11 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
             if (rec.parent_id && mRNA_to_gene.count(*rec.parent_id)) {
                 gene_id_val = mRNA_to_gene[*rec.parent_id];
                 transcript_id_val = *rec.parent_id;
+            } else if (rec.parent_id && gene_ids.count(*rec.parent_id)) {
+                // Parent is a gene (e.g. TF_binding_site): no transcript to
+                // reference — leave transcript_id empty per the inter/inter_CNS
+                // convention instead of fabricating one from the gene ID.
+                gene_id_val = *rec.parent_id;
             } else if (rec.parent_id) {
                 gene_id_val = *rec.parent_id;
                 transcript_id_val = *rec.parent_id;

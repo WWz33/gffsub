@@ -56,7 +56,21 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
         const auto found_key = pair.substr(0, eq);
         if (found_key == key) {
             const auto value = pair.substr(eq + 1);
-            return value.empty() ? std::nullopt : std::optional<std::string>{url_decode(value)};
+            if (value.empty()) {
+                return std::nullopt;
+            }
+            // Split the RAW value on ',' before decoding: a literal comma in a
+            // single value must stay escaped as %2C (GFF3 spec). Single-value
+            // fields take the first part; the index builds full lists from
+            // parse_attributes.
+            const size_t comma = value.find(',');
+            const auto first_part = (comma == std::string_view::npos)
+                                        ? value
+                                        : value.substr(0, comma);
+            if (first_part.empty()) {
+                return std::nullopt;
+            }
+            return url_decode(first_part);
         }
     }
     return std::nullopt;
@@ -88,12 +102,16 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
     while (std::getline(file, line)) {
         if (in_fasta) continue;
 
+        // Strip CR from CRLF line endings before any column parsing.
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
         if (line.rfind("##FASTA", 0) == 0) { in_fasta = true; continue; }
         if (line.empty() || line[0] == '#') continue;
 
         GffRecord rec;
         rec.line_idx = static_cast<int>(data.size());
         rec.kept = true;
+        rec.src_fmt = format;
 
         if (format == InputFormat::GFF3 || format == InputFormat::GTF) {
             auto cols = split_line(line, '\t');
@@ -104,17 +122,25 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.source = cols[1];
                 rec.type = cols[2];
                 {
-                    // GFF3 requires positive integer coordinates; reject trailing garbage.
+                    // GFF3 requires positive integer coordinates, start <= end;
+                    // reject trailing garbage. Invalid lines are skipped.
                     size_t pos = 0;
                     rec.start = std::stoll(cols[3], &pos);
                     if (pos != cols[3].size()) throw std::invalid_argument{"start"};
                     pos = 0;
                     rec.end = std::stoll(cols[4], &pos);
                     if (pos != cols[4].size()) throw std::invalid_argument{"end"};
+                    if (rec.start < 1 || rec.end < 1 || rec.start > rec.end) {
+                        throw std::invalid_argument{"coordinates"};
+                    }
                 }
                 rec.score_raw = cols[5];
                 if (cols[5] != ".") {
-                    try { rec.score = std::stod(cols[5]); } catch (...) { rec.score = std::nullopt; }
+                    try {
+                        size_t spos = 0;
+                        const double s = std::stod(cols[5], &spos);
+                        if (spos == cols[5].size()) rec.score = s;
+                    } catch (...) { rec.score = std::nullopt; }
                 }
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
@@ -124,16 +150,9 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.parent_id = extract_attr_value(cols[8], "Parent");
                 rec.gene_id = extract_attr_value(cols[8], "gene_id");
                 rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
-
-                // GFF3 multi-parent: Parent=tx1,tx2 — rec.parent_id is a single
-                // optional<string>, so keep only the first parent for direct use.
-                // The index builds the full parent list from parse_attributes.
-                if (rec.parent_id) {
-                    const auto comma = rec.parent_id->find(',');
-                    if (comma != std::string::npos) {
-                        *rec.parent_id = rec.parent_id->substr(0, comma);
-                    }
-                }
+                // Multi-parent Parent=tx1,tx2: extract_attr_value already keeps
+                // only the first raw comma part; the index builds the full list
+                // from parse_attributes.
 
                 if (format == InputFormat::GTF) {
                     apply_gtf_attributes(rec);
@@ -184,18 +203,25 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 rec.seqid = cols[0];
                 {
                     size_t pos = 0;
-                    rec.start = std::stoll(cols[1], &pos);
+                    const int64_t bed_start = std::stoll(cols[1], &pos);
                     if (pos != cols[1].size()) throw std::invalid_argument{"start"};
-                    rec.start += 1;
                     pos = 0;
                     rec.end = std::stoll(cols[2], &pos);
                     if (pos != cols[2].size()) throw std::invalid_argument{"end"};
+                    if (bed_start < 0 || rec.end <= bed_start) {
+                        throw std::invalid_argument{"coordinates"};
+                    }
+                    rec.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
                 }
                 rec.source = "gffsub";
                 rec.type = "region";
                 rec.score_raw = (cols.size() > 4) ? cols[4] : ".";
                 if (cols.size() > 4 && cols[4] != ".") {
-                    try { rec.score = std::stod(cols[4]); } catch (...) { rec.score = std::nullopt; }
+                    try {
+                        size_t spos = 0;
+                        const double s = std::stod(cols[4], &spos);
+                        if (spos == cols[4].size()) rec.score = s;
+                    } catch (...) { rec.score = std::nullopt; }
                 }
                 rec.strand = (cols.size() > 5 && !cols[5].empty()) ? cols[5][0] : '.';
                 rec.phase = '.';

@@ -50,6 +50,7 @@ OBJS = $(LIB_OBJS) $(CLI_OBJS)
 ANNOTATION_INDEX_SMOKE = annotation_index_smoke
 CLI_OUTPUT_ATTRS_SMOKE = cli_output_attrs_smoke
 CLI_SELECTOR_SMOKE = cli_selector_smoke
+REGRESSION_SMOKE = regression_smoke
 
 .PHONY: all clean test install uninstall
 
@@ -73,13 +74,17 @@ $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp
 $(CLI_SELECTOR_SMOKE): tests/cli_selector_smoke.cpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_selector_smoke.cpp
 
-clean:
-	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE)
+$(REGRESSION_SMOKE): tests/regression_smoke.cpp
+	$(CXX) $(CXXFLAGS) -o $@ tests/regression_smoke.cpp
 
-test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE)
+clean:
+	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE)
+
+test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE)
 	./$(ANNOTATION_INDEX_SMOKE)
 	./$(CLI_OUTPUT_ATTRS_SMOKE) ./$(TARGET)
 	./$(CLI_SELECTOR_SMOKE) ./$(TARGET)
+	./$(REGRESSION_SMOKE) ./$(TARGET)
 
 install: $(TARGET)
 	install -d $(PREFIX)/bin

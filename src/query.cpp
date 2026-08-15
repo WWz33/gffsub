@@ -27,7 +27,7 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
         if (result.emit_summary) {
             auto row = make_summary_row(index, query_id, matched_by, rec);
             if (!params.output_attrs.empty()) {
-                row.attrs = extract_output_attrs(rec.attr_raw, params.output_attrs);
+                row.attrs = extract_output_attrs(rec, params.output_attrs);
             }
             result.summary_rows.push_back(std::move(row));
         }
@@ -88,9 +88,12 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
     };
 
     for (const auto& id : params.ids) {
-        const auto rec = index.find_by_id(id);
-        if (rec) {
-            add_match(*rec, id, "ID");
+        // GFF3 discontinuous features: one ID may span multiple lines.
+        const auto recs = index.find_all_by_id(id);
+        if (!recs.empty()) {
+            for (const auto& rec : recs) {
+                add_match(rec, id, "ID");
+            }
         } else if (result.emit_summary) {
             auto row = make_not_found_row(id, "ID");
             row.attrs.assign(params.output_attrs.size(), "");

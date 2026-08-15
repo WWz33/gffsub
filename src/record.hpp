@@ -10,6 +10,9 @@
 
 namespace gffsub {
 
+enum class OutputFormat { GFF3, GTF2, GTF3, BED };
+enum class InputFormat { GFF3, GTF, BED };
+
 struct GffRecord {
     std::string seqid;
     std::string source;
@@ -27,6 +30,9 @@ struct GffRecord {
     std::optional<std::string> transcript_id;
     int line_idx = 0;
     bool kept = true;
+    // Input format of the record's attr_raw. GTF attr_raw uses `key "value";`
+    // which is invalid in GFF3 output; print_gff3 rewrites it when src_fmt==GTF.
+    InputFormat src_fmt = InputFormat::GFF3;
 };
 
 class GffData {
@@ -61,9 +67,6 @@ public:
 
     void clear() { index.clear(); }
 };
-
-enum class OutputFormat { GFF3, GTF2, GTF3, BED };
-enum class InputFormat { GFF3, GTF, BED };
 
 }  // namespace gffsub
 

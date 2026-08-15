@@ -137,6 +137,13 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
         return 1;
     }
 
+    if (params.ids.empty() && id_list_file.empty() && params.name.empty() &&
+        params.attr_filters.empty() && !params.nearest_region && !params.region) {
+        std::cerr << "Error: query requires a selector: --id, --ids, --name, --where, --region, or --nearest\n";
+        query_usage(prog);
+        return 1;
+    }
+
     if (!id_list_file.empty()) {
         auto ids = load_id_list_file(id_list_file);
         if (!ids) {

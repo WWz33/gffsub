@@ -1,6 +1,7 @@
 #include "query_summary.hpp"
 
 #include "annotation.hpp"
+#include "gtf_parser.hpp"
 #include "parser.hpp"
 
 #include <cstdio>
@@ -94,14 +95,10 @@ SummaryRow make_summary_row(const AnnotationIndex& index,
     row.status = "found";
 
     if (rec.id) {
-        const auto children = index.children_of(*rec.id);
-        row.child_count = children.size();
-        const auto model = index.gene_model(*rec.id);
-        if (model) {
-            add_feature_counts(row, model->records);
-        } else {
-            add_feature_counts(row, children);
-        }
+        row.child_count = index.children_of(*rec.id).size();
+        // All counts describe the matched feature's subtree: for a gene this
+        // covers the whole model, for a transcript its own exons/CDS.
+        add_feature_counts(row, index.descendants_of(*rec.id));
     }
 
     return row;
@@ -130,18 +127,32 @@ std::string infer_gene_match_key(const AnnotationIndex& index, const std::string
     return "name";
 }
 
-std::vector<std::string> extract_output_attrs(const std::string& attrs,
+std::vector<std::string> extract_output_attrs(const GffRecord& rec,
                                               const std::vector<std::string>& keys) {
-    const auto parsed = parse_attributes(attrs);
+    const auto parsed = parse_attributes(rec.attr_raw);
     std::vector<std::string> values;
     values.reserve(keys.size());
     for (const auto& key : keys) {
-        const auto it = parsed.find(key);
-        if (it == parsed.end()) {
-            values.emplace_back();
-        } else {
-            values.push_back(join_values(it->second));
+        if (key == "gene_id" && rec.gene_id) {
+            values.push_back(*rec.gene_id);
+            continue;
         }
+        if (key == "transcript_id" && rec.transcript_id) {
+            values.push_back(*rec.transcript_id);
+            continue;
+        }
+        const auto it = parsed.find(key);
+        if (it != parsed.end()) {
+            values.push_back(join_values(it->second));
+            continue;
+        }
+        // GTF fallback: `key "value";` attributes that parse_attributes cannot parse.
+        const auto gtf = extract_quoted_value(rec.attr_raw, key);
+        if (gtf) {
+            values.push_back(*gtf);
+            continue;
+        }
+        values.emplace_back();
     }
     return values;
 }

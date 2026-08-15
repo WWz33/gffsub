@@ -37,15 +37,23 @@ static std::vector<Region> load_regions(const std::string& filename, bool is_bed
 
         std::string line;
         while (std::getline(file, line)) {
+            // Strip CR from CRLF line endings before validation.
+            if (!line.empty() && line.back() == '\r') line.pop_back();
             if (line.empty() || line[0] == '#') continue;
             auto cols = split_line(line, '\t');
             if (cols.size() < 3) continue;
 
             Region r;
             try {
+                size_t pos = 0;
+                const int64_t bed_start = std::stoll(cols[1], &pos);
+                if (pos != cols[1].size()) continue;
+                pos = 0;
+                r.end = std::stoll(cols[2], &pos);
+                if (pos != cols[2].size()) continue;
+                if (bed_start < 0 || r.end <= bed_start) continue;
                 r.seqid = cols[0];
-                r.start = std::stoll(cols[1]) + 1;
-                r.end = std::stoll(cols[2]);
+                r.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
             } catch (const std::exception&) {
                 continue;
             }

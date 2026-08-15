@@ -2,9 +2,9 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace gffsub {
-namespace {
 
 std::optional<std::string> extract_quoted_value(const std::string& attrs, const std::string& key) {
     // GTF attributes are "; "-delimited: key "value";
@@ -69,8 +69,6 @@ std::optional<std::string> extract_quoted_value(const std::string& attrs, const 
     return std::nullopt;
 }
 
-}  // namespace
-
 void apply_gtf_attributes(GffRecord& rec) {
     if (!rec.gene_id) {
         rec.gene_id = extract_quoted_value(rec.attr_raw, "gene_id");
@@ -78,6 +76,83 @@ void apply_gtf_attributes(GffRecord& rec) {
     if (!rec.transcript_id) {
         rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
     }
+}
+
+std::string gtf_attrs_to_gff3(const GffRecord& rec) {
+    static const auto url_escape = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (const char ch : s) {
+            switch (ch) {
+                case ',': out += "%2C"; break;
+                case ';': out += "%3B"; break;
+                case '=': out += "%3D"; break;
+                case '%': out += "%25"; break;
+                case '\t': out += "%09"; break;
+                default: out.push_back(ch); break;
+            }
+        }
+        return out;
+    };
+
+    std::vector<std::string> parts;
+    if (rec.id) {
+        parts.push_back("ID=" + url_escape(*rec.id));
+    }
+    if (rec.parent_id) {
+        parts.push_back("Parent=" + url_escape(*rec.parent_id));
+    }
+
+    // Convert the remaining `key "value";` pairs to key=value.
+    const std::string& attrs = rec.attr_raw;
+    size_t pos = 0;
+    while (pos < attrs.size()) {
+        size_t end = attrs.find(';', pos);
+        if (end == std::string::npos) {
+            end = attrs.size();
+        }
+        std::string frag = attrs.substr(pos, end - pos);
+        pos = (end < attrs.size()) ? end + 1 : attrs.size();
+
+        const auto first = frag.find_first_not_of(" \t");
+        if (first == std::string::npos) {
+            continue;
+        }
+        const auto last = frag.find_last_not_of(" \t");
+        frag = frag.substr(first, last - first + 1);
+
+        const auto q1 = frag.find('"');
+        if (q1 == std::string::npos || q1 == 0) {
+            continue;
+        }
+        const auto q2 = frag.rfind('"');
+        if (q2 == q1) {
+            continue;
+        }
+        std::string key = frag.substr(0, q1);
+        const auto klast = key.find_last_not_of(" \t");
+        if (klast == std::string::npos) {
+            continue;
+        }
+        key = key.substr(0, klast + 1);
+        const std::string value = frag.substr(q1 + 1, q2 - q1 - 1);
+        if (key.empty() || value.empty()) {
+            continue;
+        }
+        parts.push_back(url_escape(key) + "=" + url_escape(value));
+    }
+
+    if (parts.empty()) {
+        return ".";
+    }
+    std::string out;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            out += ';';
+        }
+        out += parts[i];
+    }
+    return out;
 }
 
 }  // namespace gffsub

@@ -21,6 +21,8 @@ public:
     static AnnotationIndex from_data(GffData data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
+    // All lines sharing an ID (GFF3 discontinuous features, e.g. multi-line CDS).
+    std::vector<GffRecord> find_all_by_id(std::string_view id) const;
     std::optional<GffRecord> find_gene(std::string_view id) const;
     std::vector<GffRecord> parents_of(std::string_view id) const;
     std::vector<GffRecord> children_of(std::string_view parent_id) const;
@@ -33,6 +35,7 @@ public:
 private:
     GffData data_;
     std::unordered_map<std::string, int> id_to_record_;
+    std::unordered_map<std::string, std::vector<int>> id_to_records_;
     std::unordered_map<std::string, std::vector<int>> gene_lookup_;
     std::unordered_map<std::string, std::vector<int>> parents_by_child_id_;
     std::unordered_map<std::string, std::vector<int>> children_by_parent_id_;

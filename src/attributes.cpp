@@ -54,24 +54,23 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
                 const std::string key{pair.substr(0, eq)};
                 std::string_view value = pair.substr(eq + 1);
                 if (!key.empty()) {
-                    // URL-decode the value per GFF3 spec.
-                    const std::string decoded = url_decode(value);
-                    if (!decoded.empty()) {
-                        size_t part_start = 0;
-                        while (part_start <= decoded.size()) {
-                            size_t part_end = decoded.find(',', part_start);
-                            if (part_end == std::string::npos) {
-                                part_end = decoded.size();
-                            }
-                            const std::string part = decoded.substr(part_start, part_end - part_start);
-                            if (!part.empty()) {
-                                parsed[key].push_back(part);
-                            }
-                            if (part_end == decoded.size()) {
-                                break;
-                            }
-                            part_start = part_end + 1;
+                    // Split the RAW value on ',' before URL-decoding each part:
+                    // ',' is the value-list separator and a literal comma inside
+                    // a single value must be escaped as %2C (GFF3 spec).
+                    size_t part_start = 0;
+                    while (part_start <= value.size()) {
+                        size_t part_end = value.find(',', part_start);
+                        if (part_end == std::string_view::npos) {
+                            part_end = value.size();
                         }
+                        const std::string part = url_decode(value.substr(part_start, part_end - part_start));
+                        if (!part.empty()) {
+                            parsed[key].push_back(part);
+                        }
+                        if (part_end == value.size()) {
+                            break;
+                        }
+                        part_start = part_end + 1;
                     }
                 }
             }

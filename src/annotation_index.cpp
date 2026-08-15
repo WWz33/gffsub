@@ -1,4 +1,5 @@
 #include "annotation.hpp"
+#include "gtf_parser.hpp"
 #include "parser.hpp"
 #include "region.hpp"
 
@@ -30,6 +31,9 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
         const auto& rec = data_.records[i];
         if (rec.id) {
             id_to_record_.emplace(*rec.id, i);
+            // GFF3 discontinuous features: the same ID may appear on multiple
+            // lines; keep every line index.
+            id_to_records_[*rec.id].push_back(i);
         }
 
         if (rec.type != "gene") {
@@ -103,6 +107,19 @@ std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const 
         return std::nullopt;
     }
     return data_.records[it->second];
+}
+
+std::vector<GffRecord> AnnotationIndex::find_all_by_id(std::string_view id) const {
+    std::vector<GffRecord> records;
+    const auto it = id_to_records_.find(std::string{id});
+    if (it == id_to_records_.end()) {
+        return records;
+    }
+    records.reserve(it->second.size());
+    for (const int idx : it->second) {
+        records.push_back(data_.records[idx]);
+    }
+    return records;
 }
 
 std::optional<GffRecord> AnnotationIndex::find_gene(std::string_view id) const {
@@ -209,7 +226,11 @@ std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, i
 
 std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std::string_view value) const {
     std::vector<GffRecord> matches;
-    const std::string skey{key};
+    std::string skey{key};
+    // Accept the attr.KEY form used by --grep/-I for arbitrary column-9 keys.
+    if (skey.rfind("attr.", 0) == 0) {
+        skey = skey.substr(5);
+    }
     const std::string svalue{value};
     for (const auto& rec : data_.records) {
         // Check synthesized rec fields first (needed for GTF where attr_raw
@@ -233,14 +254,18 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
 
         const auto attrs = parse_attributes(rec.attr_raw);
         const auto it = attrs.find(skey);
-        if (it == attrs.end()) {
+        if (it != attrs.end()) {
+            for (const auto& attr_value : it->second) {
+                if (attr_value == svalue) {
+                    matches.push_back(rec);
+                    break;
+                }
+            }
             continue;
         }
-        for (const auto& attr_value : it->second) {
-            if (attr_value == svalue) {
-                matches.push_back(rec);
-                break;
-            }
+        // GTF fallback: `key "value";` attributes (same as record_field_value).
+        if (extract_quoted_value(rec.attr_raw, skey) == std::optional<std::string>{svalue}) {
+            matches.push_back(rec);
         }
     }
     return matches;

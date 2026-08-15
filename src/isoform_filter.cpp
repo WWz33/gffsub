@@ -111,14 +111,23 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
                 bool found = false;
 
                 if (gene_has_cds) {
+                    // Distinct CDS IDs under one transcript are alternative
+                    // protein variants (spec EDEN example: cds00003/cds00004);
+                    // score by the LONGEST variant, do not sum across variants.
+                    // Lines sharing an ID are one discontinuous CDS (summed).
+                    std::unordered_map<std::string, int64_t> variant_len;
                     for (int child_idx : child_it->second) {
                         const auto& child = data.records[child_idx];
                         if (child.type == "CDS") {
-                            len += child.end - child.start + 1;
-                            found = true;
+                            const std::string key = child.id ? *child.id : std::string{};
+                            variant_len[key] += child.end - child.start + 1;
                         }
                     }
-                    if (!found) continue; // isoform without CDS is skipped
+                    if (variant_len.empty()) continue; // isoform without CDS is skipped
+                    for (const auto& [key, vlen] : variant_len) {
+                        (void)key;
+                        if (vlen > len) len = vlen;
+                    }
                 } else {
                     for (int child_idx : child_it->second) {
                         const auto& child = data.records[child_idx];
@@ -127,9 +136,9 @@ void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view fe
                             found = true;
                         }
                     }
-                    if (!found) {
-                        len = iso.end - iso.start + 1;
-                    }
+                    // No exon children: cannot be "longest" by exon span,
+                    // mirroring gffread's covlen (sum of exon lengths).
+                    if (!found) continue;
                 }
 
                 if (len > max_len) {

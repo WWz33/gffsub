@@ -1,4 +1,5 @@
 #include "selector_filter.hpp"
+#include "gtf_parser.hpp"
 #include "parser.hpp"
 
 #include <algorithm>
@@ -83,10 +84,12 @@ std::optional<std::string> record_field_value(const GffRecord& rec, std::string_
 
     const auto attrs = parse_attributes(rec.attr_raw);
     const auto it = attrs.find(attr_key);
-    if (it == attrs.end() || it->second.empty()) {
-        return std::nullopt;
+    if (it != attrs.end() && !it->second.empty()) {
+        return join_filter_values(it->second);
     }
-    return join_filter_values(it->second);
+    // GTF fallback: column 9 uses `key "value";` which parse_attributes cannot
+    // parse. GFF3 attr_raw never matches that form, so this is format-agnostic.
+    return extract_quoted_value(rec.attr_raw, attr_key);
 }
 
 bool parse_number(std::string_view value, double& out) {
