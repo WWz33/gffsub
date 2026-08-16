@@ -5,8 +5,8 @@
 Syntax: `--id ID` (repeatable)
 
 - Exact match on the feature's ID attribute (column 9 `ID=` in GFF3, synthesized from gene_id/transcript_id in GTF)
-- Multiple --id flags are OR'd: records matching any ID are kept
-- Without -C/--children/--parents/--model, only the exact ID match is returned
+- Multiple --id flags are OR'd: a record matching any ID is kept
+- Without -C/--children/--parents/--model, only the exact ID match returns
 
 Sample data (demo.gff3):
 ```
@@ -42,10 +42,10 @@ Command: `./gffsub demo.gff3 --ids ids.txt -C`
 
 Syntax: `--name NAME`
 
-- Searches gene records by multiple naming keys (not just the ID attribute)
+- Searches gene records by multiple naming keys, not just the ID attribute
 - Lookup keys: ID, gene_id, Name, locus_tag, Alias, Dbxref (any may match; on collisions the first gene in file order wins)
-- Only matches gene-type features (type == "gene")
-- Returns the gene record; use -C or --model to expand
+- Matches only gene-type features (type == "gene")
+- Returns the gene record; add -C or --model to expand
 
 Commands:
 1. `./gffsub demo.gff3 --name BRCA1` — gene with Name=BRCA1

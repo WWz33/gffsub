@@ -11,7 +11,7 @@ gene
         └── CDS
 ```
 
-The index follows Parent= links. GTF input uses synthesized parent/child links from gene_id and transcript_id.
+The index follows `Parent=` links. GTF input uses synthesized parent/child links from gene_id and transcript_id.
 
 Sample data (demo.gff3):
 ```

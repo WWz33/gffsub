@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two isoforms of the chosen type are reduced to the longest one. The longest is scored by CDS span when the gene has any CDS, otherwise by exon span. The non-selected isoforms and their child features (exons, CDS) are dropped. Genes with one isoform are left unchanged. Genes with no isoform of the chosen type are dropped.
+The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two isoforms of the chosen type are reduced to the longest. The longest is scored by CDS span when the gene has any CDS, otherwise by exon span. The non-selected isoforms and their child features (exons, CDS) are dropped. Genes with one isoform are left unchanged. Genes with no isoform of the chosen type are dropped.
 
 ## Algorithm
 
@@ -17,7 +17,7 @@ The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two 
      - When the gene has no CDS: sum of exon lengths. Isoforms without exon children are skipped, so they cannot be selected.
    - Keep the isoform with the maximum span. Ties keep the first encountered (strict greater-than comparison).
    - Drop non-kept isoforms and their children. Children of the kept isoform stay.
-4. Threads (via `-@` / `--threads`) parallelize across chromosomes. Each chromosome is processed independently.
+4. Threads (`-@` / `--threads`) parallelize across chromosomes. Each chromosome is processed independently.
 
 ## Isoform type auto-detection
 
@@ -26,9 +26,9 @@ When `-f` / `--feature` is not specified:
 - Otherwise, if the data has `transcript` records, use `transcript`.
 - If neither exists, default to `mRNA`. All genes are then dropped because no isoform matches.
 
-This handles both GFF3 (typically mRNA) and GTF (typically transcript).
+Covers both GFF3 (typically mRNA) and GTF (typically transcript).
 
-When `-f TYPE` is specified, that type is the isoform type, and the run additionally drops every record whose type is not TYPE (genes, CDS, exons, and others). The longest selection runs first, then the feature filter keeps only TYPE records.
+When `-f TYPE` is specified, that type is the isoform type, and the run additionally drops every record whose type is not TYPE (genes, CDS, exons, and others). Longest selection runs first, then the feature filter keeps only TYPE records.
 
 ## Sample data
 

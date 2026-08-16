@@ -6,7 +6,7 @@ Syntax: `--where KEY=VALUE` (repeatable)
 
 - Matches GFF3 column-9 attributes exactly
 - For GTF input, gene_id and transcript_id are accessible (synthesized by the parser)
-- Multiple --where flags are OR'd (records matching any condition are kept)
+- Multiple --where flags are OR'd (a record matching any condition is kept)
 - Attribute values are URL-decoded before comparison (GFF3 spec): a file value `Note=a%2Cb` is matched by the decoded query form `--where Note=a,b`
 
 Sample data (demo.gff3):
@@ -27,10 +27,10 @@ Commands:
 Syntax: `--grep FIELD:PATTERN` (repeatable)
 
 - Searches for substring PATTERN within the named FIELD
-- Fields include column fields (seqid, source, type, start, end, score, strand, phase) and column-9 attribute keys (ID, Name, Parent, gene_id, transcript_id, biotype, etc.)
-- Any key not in the predefined list can be accessed with `attr.` prefix
+- Fields: column fields (seqid, source, type, start, end, score, strand, phase) and column-9 attribute keys (ID, Name, Parent, gene_id, transcript_id, biotype, etc.)
+- Keys not in the predefined list need the `attr.` prefix
 - Multiple --grep flags are OR'd (any match keeps the record)
-- Use `-v` / `--invert-match` to invert: keep records that do NOT match
+- `-v` / `--invert-match` inverts: keep records that do NOT match
 
 Commands:
 1. `./gffsub demo.gff3 --grep type:gene` — genes (substring "gene" in type column)
@@ -41,7 +41,7 @@ Commands:
 
 Syntax: `--grep-regex FIELD:REGEX` (repeatable)
 
-- Uses ECMAScript regex syntax (std::regex)
+- ECMAScript regex syntax (std::regex)
 - Same field list as --grep
 - Multiple flags are OR'd
 

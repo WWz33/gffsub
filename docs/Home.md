@@ -8,18 +8,16 @@ Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene m
 
 ## Filtering
 
-Progressive from simple to advanced:
-
-1. [Region and BED Filtering](region-bed-filtering.md): subset by genomic coordinates (`-r`, `-b`, `--seqid`)
-2. [Feature ID and Gene Name Lookup](id-name-lookup.md): select by ID or name (`--id`, `--ids`, `--name`)
-3. [Gene Model Expansion](gene-model-expansion.md): include children, parents, or full gene model (`-C`, `--parents`, `--model`)
-4. [Attribute Filtering](attribute-filtering.md): match column-9 attributes (`--where`, `--grep`, `--grep-regex`, `--grep-file`)
-5. [Expression Filtering](expression-filtering.md): numeric comparison and logical operators (`-I`, `-E`)
+1. [Region and BED Filtering](region-bed-filtering.md): `-r`, `-b`, `--seqid`
+2. [Feature ID and Gene Name Lookup](id-name-lookup.md): `--id`, `--ids`, `--name`
+3. [Gene Model Expansion](gene-model-expansion.md): `-C`, `--parents`, `--model`
+4. [Attribute Filtering](attribute-filtering.md): `--where`, `--grep`, `--grep-regex`, `--grep-file`
+5. [Expression Filtering](expression-filtering.md): `-I`, `-E`
 
 ## Selection
 
-- [Longest Isoform Selection](longest-isoform.md): keep one isoform per gene (`--longest`, `-@`)
-- [Window Subcommand](window-subcommand.md): records around a feature (`window`, `--up`, `--down`, `--strand-aware`)
+- [Longest Isoform Selection](longest-isoform.md): `--longest`, `-@`
+- [Window Subcommand](window-subcommand.md): `window`, `--up`, `--down`, `--strand-aware`
 
 ## Output
 
@@ -28,4 +26,4 @@ Progressive from simple to advanced:
 
 ## Input
 
-- [GTF Input Handling](gtf-input.md): GTF attribute parsing, Parent/ID synthesis, and isoform auto-detection
+- [GTF Input Handling](gtf-input.md): GTF attribute parsing, Parent/ID synthesis, isoform auto-detection

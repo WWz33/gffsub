@@ -2,7 +2,7 @@
 
 ## Overview
 
-Instead of printing annotation records, gffsub can output a tabular summary of selector hits. This is useful for inspecting gene structure details.
+Instead of printing annotation records, gffsub can output a tabular summary of selector hits. Useful for inspecting gene structure details.
 
 ## --summary flag
 
@@ -91,7 +91,7 @@ gene01	gene01	ID	chr1	100	1000	+	gene		1	1	2	402	found
 
 ## not_found status
 
-When a query ID does not match any feature, the summary includes a row with status `not_found`: `matched_by` keeps the lookup key, numeric counts are 0, and the remaining fields are empty. This allows batch queries to report missing IDs.
+When a query ID does not match any feature, the summary includes a row with status `not_found`: `matched_by` keeps the lookup key, numeric counts are 0, and the remaining fields are empty. Batch queries report missing IDs.
 
 ## Restrictions
 

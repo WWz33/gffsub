@@ -9,16 +9,11 @@ git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
 ```
 
-This produces the `./gffsub` binary.
-
-Requirements:
-
-- C++17 compiler (g++ 9+, clang 10+)
-- No external dependencies
+Produces `./gffsub`. Needs a C++17 compiler (g++ 9+, clang 10+), no external dependencies.
 
 ## Quick Start
 
-Save this sample data as `demo.gff3` and use it for all examples below.
+Sample data (save as `demo.gff3`):
 
 ```
 ##gff-version 3
@@ -40,7 +35,7 @@ Keep records overlapping a genomic interval.
 
 ### Select by ID with children
 
-Keep one feature and everything descended from it.
+Keep one feature and all its descendants.
 
 ```bash
 ./gffsub demo.gff3 --id tx01 -C
@@ -48,15 +43,11 @@ Keep one feature and everything descended from it.
 
 ### Filter by feature type
 
-Keep only records of a given type.
-
 ```bash
 ./gffsub demo.gff3 -f exon
 ```
 
 ### Convert to GTF
-
-Subset, then write GTF instead of GFF3.
 
 ```bash
 ./gffsub demo.gff3 --id gene01 -C -t gtf
@@ -64,7 +55,7 @@ Subset, then write GTF instead of GFF3.
 
 ### Longest isoform
 
-Keep only the longest mRNA per gene.
+Keep the longest mRNA per gene.
 
 ```bash
 ./gffsub demo.gff3 --longest
@@ -78,9 +69,9 @@ gffsub query <input.gff3> [options]
 gffsub window <input.gff3> [options]
 ```
 
-- Default mode: subset and filter records, then output annotation records.
-- `query` subcommand: look up features by ID, name, or attribute, with summary output.
-- `window` subcommand: return records overlapping a window around one feature.
+- Default mode: subset and filter records, write annotation output.
+- `query`: look up features by ID, name, or attribute, with summary output.
+- `window`: records overlapping a window around one feature.
 
 ## Help
 

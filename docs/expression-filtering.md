@@ -1,6 +1,6 @@
 # Expression Filtering
 
-gffsub supports filtering records by field values, numeric comparisons, and attribute matching using `-I` / `--include-expr` (keep matching) and `-E` / `--exclude-expr` (drop matching).
+gffsub filters records by field values, numeric comparisons, and attribute matching using `-I` / `--include-expr` (keep matching) and `-E` / `--exclude-expr` (drop matching).
 
 ## Syntax
 
@@ -8,7 +8,7 @@ gffsub supports filtering records by field values, numeric comparisons, and attr
 -I 'FIELD OP VALUE'
 ```
 
-Multiple `-I` and `-E` flags combine with AND logic. Each expression also supports `&&` (and), `||` (or), `!` (not), and parentheses `()`.
+Multiple `-I` and `-E` flags combine with AND logic. Each expression supports `&&` (and), `||` (or), `!` (not), and parentheses `()`.
 
 ### Operators
 
@@ -23,14 +23,14 @@ Multiple `-I` and `-E` flags combine with AND logic. Each expression also suppor
 | `>` | numeric greater than | `-I 'length > 500'` |
 | `>=` | numeric greater or equal | `-I 'length >= 1000'` |
 
-Values containing spaces or special characters should be quoted with double quotes.
+Quote values containing spaces or special characters with double quotes.
 
 ### Logical operators
 
 Combine conditions within a single expression:
 
 ```bash
-# exon length >= 100 AND on plus strand
+# exon length >= 100 on plus strand
 -I 'length >= 100 && strand == "+"'
 
 # gene or transcript
@@ -59,7 +59,7 @@ Combine conditions within a single expression:
 
 ### Attribute fields
 
-GFF3 column-9 attributes are accessible by key name. For keys not in the built-in list, use the `attr.` prefix.
+GFF3 column-9 attributes are accessible by key name. Keys not in the built-in list need the `attr.` prefix.
 
 | Field | GFF3 key | Notes |
 |-------|----------|-------|
@@ -79,7 +79,7 @@ GTF input: `gene_id`, `transcript_id`, `ID`, and `Parent` resolve from the parse
 
 ## Numeric comparisons
 
-Fields `start`, `end`, `length`, and `score` are treated as numeric for `<`, `<=`, `>`, `>=`, `==`, and `!=`. Non-numeric values fail the comparison (no crash).
+Fields `start`, `end`, `length`, and `score` are numeric for `<`, `<=`, `>`, `>=`, `==`, and `!=`. Non-numeric values fail the comparison (no crash, record excluded).
 
 ## Missing attributes
 
@@ -88,7 +88,7 @@ When a record lacks the referenced attribute:
 - `==`, `~`, `<`, `<=`, `>`, `>=` do not match (record excluded by `-I`).
 - `!=` and `!~` do match (record kept by `-I`).
 
-This means `-I 'attr.biotype != "lncRNA"'` keeps records with no `biotype` attribute, treating missing as "not equal".
+So `-I 'attr.biotype != "lncRNA"'` keeps records with no `biotype` attribute, treating missing as "not equal".
 
 ## Length filtering examples
 

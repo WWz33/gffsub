@@ -24,7 +24,7 @@ The `--up` flag has the long alias `--upstream`; `--down` has `--downstream`.
 Without --strand-aware (default):
 - Window start = feature start - upstream
 - Window end = feature end + downstream
-- Direction-independent: window extends equally left and right
+- Direction-independent: window extends left and right
 
 With --strand-aware:
 - Plus strand: upstream extends left of the start, downstream extends right of the end
@@ -34,7 +34,7 @@ Any computed start below 1 is clamped to 1 before overlap lookup.
 
 ## --id lookup
 
---id accepts both feature IDs and gene-name keys, using the same lookup as --name. An ID match takes priority. If no ID matches, the gene-name lookup runs next. The indexed gene-name attributes are Name, gene_id, locus_tag, Alias, and Dbxref.
+--id accepts feature IDs and gene-name keys, using the same lookup as --name. An ID match takes priority. If no ID matches, the gene-name lookup runs next. The indexed gene-name attributes are Name, gene_id, locus_tag, Alias, and Dbxref.
 
 ## Sample data
 
@@ -70,7 +70,7 @@ In default (non-subcommand) mode, --up and --down with exactly one --id trigger 
 ./gffsub demo.gff3 --id gene01 --up 200 --down 500
 ```
 
-This path requires exactly one --id, plus any of --up, --down, or --strand-aware. No other filter flags are accepted. Passing another filter flag aborts with an error naming the allowed set: --id, --up/--upstream, --down/--downstream, and --strand-aware.
+Requires exactly one --id, plus any of --up, --down, or --strand-aware. No other filter flags are accepted. Passing another filter flag aborts with an error naming the allowed set: --id, --up/--upstream, --down/--downstream, and --strand-aware.
 
 ## Validation
 

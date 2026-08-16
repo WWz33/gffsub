@@ -25,7 +25,7 @@ GTF has no explicit `ID=` and `Parent=` attributes. gffsub synthesizes these fro
 | transcript / mRNA | transcript_id | gene_id |
 | exon, CDS, etc. | none | transcript_id |
 
-The synthesis builds the parent/child index so that `--children`, `--parents`, and `--model` work correctly on GTF input. Exon and CDS records get no synthesized ID; they are linked to their transcript via the parent field only. This avoids ID collisions when multiple exons share the same transcript_id.
+The synthesis builds the parent/child index so `--children`, `--parents`, and `--model` work on GTF input. Exon and CDS records get no synthesized ID; they link to their transcript via the parent field only. This avoids ID collisions when multiple exons share the same transcript_id.
 
 ## GTF-specific parsing
 
@@ -39,7 +39,7 @@ For `--where`, `--grep`, and `-I` expressions:
 - `gene_id` and `transcript_id` resolve from the synthesized record fields, not from parsing column 9.
 - Other GTF attributes (like `gene_name`, `gene_biotype`) are accessible via the `attr.` prefix, but they use GTF parsing which extracts the quoted value directly.
 
-To filter by gene_id in GTF:
+Filter by gene_id in GTF:
 ```bash
 ./gffsub input.gtf --where gene_id=ENSG000001
 ./gffsub input.gtf --grep gene_id:ENSG
@@ -52,7 +52,7 @@ The isoform type is auto-detected. GTF typically uses `transcript` rather than `
 - If `mRNA` records exist, use `mRNA`.
 - Otherwise if `transcript` records exist, use `transcript`.
 
-This makes `--longest` work on GTF without needing `-f transcript`.
+`--longest` works on GTF without needing `-f transcript`.
 
 ## GTF output
 

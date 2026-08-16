@@ -1,6 +1,6 @@
 # 表达式筛选
 
-gffsub 通过 `-I` / `--include-expr`（保留匹配记录）和 `-E` / `--exclude-expr`（丢弃匹配记录）支持按字段值、数值比较和属性匹配筛选记录。
+gffsub 通过 `-I` / `--include-expr`（保留匹配记录）和 `-E` / `--exclude-expr`（丢弃匹配记录）按字段值、数值比较和属性匹配筛选记录。
 
 ## 语法
 
@@ -88,7 +88,7 @@ GTF 输入：`gene_id`、`transcript_id`、`ID`、`Parent` 从解析器合成的
 - `==`、`~`、`<`、`<=`、`>`、`>=` 不匹配（`-I` 排除该记录）。
 - `!=` 和 `!~` 匹配（`-I` 保留该记录）。
 
-即 `-I 'attr.biotype != "lncRNA"'` 会保留没有 `biotype` 属性的记录，将缺失视为"不等于"。
+即 `-I 'attr.biotype != "lncRNA"'` 保留没有 `biotype` 属性的记录，将缺失视为"不等于"。
 
 ## 按长度筛选示例
 
