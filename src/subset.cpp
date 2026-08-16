@@ -6,6 +6,26 @@
 
 namespace gffsub {
 
+// Parse comma-separated list with optional ^ prefix for exclusion mode.
+// e.g. "exon,CDS" -> {"exon","CDS"}, exclude=false
+//      "^gene" -> {"gene"}, exclude=true
+static std::unordered_set<std::string> parse_list(std::string_view sv, bool& exclude) {
+    exclude = false;
+    if (!sv.empty() && sv.front() == '^') {
+        exclude = true;
+        sv.remove_prefix(1);
+    }
+    std::unordered_set<std::string> result;
+    size_t pos = 0;
+    while (pos < sv.size()) {
+        auto comma = sv.find(',', pos);
+        if (comma == std::string_view::npos) comma = sv.size();
+        if (comma > pos) result.emplace(sv.substr(pos, comma - pos));
+        pos = comma + 1;
+    }
+    return result;
+}
+
 void subset(GffData& data, const SubsetParams& params) {
     if (params.region) {
         filter_by_region(data, *params.region);
@@ -17,24 +37,14 @@ void subset(GffData& data, const SubsetParams& params) {
 
     if (!params.seqid_filter.empty()) {
         bool seqid_exclude = false;
-        std::string_view sv = params.seqid_filter;
-        if (!sv.empty() && sv.front() == '^') {
-            seqid_exclude = true;
-            sv.remove_prefix(1);
-        }
-        std::unordered_set<std::string> seqids;
-        size_t pos = 0;
-        while (pos < sv.size()) {
-            auto comma = sv.find(',', pos);
-            if (comma == std::string_view::npos) comma = sv.size();
-            if (comma > pos) seqids.emplace(sv.substr(pos, comma - pos));
-            pos = comma + 1;
-        }
+        auto seqids = parse_list(params.seqid_filter, seqid_exclude);
         filter_by_seqid(data, seqids, seqid_exclude);
     }
 
     if (!params.source_filter.empty()) {
-        filter_by_source(data, params.source_filter);
+        bool source_exclude = false;
+        auto sources = parse_list(params.source_filter, source_exclude);
+        filter_by_source(data, sources, source_exclude);
     }
 
     if (params.score_filter) {
@@ -64,7 +74,9 @@ void subset(GffData& data, const SubsetParams& params) {
     if (params.longest) {
         filter_longest_isoform(data, params.feature, params.threads);
     } else if (!params.feature.empty()) {
-        filter_by_feature(data, params.feature);
+        bool feature_exclude = false;
+        auto features = parse_list(params.feature, feature_exclude);
+        filter_by_feature(data, features, feature_exclude);
     }
 }
 

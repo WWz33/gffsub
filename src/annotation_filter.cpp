@@ -78,9 +78,11 @@ void filter_by_regions_from_file(GffData& data, const std::string& bed_file) {
     }
 }
 
-void filter_by_feature(GffData& data, std::string_view feature_type) {
+void filter_by_feature(GffData& data, const std::unordered_set<std::string>& feature_types, bool exclude) {
     for (auto& rec : data) {
-        if (rec.kept && rec.type != feature_type) {
+        if (!rec.kept) continue;
+        bool found = feature_types.count(rec.type) > 0;
+        if (exclude ? found : !found) {
             rec.kept = false;
         }
     }
@@ -96,9 +98,11 @@ void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqid
     }
 }
 
-void filter_by_source(GffData& data, std::string_view source) {
+void filter_by_source(GffData& data, const std::unordered_set<std::string>& sources, bool exclude) {
     for (auto& rec : data) {
-        if (rec.kept && rec.source != source) {
+        if (!rec.kept) continue;
+        bool found = sources.count(rec.source) > 0;
+        if (exclude ? found : !found) {
             rec.kept = false;
         }
     }

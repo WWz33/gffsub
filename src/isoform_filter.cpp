@@ -22,12 +22,24 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
         isoform_type = has_mrna ? "mRNA" : (has_transcript ? "transcript" : "mRNA");
     }
 
-    // Build gene -> [isoform indices] index once
+    // Build gene -> [isoform indices] index once.
+    // Use parse_attributes to get ALL Parent values so a multi-parent isoform
+    // (Parent=geneA,geneB) is registered under every gene it belongs to.
     std::unordered_map<std::string, std::vector<int>> gene_to_isoforms;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
-        if (rec.type == isoform_type && rec.parent_id) {
+        if (rec.type != isoform_type) continue;
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto parent_it = attrs.find("Parent");
+        if (parent_it != attrs.end()) {
+            for (const auto& parent_id : parent_it->second) {
+                auto& vec = gene_to_isoforms[parent_id];
+                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                    vec.push_back(i);
+                }
+            }
+        } else if (rec.parent_id) {
             gene_to_isoforms[*rec.parent_id].push_back(i);
         }
     }
@@ -71,8 +83,13 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
             // Find isoforms for this gene using index
             auto isoform_it = gene_to_isoforms.find(*gene.id);
             if (isoform_it == gene_to_isoforms.end()) {
-                // gene with no isoform children is dropped
-                data.records[gene_idx].kept = false;
+                // gene with no isoform children: keep only if it has any
+                // non-isoform children (e.g. TF_binding_site). A gene with
+                // no children at all is dropped.
+                auto child_it = isoform_to_children.find(*gene.id);
+                if (child_it == isoform_to_children.end()) {
+                    data.records[gene_idx].kept = false;
+                }
                 continue;
             }
             if (isoform_it->second.size() <= 1) continue;
@@ -198,7 +215,8 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
     }
 
     if (!feature_type.empty()) {
-        filter_by_feature(data, feature_type);
+        std::unordered_set<std::string> types{std::string(feature_type)};
+        filter_by_feature(data, types, false);
     }
 }
 

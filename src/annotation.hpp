@@ -25,6 +25,7 @@ public:
     // All lines sharing an ID (GFF3 discontinuous features, e.g. multi-line CDS).
     std::vector<GffRecord> find_all_by_id(std::string_view id) const;
     std::optional<GffRecord> find_gene(std::string_view id) const;
+    std::vector<GffRecord> find_all_genes(std::string_view id) const;
     std::vector<GffRecord> parents_of(std::string_view id) const;
     std::vector<GffRecord> children_of(std::string_view parent_id) const;
     std::vector<GffRecord> descendants_of(std::string_view parent_id) const;

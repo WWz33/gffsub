@@ -15,7 +15,8 @@ void print_gff3(std::ostream& out, const GffData& data) {
         const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
         // GTF attr_raw is `key "value";` which is invalid GFF3 column 9;
         // rewrite it as tag=value with synthesized ID=/Parent=.
-        const std::string& col9 = (rec.src_fmt == InputFormat::GTF) ? gtf_attrs_to_gff3(rec) : rec.attr_raw;
+        const std::string& raw_col9 = (rec.src_fmt == InputFormat::GTF) ? gtf_attrs_to_gff3(rec) : rec.attr_raw;
+        const std::string& col9 = raw_col9.empty() ? std::string{"."} : raw_col9;
         out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << col9 << '\n';

@@ -102,10 +102,13 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
     }
 
     if (!params.name.empty()) {
-        const auto rec = index.find_gene(params.name);
-        if (rec) {
-            add_match(*rec, params.name, infer_gene_match_key(index, params.name, *rec));
-        } else if (result.emit_summary) {
+        const auto genes = index.find_all_genes(params.name);
+        bool matched = false;
+        for (const auto& rec : genes) {
+            matched = true;
+            add_match(rec, params.name, infer_gene_match_key(index, params.name, rec));
+        }
+        if (!matched && result.emit_summary) {
             auto row = make_not_found_row(params.name, "name");
             row.attrs.assign(params.output_attrs.size(), "");
             result.summary_rows.push_back(std::move(row));

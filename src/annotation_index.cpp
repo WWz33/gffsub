@@ -137,6 +137,18 @@ std::optional<GffRecord> AnnotationIndex::find_gene(std::string_view id) const {
     return data_.records[it->second.front()];
 }
 
+std::vector<GffRecord> AnnotationIndex::find_all_genes(std::string_view id) const {
+    std::vector<GffRecord> result;
+    const auto it = gene_lookup_.find(std::string{id});
+    if (it == gene_lookup_.end()) {
+        return result;
+    }
+    for (int idx : it->second) {
+        result.push_back(data_.records[idx]);
+    }
+    return result;
+}
+
 std::vector<GffRecord> AnnotationIndex::parents_of(std::string_view id) const {
     std::vector<GffRecord> parents;
     const auto it = parents_by_child_id_.find(std::string{id});
