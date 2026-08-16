@@ -8,7 +8,17 @@
 namespace gffsub {
 
 GffData window(const AnnotationIndex& index, const WindowParams& params) {
-    auto target = index.find_by_id(params.id);
+    // For discontinuous features (multi-line CDS sharing one ID), compute the
+    // span across all segments so the window covers the whole feature.
+    std::optional<GffRecord> target;
+    auto all_segments = index.find_all_by_id(params.id);
+    if (!all_segments.empty()) {
+        target = all_segments[0];
+        for (const auto& seg : all_segments) {
+            if (seg.start < target->start) target->start = seg.start;
+            if (seg.end > target->end) target->end = seg.end;
+        }
+    }
     if (!target) {
         target = index.find_gene(params.id);
     }

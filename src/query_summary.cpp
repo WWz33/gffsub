@@ -160,6 +160,20 @@ std::vector<std::string> extract_output_attrs(const GffRecord& rec,
 void print_summary_tsv(std::ostream& out,
                        const std::vector<SummaryRow>& rows,
                        const std::vector<std::string>& output_attrs) {
+    // TSV values cannot contain literal tabs/newlines/CR; replace them with
+    // C-style escapes so decoded attribute values (e.g. %09 -> tab) don't
+    // break column structure.
+    auto tsv_escape = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (char ch : s) {
+            if (ch == '\t') out += "\\t";
+            else if (ch == '\n') out += "\\n";
+            else if (ch == '\r') out += "\\r";
+            else out.push_back(ch);
+        }
+        return out;
+    };
     out << "query_id\tmatched_id\tmatched_by\tseqid\tstart\tend\tstrand\ttype\tparent_id\t"
         << "child_count\ttranscript_count\texon_count\tcds_length\tstatus";
     for (const auto& key : output_attrs) {
@@ -167,15 +181,15 @@ void print_summary_tsv(std::ostream& out,
     }
     out << '\n';
     for (const auto& row : rows) {
-        out << row.query_id << '\t'
-            << row.matched_id << '\t'
-            << row.matched_by << '\t'
-            << row.seqid << '\t'
+        out << tsv_escape(row.query_id) << '\t'
+            << tsv_escape(row.matched_id) << '\t'
+            << tsv_escape(row.matched_by) << '\t'
+            << tsv_escape(row.seqid) << '\t'
             << row.start << '\t'
             << row.end << '\t'
             << row.strand << '\t'
-            << row.type << '\t'
-            << row.parent_id << '\t'
+            << tsv_escape(row.type) << '\t'
+            << tsv_escape(row.parent_id) << '\t'
             << row.child_count << '\t'
             << row.transcript_count << '\t'
             << row.exon_count << '\t'
@@ -184,7 +198,7 @@ void print_summary_tsv(std::ostream& out,
         for (size_t i = 0; i < output_attrs.size(); ++i) {
             out << '\t';
             if (i < row.attrs.size()) {
-                out << row.attrs[i];
+                out << tsv_escape(row.attrs[i]);
             }
         }
         out << '\n';
