@@ -9,7 +9,14 @@
 namespace gffsub {
 
 void print_gff3(std::ostream& out, const GffData& data) {
-    out << "##gff-version 3\n";
+    // Emit captured ## directives; if none, fall back to a default header.
+    if (!data.directives.empty()) {
+        for (const auto& d : data.directives) {
+            out << d << '\n';
+        }
+    } else {
+        out << "##gff-version 3\n";
+    }
     for (const auto& rec : data) {
         if (!rec.kept) continue;
         const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
@@ -27,12 +34,16 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
     // GTF2.2: gene_id required on every line. transcript_id only on non-gene features.
     // Escape quotes and backslashes in values (GTF attributes are quoted strings).
     auto gtf_escape = [](const std::string& s) {
+        // GTF2.2 / GFF2: escape quotes, backslashes, and control chars
+        // using C-style backslash-escaped representation.
         std::string out;
         out.reserve(s.size());
         for (const char ch : s) {
-            if (ch == '"' || ch == '\\') {
-                out.push_back('\\');
-            }
+            if (ch == '"') { out += "\\\""; continue; }
+            if (ch == '\\') { out += "\\\\"; continue; }
+            if (ch == '\n') { out += "\\n"; continue; }
+            if (ch == '\t') { out += "\\t"; continue; }
+            if (ch == '\r') { out += "\\r"; continue; }
             out.push_back(ch);
         }
         return out;

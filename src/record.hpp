@@ -37,6 +37,7 @@ struct GffRecord {
 class GffData {
 public:
     std::vector<GffRecord> records;
+    std::vector<std::string> directives;
 
     void append(const GffRecord& rec) { records.push_back(rec); }
     void append(GffRecord&& rec) { records.push_back(std::move(rec)); }
@@ -45,7 +46,7 @@ public:
     auto end() { return records.end(); }
     auto begin() const { return records.begin(); }
     auto end() const { return records.end(); }
-    void clear() { records.clear(); }
+    void clear() { records.clear(); directives.clear(); }
     void reserve(size_t n) { records.reserve(n); }
 };
 

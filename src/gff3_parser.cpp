@@ -126,7 +126,15 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
 
         if (line.rfind("##FASTA", 0) == 0) { in_fasta = true; continue; }
-        if (line.empty() || line[0] == '#') continue;
+        if (line.empty()) continue;
+        if (line[0] == '#') {
+            // Capture ## directives (##gff-version, ##sequence-region, etc.)
+            // for re-emission on output. Single-line # comments are skipped.
+            if (line.size() > 1 && line[1] == '#') {
+                data.directives.push_back(line);
+            }
+            continue;
+        }
 
         GffRecord rec;
         rec.line_idx = static_cast<int>(data.size());
