@@ -68,6 +68,14 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
     } else {
         out << "##gtf-version 2\n";
     }
+    // Preserve ## directives from input (##sequence-region, ##species, etc.)
+    // but skip ##gff-version / ##gtf-version — the header line above already
+    // declares the output format version.
+    for (const auto& d : data.directives) {
+        if (d.rfind("##gff-version", 0) == 0) continue;
+        if (d.rfind("##gtf-version", 0) == 0) continue;
+        out << d << '\n';
+    }
 
     // Build mappings from ALL records (not just kept) so parent mRNAs
     // filtered out by subset still resolve gene_id for surviving children.
