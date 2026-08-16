@@ -269,14 +269,74 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
     return 0;
 }
 
-InputFormat infer_input_format(const std::string& path) {
-    const auto dot = path.rfind('.');
-    if (dot != std::string::npos) {
-        const auto ext = path.substr(dot + 1);
-        if (ext == "gtf" || ext == "GTF") return InputFormat::GTF;
-        if (ext == "bed" || ext == "BED") return InputFormat::BED;
+namespace {
+
+// Detect the input format by sniffing the first non-comment feature line.
+// Heuristics mirror AGAT's select_gff_format: column-9 character shape wins
+// over the filename extension, so a GFF3 file renamed .gtf is still parsed as
+// GFF3.
+//
+//   GFF3: >=8 cols, col9 contains both '=' and ';'
+//   GTF:  >=8 cols, col9 contains '"' (quoted attribute values)
+//   BED:  3..12 cols, no col9, cols[1] and cols[2] are integers
+//   default: GFF3
+InputFormat sniff_format(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open()) return InputFormat::GFF3;
+    // On non-seekable input (FIFO/pipe) reading here would consume bytes the
+    // later parse_file() re-open cannot recover; fall back to GFF3, the
+    // project's primary format.
+    {
+        const auto pos = f.tellg();
+        f.seekg(0, std::ios::end);
+        if (!f) return InputFormat::GFF3;
+        f.seekg(pos);
+    }
+    std::string line;
+    while (std::getline(f, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind("##FASTA", 0) == 0) break;
+
+        const auto cols = split_line(line, '\t');
+        if (cols.size() >= 9) {
+            const auto& a = cols[8];
+            if (a.find('=') != std::string::npos &&
+                a.find(';') != std::string::npos) {
+                return InputFormat::GFF3;
+            }
+            if (a.find('"') != std::string::npos) {
+                return InputFormat::GTF;
+            }
+            // Col9 present but neither GFF3 nor GTF shape; fall back to GFF3
+            // (lenient) rather than guessing BED from a 9-column line.
+            return InputFormat::GFF3;
+        }
+        if (cols.size() >= 3 && cols.size() <= 12) {
+            // Tentative BED: require integer start/end.
+            const auto is_int = [](const std::string& s) {
+                if (s.empty()) return false;
+                size_t pos = 0;
+                try {
+                    std::stoll(s, &pos);
+                } catch (...) {
+                    return false;
+                }
+                return pos == s.size();
+            };
+            if (is_int(cols[1]) && is_int(cols[2])) {
+                return InputFormat::BED;
+            }
+        }
+        // Not a recognizable feature line; keep scanning.
     }
     return InputFormat::GFF3;
+}
+
+}  // namespace
+
+InputFormat infer_input_format(const std::string& path) {
+    return sniff_format(path);
 }
 
 }  // namespace gffsub
