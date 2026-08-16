@@ -33,7 +33,7 @@ struct SubsetParams {
 
 // Apply region, bed, seqid, source, score, strand, phase, grep, expr, and
 // feature filters in sequence. Modifies data in place.
-void subset(GffData& data, IdIndex& idx, const SubsetParams& params);
+void subset(GffData& data, const SubsetParams& params);
 
 }  // namespace gffsub
 

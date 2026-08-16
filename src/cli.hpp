@@ -74,7 +74,6 @@ struct CliArgs {
 std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_requested);
 
 // Helpers used by cli and main
-InputFormat infer_input_format(const std::string& path);
 AnnotationIndex load_index(const std::string& path);
 std::vector<std::string> split_attr_keys_cli(std::string_view keys);
 

@@ -7,7 +7,6 @@
 #include "record.hpp"
 #include "region.hpp"
 
-#include <iostream>
 #include <optional>
 #include <string>
 #include <utility>

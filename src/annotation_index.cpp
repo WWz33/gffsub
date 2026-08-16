@@ -13,10 +13,17 @@
 
 namespace gffsub {
 
+AnnotationIndex AnnotationIndex::from_file(const std::string& path) {
+    GffData data;
+    if (parse_file(path, data, infer_input_format(path)) != 0) {
+        throw std::runtime_error("cannot parse file: " + path);
+    }
+    return AnnotationIndex{std::move(data)};
+}
+
 AnnotationIndex AnnotationIndex::from_gff3(const std::string& path) {
     GffData data;
-    IdIndex idx;
-    if (parse_file(path, data, idx, InputFormat::GFF3) != 0) {
+    if (parse_file(path, data, InputFormat::GFF3) != 0) {
         throw std::runtime_error("cannot parse GFF3 file: " + path);
     }
     return AnnotationIndex{std::move(data)};

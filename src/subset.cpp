@@ -6,7 +6,7 @@
 
 namespace gffsub {
 
-void subset(GffData& data, IdIndex& idx, const SubsetParams& params) {
+void subset(GffData& data, const SubsetParams& params) {
     if (params.region) {
         filter_by_region(data, *params.region);
     }
@@ -62,7 +62,7 @@ void subset(GffData& data, IdIndex& idx, const SubsetParams& params) {
     }
 
     if (params.longest) {
-        filter_longest_isoform(data, idx, params.feature, params.threads);
+        filter_longest_isoform(data, params.feature, params.threads);
     } else if (!params.feature.empty()) {
         filter_by_feature(data, params.feature);
     }

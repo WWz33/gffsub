@@ -17,6 +17,7 @@ struct GeneModel {
 
 class AnnotationIndex {
 public:
+    static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
     static AnnotationIndex from_data(GffData data);
 

@@ -1,6 +1,6 @@
 # Library API
 
-`libgffsub_core.a` exposes the same functionality the `gffsub` binary uses. Link it from C++17 code to subset, query, or convert GFF3/GTF annotations without shelling out.
+`libgffsub_core.a` exposes the same functionality the `gffsub` binary uses. Link it from C++17 code to subset, query, or convert GFF3/GTF annotations in-process.
 
 ## Linking
 
@@ -40,26 +40,20 @@ public:
     void clear();
     void reserve(size_t n);
 };
-
-class IdIndex {
-public:
-    std::unordered_map<std::string, std::vector<int>> index;
-    void add(const std::string& id, int idx);
-    std::optional<int> lookup(const std::string& id) const;
-};
 ```
 
-`GffData` holds records in input order. `IdIndex` maps feature IDs to record indices (one ID can map to several indices for discontinuous features).
+`GffData` holds records in input order.
 
 ## Parsing
 
 ```cpp
 // src/parser.hpp
-int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFormat format);
+int parse_file(const std::string& filename, GffData& data, InputFormat format);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
+InputFormat infer_input_format(const std::string& path);
 ```
 
-`parse_file` reads a GFF3, GTF, or BED file, populates `data` and `idx`, and returns the record count. `InputFormat::GFF3` treats anything not ending in `.gtf`/`.bed` as GFF3, matching the CLI's extension-based detection. `parse_attributes` splits a GFF3 column-9 string into key to list-of-values, URL-decoding each value. Comma is the value-list separator (GFF3 spec), `%2C` decodes to a literal comma.
+`parse_file` reads a GFF3, GTF, or BED file, populates `data`, returns 0 on success or -1 on open failure. `infer_input_format` maps `.gtf`/`.GTF` to GTF, `.bed`/`.BED` to BED, everything else to GFF3. `parse_attributes` splits a GFF3 column-9 string into key to list-of-values, URL-decoding each value. Comma is the value-list separator (GFF3 spec), `%2C` decodes to a literal comma.
 
 ## AnnotationIndex
 
@@ -67,6 +61,7 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
 // src/annotation.hpp
 class AnnotationIndex {
 public:
+    static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
     static AnnotationIndex from_data(GffData data);
 
@@ -88,7 +83,9 @@ struct GeneModel {
 };
 ```
 
-`from_gff3` parses the file and builds the index. `from_data` takes an already-parsed `GffData`. The index stores ID to record, parent/child links, gene-name lookup keys (ID, gene_id, Name, locus_tag, Alias, Dbxref), and attribute indices.
+> **Migration (IdIndex removed).** The standalone `IdIndex` class and the `IdIndex&` parameter of `parse_file` are gone. The ID-to-record index is now built inside `AnnotationIndex`. Replace `parse_file(path, data, idx, fmt)` with `parse_file(path, data, fmt)`, and `idx.lookup(id)` with `AnnotationIndex::from_data(std::move(data)).find_by_id(id)`.
+
+`from_file` infers format from the extension (`.gtf` -> GTF, `.bed` -> BED, else GFF3) and builds the index. `from_gff3` forces GFF3 parsing. `from_data` takes an already-parsed `GffData`. The index stores ID to record, parent/child links, gene-name lookup keys (ID, gene_id, Name, locus_tag, Alias, Dbxref), and attribute indices.
 
 `find_gene` searches gene-type records by any of the naming keys. `gene_model` returns the gene plus all transcripts and their children. `find_all_by_id` returns every line sharing an ID (multi-line CDS, discontinuous features).
 
@@ -160,7 +157,7 @@ struct SubsetParams {
     bool invert_grep = false;
 };
 
-void subset(GffData& data, IdIndex& idx, const SubsetParams& params);
+void subset(GffData& data, const SubsetParams& params);
 ```
 
 Applies region, BED, seqid, source, score, strand, phase, grep, expr, and feature filters in sequence. Modifies `data` in place. `longest` selects one isoform per gene (see [Longest Isoform Selection](longest-isoform.md)). `threads` parallelizes longest selection across chromosomes.
@@ -176,7 +173,7 @@ void filter_by_source(GffData& data, std::string_view source);
 void filter_by_score(GffData& data, std::optional<double> score);
 void filter_by_strand(GffData& data, char strand);
 void filter_by_phase(GffData& data, char phase);
-void filter_longest_isoform(GffData& data, IdIndex& idx, std::string_view feature_type, size_t num_threads = 1);
+void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t num_threads = 1);
 
 void filter_by_grep(GffData& data, const std::vector<GrepFilter>& filters, bool invert);
 void filter_by_expr(GffData& data, const std::vector<ExprNode>& filters, bool include);
@@ -308,14 +305,13 @@ Subset by region then keep longest isoform:
 
 int main() {
     gffsub::GffData data;
-    gffsub::IdIndex idx;
-    gffsub::parse_file("ann.gff3", data, idx, gffsub::InputFormat::GFF3);
+    gffsub::parse_file("ann.gff3", data, gffsub::InputFormat::GFF3);
 
     gffsub::SubsetParams sp;
     sp.region = gffsub::parse_region("chr1:1-1000000").value();
     sp.longest = true;
     sp.threads = 4;
-    gffsub::subset(data, idx, sp);
+    gffsub::subset(data, sp);
 
     gffsub::print_gff3(std::cout, data);
     return 0;

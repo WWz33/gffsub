@@ -1,7 +1,7 @@
 #ifndef GFFSUB_GTF_PARSER_HPP
 #define GFFSUB_GTF_PARSER_HPP
 
-#include "annotation.hpp"
+#include "record.hpp"
 
 #include <optional>
 #include <string>

@@ -7,7 +7,7 @@
 
 namespace gffsub {
 
-void filter_longest_isoform(GffData& data, IdIndex& /*idx*/, std::string_view feature_type, size_t num_threads) {
+void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t num_threads) {
     std::string isoform_type{feature_type};
     if (isoform_type.empty()) {
         // Auto-detect: GFF3 uses "mRNA", GTF uses "transcript".

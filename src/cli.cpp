@@ -73,23 +73,8 @@ static std::optional<std::optional<double>> parse_score_filter(std::string_view 
     return std::nullopt;
 }
 
-InputFormat infer_input_format(const std::string& path) {
-    const auto dot = path.rfind('.');
-    if (dot != std::string::npos) {
-        const auto ext = path.substr(dot + 1);
-        if (ext == "gtf" || ext == "GTF") return InputFormat::GTF;
-        if (ext == "bed" || ext == "BED") return InputFormat::BED;
-    }
-    return InputFormat::GFF3;
-}
-
 AnnotationIndex load_index(const std::string& path) {
-    GffData data;
-    IdIndex idx;
-    if (parse_file(path, data, idx, infer_input_format(path)) != 0) {
-        throw std::runtime_error("cannot parse file: " + path);
-    }
-    return AnnotationIndex::from_data(std::move(data));
+    return AnnotationIndex::from_file(path);
 }
 
 std::optional<std::vector<std::string>> load_id_list_file(const std::string& path) {

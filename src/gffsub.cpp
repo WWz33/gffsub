@@ -401,9 +401,8 @@ int main(int argc, char* argv[]) {
     // --- main subset path ---
 
     GffData data;
-    IdIndex idx;
     const InputFormat input_fmt = infer_input_format(a.input_file);
-    if (parse_file(a.input_file, data, idx, input_fmt) != 0) {
+    if (parse_file(a.input_file, data, input_fmt) != 0) {
         std::cerr << "Error: cannot parse " << a.input_file << '\n';
         return 1;
     }
@@ -429,7 +428,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    subset(data, idx, build_subset_params(a));
+    subset(data, build_subset_params(a));
 
     // Output
     std::ofstream out_file;

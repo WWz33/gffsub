@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace gffsub {
@@ -40,6 +39,7 @@ public:
     std::vector<GffRecord> records;
 
     void append(const GffRecord& rec) { records.push_back(rec); }
+    void append(GffRecord&& rec) { records.push_back(std::move(rec)); }
     auto size() const { return records.size(); }
     auto begin() { return records.begin(); }
     auto end() { return records.end(); }
@@ -47,25 +47,6 @@ public:
     auto end() const { return records.end(); }
     void clear() { records.clear(); }
     void reserve(size_t n) { records.reserve(n); }
-};
-
-class IdIndex {
-public:
-    std::unordered_map<std::string, std::vector<int>> index;
-
-    void add(const std::string& id, int idx) {
-        index[id].push_back(idx);
-    }
-
-    std::optional<int> lookup(const std::string& id) const {
-        auto it = index.find(id);
-        if (it != index.end() && !it->second.empty()) {
-            return it->second.front();
-        }
-        return std::nullopt;
-    }
-
-    void clear() { index.clear(); }
 };
 
 }  // namespace gffsub
