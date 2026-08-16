@@ -79,6 +79,7 @@ gffsub query|window <input.gff3> [options]
 - [输出格式](docs/output-formats.md)
 - [摘要输出](docs/summary-output.md)
 - [GTF 输入处理](docs/gtf-input.md)
+- [库 API](docs/library-api.md)
 
 ## License
 

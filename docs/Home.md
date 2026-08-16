@@ -27,3 +27,7 @@ Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene m
 ## Input
 
 - [GTF Input Handling](gtf-input.md): GTF attribute parsing, Parent/ID synthesis, isoform auto-detection
+
+## Library
+
+- [Library API](library-api.md): link `libgffsub_core.a` and call `query()`, `window()`, `subset()` from C++17

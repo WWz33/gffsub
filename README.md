@@ -80,6 +80,7 @@ Full guides in [`docs/`](docs/Home.md):
 - [Output Formats](docs/output-formats.md)
 - [Summary Output](docs/summary-output.md)
 - [GTF Input Handling](docs/gtf-input.md)
+- [Library API](docs/library-api.md)
 
 ## License
 
