@@ -92,9 +92,29 @@ static std::vector<std::string> split_line(const std::string& line, char delimit
     return cols;
 }
 
-int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFormat format) {
+int parse_file(const std::string& filename, GffData& data, InputFormat format) {
     std::ifstream file(filename);
     if (!file.is_open()) return -1;
+
+    // Reserve records capacity from file size to avoid ~20 reallocations
+    // when pushing 1M+ records. Average GFF3 line is ~130 bytes. Only run
+    // the seek optimization on seekable regular files; on a FIFO/pipe the
+    // seeks fail and would leave failbit set, silently zeroing the output.
+    {
+        const auto pos = file.tellg();
+        file.seekg(0, std::ios::end);
+        const auto end = file.tellg();
+        if (file && end > pos) {
+            // Cap to avoid bad_alloc on sparse / comment-heavy files where the
+            // byte/record ratio is far lower than 130.
+            size_t hint = static_cast<size_t>(end - pos) / 130;
+            if (hint > 1u << 20) hint = 1u << 20;
+            data.reserve(hint);
+            file.seekg(pos);  // restore (only valid when seeks succeeded)
+        } else {
+            file.clear();  // non-seekable input (FIFO/pipe): drop failbit, stay at pos 0
+        }
+    }
 
     std::string line;
     bool in_fasta = false;
@@ -118,9 +138,9 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
             if (cols.size() < 9) continue;
 
             try {
-                rec.seqid = cols[0];
-                rec.source = cols[1];
-                rec.type = cols[2];
+                rec.seqid = std::move(cols[0]);
+                rec.source = std::move(cols[1]);
+                rec.type = std::move(cols[2]);
                 {
                     // GFF3 requires positive integer coordinates, start <= end;
                     // reject trailing garbage. Invalid lines are skipped.
@@ -144,12 +164,20 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
                 }
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
-                rec.attr_raw = cols[8];
+                rec.attr_raw = std::move(cols[8]);
 
-                rec.id = extract_attr_value(cols[8], "ID");
-                rec.parent_id = extract_attr_value(cols[8], "Parent");
-                rec.gene_id = extract_attr_value(cols[8], "gene_id");
-                rec.transcript_id = extract_attr_value(cols[8], "transcript_id");
+                // Extract ID and Parent from col9. gene_id and transcript_id
+                // are GTF conventions but also appear in some GFF3 files, so
+                // they are only scanned when the key is present in col9 (quick
+                // substring check avoids a full col9 walk when absent).
+                rec.id = extract_attr_value(rec.attr_raw, "ID");
+                rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");
+                if (rec.attr_raw.find("gene_id=") != std::string::npos) {
+                    rec.gene_id = extract_attr_value(rec.attr_raw, "gene_id");
+                }
+                if (rec.attr_raw.find("transcript_id=") != std::string::npos) {
+                    rec.transcript_id = extract_attr_value(rec.attr_raw, "transcript_id");
+                }
                 // Multi-parent Parent=tx1,tx2: extract_attr_value already keeps
                 // only the first raw comma part; the index builds the full list
                 // from parse_attributes.
@@ -235,14 +263,20 @@ int parse_file(const std::string& filename, GffData& data, IdIndex& idx, InputFo
             }
         }
 
-        if (rec.id) {
-            idx.add(*rec.id, rec.line_idx);
-        }
-
-        data.append(rec);
+        data.append(std::move(rec));
     }
 
     return 0;
+}
+
+InputFormat infer_input_format(const std::string& path) {
+    const auto dot = path.rfind('.');
+    if (dot != std::string::npos) {
+        const auto ext = path.substr(dot + 1);
+        if (ext == "gtf" || ext == "GTF") return InputFormat::GTF;
+        if (ext == "bed" || ext == "BED") return InputFormat::BED;
+    }
+    return InputFormat::GFF3;
 }
 
 }  // namespace gffsub
