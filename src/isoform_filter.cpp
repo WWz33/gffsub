@@ -19,9 +19,7 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
             if (rec.type == "mRNA") has_mrna = true;
             else if (rec.type == "transcript") has_transcript = true;
         }
-        if (has_mrna) {
-            isoform_type = "mRNA";
-        } else if (has_transcript) {
+        if (!has_mrna && has_transcript) {
             isoform_type = "transcript";
         } else {
             isoform_type = "mRNA";
