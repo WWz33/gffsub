@@ -1,4 +1,5 @@
 #include "cli_usage.hpp"
+#include "version.hpp"
 
 #include <iostream>
 
@@ -7,7 +8,7 @@ namespace gffsub {
 void usage(const char* prog) {
     std::cerr
         << "Program: gffsub (subset GFF3/GTF annotations)\n"
-        << "Version: 0.1\n"
+        << "Version: " << kVersion << "\n"
         << "\n"
         << "Usage:   " << prog << " <input.gff3> [options]\n"
         << "         " << prog << " query|window <input.gff3> [options]\n"
@@ -53,6 +54,7 @@ void usage(const char* prog) {
         << "  -t, --format FMT             gff3|gtf|gtf2|gtf3|bed [gff3]\n"
         << "  -o, --output FILE            write to FILE [stdout]\n"
         << "  -h, --help                   show this help\n"
+        << "  --version                    print version and exit\n"
         << "\n"
         << "Aliases: --id-list=--ids  --attr=--where  --include-children=-C\n"
         << "         --include-parents=--parents  --gene-model=--model\n"

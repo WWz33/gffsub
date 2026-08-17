@@ -4,6 +4,7 @@
 #include "record.hpp"
 #include "region.hpp"
 #include "gtf_parser.hpp"
+#include "string_utils.hpp"
 #include <fstream>
 
 namespace gffsub {
@@ -75,22 +76,6 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
         }
     }
     return std::nullopt;
-}
-
-static std::vector<std::string> split_line(const std::string& line, char delimiter) {
-    std::vector<std::string> cols;
-    cols.reserve(delimiter == '\t' ? 9 : 4);
-    size_t start = 0;
-    while (true) {
-        auto pos = line.find(delimiter, start);
-        if (pos == std::string::npos) {
-            cols.emplace_back(line.substr(start));
-            break;
-        }
-        cols.emplace_back(line.substr(start, pos - start));
-        start = pos + 1;
-    }
-    return cols;
 }
 
 int parse_file(const std::string& filename, GffData& data, InputFormat format) {

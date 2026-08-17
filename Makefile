@@ -7,6 +7,7 @@ TARGET = gffsub
 LIB = libgffsub_core.a
 
 LIB_SRCS = src/feature_types.cpp \
+       src/string_utils.cpp \
        src/selector_filter.cpp \
        src/gtf_parser.cpp \
        src/query_summary.cpp \
@@ -42,7 +43,9 @@ HDRS = src/annotation.hpp \
        src/record.hpp \
        src/region.hpp \
        src/selector_filter.hpp \
+       src/string_utils.hpp \
        src/subset.hpp \
+       src/version.hpp \
        src/window.hpp
 
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)
@@ -68,20 +71,20 @@ $(TARGET): $(CLI_OBJS) $(LIB)
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp
+$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp
 
-$(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp
+$(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp
 
-$(CLI_SELECTOR_SMOKE): tests/cli_selector_smoke.cpp
+$(CLI_SELECTOR_SMOKE): tests/cli_selector_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_selector_smoke.cpp
 
-$(REGRESSION_SMOKE): tests/regression_smoke.cpp
+$(REGRESSION_SMOKE): tests/regression_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/regression_smoke.cpp
 
-$(FEATURE_TYPES_SMOKE): tests/feature_types_smoke.cpp src/feature_types.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/feature_types_smoke.cpp src/feature_types.cpp
+$(FEATURE_TYPES_SMOKE): tests/feature_types_smoke.cpp src/feature_types.cpp src/string_utils.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/feature_types_smoke.cpp src/feature_types.cpp src/string_utils.cpp
 
 clean:
 	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE)

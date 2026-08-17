@@ -9,64 +9,14 @@
 #include <sstream>
 #include <string>
 
-// ---------------------------------------------------------------------------
-// Helpers (copied from cli_selector_smoke.cpp to stay self-contained)
-// ---------------------------------------------------------------------------
+#include "test_utils.hpp"
 
-static std::string read_file(const std::string& path) {
-    std::ifstream in{path};
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    return buffer.str();
-}
-
-static int run_command(const std::string& command) {
-    const int status = std::system(command.c_str());
-    if (status != 0) {
-        std::cerr << "command failed: " << command << '\n';
-    }
-    return status;
-}
-
-// Expect a command to FAIL (non-zero exit). Returns 0 on success of the
-// expectation, 1 if the command unexpectedly succeeded.
-static int expect_command_failure(const std::string& command) {
-    const int status = std::system(command.c_str());
-    if (status == 0) {
-        std::cerr << "command unexpectedly succeeded: " << command << '\n';
-        return 1;
-    }
-    return 0;
-}
-
-static int require_contains(const std::string& path, const std::string& needle) {
-    const auto text = read_file(path);
-    if (text.find(needle) == std::string::npos) {
-        std::cerr << "missing '" << needle << "' in " << path << '\n';
-        return 1;
-    }
-    return 0;
-}
-
-static int require_not_contains(const std::string& path, const std::string& needle) {
-    const auto text = read_file(path);
-    if (text.find(needle) != std::string::npos) {
-        std::cerr << "unexpected '" << needle << "' in " << path << '\n';
-        return 1;
-    }
-    return 0;
-}
-
-static int require_exit_one_with_error(const std::string& command,
-                                       const std::string& err_path,
-                                       const std::string& message) {
-    if (expect_command_failure(command) != 0 ||
-        require_contains(err_path, "Error:") != 0 ||
-        require_contains(err_path, message) != 0) {
-        return 1;
-    }
-    return 0;
-}
+using test_utils::expect_command_failure;
+using test_utils::read_file;
+using test_utils::require_contains;
+using test_utils::require_exit_one_with_error;
+using test_utils::require_not_contains;
+using test_utils::run_command;
 
 // ---------------------------------------------------------------------------
 // Fixture writers

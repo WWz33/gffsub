@@ -13,7 +13,11 @@
 ```bash
 git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
+```
 
+最小 GFF3 示例：
+
+```bash
 printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tgene\t1\t100\t.\t+\t.\tID=GeneA;Name=GeneA' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \

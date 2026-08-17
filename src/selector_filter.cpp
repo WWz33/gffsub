@@ -1,8 +1,8 @@
 #include "selector_filter.hpp"
 #include "gtf_parser.hpp"
 #include "parser.hpp"
+#include "string_utils.hpp"
 
-#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <exception>
@@ -109,13 +109,6 @@ bool is_numeric_filter_field(std::string_view field) {
     return field == "start" || field == "end" || field == "length" || field == "score";
 }
 
-std::string lowercase_copy(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 bool field_matches_grep(const GffRecord& rec, const GrepFilter& filter) {
     const auto value = record_field_value(rec, filter.field);
     if (!value) {
@@ -125,7 +118,7 @@ bool field_matches_grep(const GffRecord& rec, const GrepFilter& filter) {
         return filter.compiled && std::regex_search(*value, *filter.compiled);
     }
     if (filter.ignore_case) {
-        return lowercase_copy(*value).find(lowercase_copy(filter.pattern)) != std::string::npos;
+        return to_lower(*value).find(to_lower(filter.pattern)) != std::string::npos;
     }
     return value->find(filter.pattern) != std::string::npos;
 }
@@ -137,8 +130,8 @@ bool field_matches_expr(const GffRecord& rec, const ExprFilter& filter) {
         // all other operators should not match.
         return filter.op == ExprOp::NotEqual || filter.op == ExprOp::NotRegex;
     }
-    const auto comparable_value = filter.ignore_case ? lowercase_copy(*value) : *value;
-    const auto comparable_filter = filter.ignore_case ? lowercase_copy(filter.value) : filter.value;
+    const auto comparable_value = filter.ignore_case ? to_lower(*value) : std::string(*value);
+    const auto comparable_filter = filter.ignore_case ? to_lower(filter.value) : filter.value;
     switch (filter.op) {
         case ExprOp::Equal:
         case ExprOp::NotEqual: {

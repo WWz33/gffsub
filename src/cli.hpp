@@ -11,6 +11,7 @@
 #include "region.hpp"
 #include "selector_filter.hpp"
 #include "subset.hpp"
+#include "version.hpp"
 #include "window.hpp"
 
 #include <optional>

@@ -13,8 +13,11 @@ Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene m
 ```bash
 git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
+```
 
-# minimal GFF3
+Minimal GFF3:
+
+```bash
 printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tgene\t1\t100\t.\t+\t.\tID=GeneA;Name=GeneA' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \

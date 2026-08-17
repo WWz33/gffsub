@@ -4,6 +4,14 @@
 #include <sstream>
 #include <string>
 
+#include "test_utils.hpp"
+
+using test_utils::compare_files;
+using test_utils::read_file;
+using test_utils::require_contains;
+using test_utils::require_not_contains;
+using test_utils::run_command;
+
 static bool write_test_annotation(const std::string& path) {
     std::ofstream out{path};
     if (!out.is_open()) {
@@ -23,53 +31,6 @@ static bool write_test_annotation(const std::string& path) {
         << "chr2\tother\tmRNA\t300\t380\t.\t+\t.\tID=orphan_tx\n"
         << "chr2\tother\texon\t320\t360\t.\t+\t.\tID=orphan_exon;Parent=orphan_tx\n";
     return true;
-}
-
-static std::string read_file(const std::string& path) {
-    std::ifstream in{path};
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    return buffer.str();
-}
-
-static int run_command(const std::string& command) {
-    const int status = std::system(command.c_str());
-    if (status != 0) {
-        std::cerr << "command failed: " << command << '\n';
-    }
-    return status;
-}
-
-static bool contains(const std::string& text, const std::string& needle) {
-    return text.find(needle) != std::string::npos;
-}
-
-static int require_contains(const std::string& path, const std::string& needle) {
-    const auto text = read_file(path);
-    if (!contains(text, needle)) {
-        std::cerr << "missing '" << needle << "' in " << path << '\n';
-        return 1;
-    }
-    return 0;
-}
-
-static int require_not_contains(const std::string& path, const std::string& needle) {
-    const auto text = read_file(path);
-    if (contains(text, needle)) {
-        std::cerr << "unexpected '" << needle << "' in " << path << '\n';
-        return 1;
-    }
-    return 0;
-}
-
-static int compare_files(const std::string& lhs_path, const std::string& rhs_path) {
-    const auto lhs = read_file(lhs_path);
-    const auto rhs = read_file(rhs_path);
-    if (lhs != rhs) {
-        std::cerr << "output mismatch: " << lhs_path << " vs " << rhs_path << '\n';
-        return 1;
-    }
-    return 0;
 }
 
 static void cleanup_outputs() {

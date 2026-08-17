@@ -162,7 +162,8 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         OPT_INCLUDE_EXPR,
         OPT_EXCLUDE_EXPR,
         OPT_INVERT_MATCH,
-        OPT_IGNORE_CASE
+        OPT_IGNORE_CASE,
+        OPT_VERSION
     };
     static struct option long_options[] = {
         {"id",            required_argument, nullptr, OPT_ID},
@@ -213,6 +214,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"output-format", required_argument, nullptr, 't'},
         {"output",        required_argument, nullptr, 'o'},
         {"help",          no_argument,       nullptr, 'h'},
+        {"version",       no_argument,       nullptr, OPT_VERSION},
         {nullptr,         0,                 nullptr, 0}
     };
 
@@ -376,6 +378,10 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             }
             case 'o': args.output_file = optarg; break;
             case 'h': usage(argv[0]); help_requested = true; return std::nullopt;
+            case OPT_VERSION:
+                std::cout << "gffsub " << kVersion << '\n';
+                help_requested = true;
+                return std::nullopt;
             default: usage(argv[0]); return std::nullopt;
         }
     }

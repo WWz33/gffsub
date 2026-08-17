@@ -1,21 +1,12 @@
 #include "feature_types.hpp"
+#include "string_utils.hpp"
 
-#include <cctype>
 #include <string>
 #include <unordered_set>
 
 namespace gffsub {
 
 namespace {
-
-std::string to_lower(std::string_view sv) {
-    std::string s;
-    s.reserve(sv.size());
-    for (char ch : sv) {
-        s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
-    }
-    return s;
-}
 
 bool ends_with(std::string_view s, std::string_view suffix) {
     return s.size() >= suffix.size() &&
