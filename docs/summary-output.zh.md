@@ -1,5 +1,11 @@
 # 摘要输出
 
+<!-- I18N:START -->
+
+[English](./summary-output.md) | **中文**
+
+<!-- I18N:END -->
+
 ## 概述
 
 gffsub 不输出注释记录，而是输出 selector 命中结果的表格摘要。便于检查 gene 结构细节。

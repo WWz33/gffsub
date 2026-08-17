@@ -1,5 +1,11 @@
 # Summary Output
 
+<!-- I18N:START -->
+
+**English** | [中文](./summary-output.zh.md)
+
+<!-- I18N:END -->
+
 ## Overview
 
 Instead of printing annotation records, gffsub can output a tabular summary of selector hits. Useful for inspecting gene structure details.

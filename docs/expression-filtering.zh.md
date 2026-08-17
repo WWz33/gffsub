@@ -1,5 +1,11 @@
 # 表达式筛选
 
+<!-- I18N:START -->
+
+[English](./expression-filtering.md) | **中文**
+
+<!-- I18N:END -->
+
 gffsub 通过 `-I` / `--include-expr`（保留匹配记录）和 `-E` / `--exclude-expr`（丢弃匹配记录）按字段值、数值比较和属性匹配筛选记录。
 
 ## 语法

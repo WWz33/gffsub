@@ -1,5 +1,11 @@
 # Library API
 
+<!-- I18N:START -->
+
+**English** | [中文](./library-api.zh.md)
+
+<!-- I18N:END -->
+
 `libgffsub_core.a` exposes the same functionality the `gffsub` binary uses. Link it from C++17 code to subset, query, or convert GFF3/GTF annotations in-process.
 
 ## Linking

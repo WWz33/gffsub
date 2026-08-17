@@ -1,5 +1,11 @@
 # Output Formats
 
+<!-- I18N:START -->
+
+**English** | [中文](./output-formats.zh.md)
+
+<!-- I18N:END -->
+
 ## -t / --format flag
 
 Syntax: `-t FMT` or `--format FMT` (alias: `--output-format FMT`)

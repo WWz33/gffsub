@@ -1,5 +1,11 @@
 # Feature ID and Gene Name Lookup
 
+<!-- I18N:START -->
+
+**English** | [中文](./id-name-lookup.zh.md)
+
+<!-- I18N:END -->
+
 ## By ID: --id
 
 Syntax: `--id ID` (repeatable)

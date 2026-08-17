@@ -1,5 +1,11 @@
 # 输出格式
 
+<!-- I18N:START -->
+
+[English](./output-formats.md) | **中文**
+
+<!-- I18N:END -->
+
 ## -t / --format 标志
 
 语法：`-t FMT` 或 `--format FMT`（别名：`--output-format FMT`）

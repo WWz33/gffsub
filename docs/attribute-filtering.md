@@ -1,5 +1,11 @@
 # Attribute Filtering
 
+<!-- I18N:START -->
+
+**English** | [中文](./attribute-filtering.zh.md)
+
+<!-- I18N:END -->
+
 ## --where: exact attribute match
 
 Syntax: `--where KEY=VALUE` (repeatable)

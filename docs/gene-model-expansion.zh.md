@@ -1,5 +1,11 @@
 # Gene Model 展开
 
+<!-- I18N:START -->
+
+[English](./gene-model-expansion.md) | **中文**
+
+<!-- I18N:END -->
+
 gffsub 根据 ID 和 Parent 属性构建父/子索引。三个 flag 沿层级展开选择器命中的记录。
 
 ## 层级

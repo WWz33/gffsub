@@ -1,5 +1,11 @@
 # Window Subcommand
 
+<!-- I18N:START -->
+
+**English** | [中文](./window-subcommand.zh.md)
+
+<!-- I18N:END -->
+
 ## Syntax
 
 ```

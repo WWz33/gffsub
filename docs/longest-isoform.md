@@ -1,5 +1,11 @@
 # Longest Isoform Selection
 
+<!-- I18N:START -->
+
+**English** | [中文](./longest-isoform.zh.md)
+
+<!-- I18N:END -->
+
 ## Overview
 
 The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two isoforms of the chosen type are reduced to the longest. The longest is scored by CDS span when the gene has any CDS, otherwise by exon span. The non-selected isoforms and their child features (exons, CDS) are dropped. Genes with one isoform are left unchanged. Genes with no isoform of the chosen type are dropped.

@@ -1,5 +1,11 @@
 # gffsub Documentation
 
+<!-- I18N:START -->
+
+**English** | [中文](./Home.zh.md)
+
+<!-- I18N:END -->
+
 Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene model.
 
 ## Getting Started

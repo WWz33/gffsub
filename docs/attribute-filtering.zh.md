@@ -1,5 +1,11 @@
 # 属性筛选
 
+<!-- I18N:START -->
+
+[English](./attribute-filtering.md) | **中文**
+
+<!-- I18N:END -->
+
 ## --where：属性精确匹配
 
 语法：`--where KEY=VALUE`（可重复）
@@ -97,4 +103,4 @@ TP53
 | locus_tag | 第 9 列属性 |
 | attr.KEY | 第 9 列属性（任意键） |
 
-参见 [表达式筛选](expression-filtering.md) 了解数值比较、逻辑运算符和复合谓词。
+参见 [表达式筛选](expression-filtering.zh.md) 了解数值比较、逻辑运算符和复合谓词。

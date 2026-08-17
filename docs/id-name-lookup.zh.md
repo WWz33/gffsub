@@ -1,5 +1,11 @@
 # Feature ID 与基因名查找
 
+<!-- I18N:START -->
+
+[English](./id-name-lookup.md) | **中文**
+
+<!-- I18N:END -->
+
 ## 按 ID：--id
 
 语法：`--id ID`（可重复）
@@ -21,7 +27,7 @@ chr1	src	exon	100	800	.	+	.	ID=ex02;Parent=tx02
 命令：
 1. `./gffsub demo.gff3 --id gene01` — 仅 gene 记录
 2. `./gffsub demo.gff3 --id tx01 --id tx02` — 两条 mRNA 记录
-3. `./gffsub demo.gff3 --id gene01 -C` — gene 加全部后代（见 [Gene Model 展开](gene-model-expansion.md)）
+3. `./gffsub demo.gff3 --id gene01 -C` — gene 加全部后代（见 [Gene Model 展开](gene-model-expansion.zh.md)）
 
 ## 按 ID 文件：--ids
 
@@ -63,4 +69,4 @@ tx01
 ./gffsub query demo.gff3 --ids ids.txt --summary json
 ```
 
-另见：[Gene Model 展开](gene-model-expansion.md)、[汇总输出](summary-output.md)。
+另见：[Gene Model 展开](gene-model-expansion.zh.md)、[汇总输出](summary-output.zh.md)。

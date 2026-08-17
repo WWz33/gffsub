@@ -1,5 +1,11 @@
 # 快速上手
 
+<!-- I18N:START -->
+
+[English](./getting-started.md) | **中文**
+
+<!-- I18N:END -->
+
 gffsub 按 region、feature ID、属性或 gene model 从 GFF3 和 GTF 注释文件中提取子集。
 
 ## 安装

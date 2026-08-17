@@ -1,5 +1,11 @@
 # GTF 输入处理
 
+<!-- I18N:START -->
+
+[English](./gtf-input.md) | **中文**
+
+<!-- I18N:END -->
+
 ## 格式检测
 
 gffsub 根据文件扩展名推断输入格式：
@@ -62,7 +68,7 @@ GTF 转 GTF 时，gffsub 读取 gene_id 和 transcript_id，重建层级，输�
 - gene 行不写 transcript_id（符合 GTF2.2 和 GENCODE 约定）。
 - 属性值做转义处理（反斜杠和引号）。
 
-详见 [输出格式](output-formats.md)。
+详见 [输出格式](output-formats.zh.md)。
 
 ## 示例
 

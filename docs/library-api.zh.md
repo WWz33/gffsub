@@ -1,5 +1,11 @@
 # Library API
 
+<!-- I18N:START -->
+
+[English](./library-api.md) | **中文**
+
+<!-- I18N:END -->
+
 `libgffsub_core.a` 暴露与 `gffsub` 二进制相同的功能。从 C++17 代码中链接它，可在进程内对 GFF3/GTF 注释做 subset、query 或转换。
 
 ## 链接
@@ -160,7 +166,7 @@ struct SubsetParams {
 void subset(GffData& data, const SubsetParams& params);
 ```
 
-依次应用 region、BED、seqid、source、score、strand、phase、grep、expr 和 feature 筛选。原地修改 `data`。`longest` 每 gene 选一个 isoform（见 [Longest Isoform Selection](longest-isoform.md)）。`threads` 按染色体并行执行 longest 选择。
+依次应用 region、BED、seqid、source、score、strand、phase、grep、expr 和 feature 筛选。原地修改 `data`。`longest` 每 gene 选一个 isoform（见 [Longest Isoform Selection](longest-isoform.zh.md)）。`threads` 按染色体并行执行 longest 选择。
 
 各筛选函数也可单独调用（`src/filter.hpp`、`src/selector_filter.hpp`）：
 
@@ -205,7 +211,7 @@ bool compile_filter_regexes(std::vector<GrepFilter>& grep_filters,
                             bool ignore_case, std::string& error);
 ```
 
-把 `length >= 100 && strand == "+"` 之类的表达式字符串解析为 `ExprNode` 树。传入 `filter_by_expr` 前先编译一次正则。字段名和操作符见 [Expression Filtering](expression-filtering.md)。
+把 `length >= 100 && strand == "+"` 之类的表达式字符串解析为 `ExprNode` 树。传入 `filter_by_expr` 前先编译一次正则。字段名和操作符见 [Expression Filtering](expression-filtering.zh.md)。
 
 ## 输出
 

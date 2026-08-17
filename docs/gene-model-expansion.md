@@ -1,5 +1,11 @@
 # Gene Model Expansion
 
+<!-- I18N:START -->
+
+**English** | [中文](./gene-model-expansion.zh.md)
+
+<!-- I18N:END -->
+
 gffsub builds a parent/child index from the ID and Parent attributes. Three flags expand selector hits along the hierarchy.
 
 ## Hierarchy

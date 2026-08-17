@@ -1,5 +1,11 @@
 # Getting Started
 
+<!-- I18N:START -->
+
+**English** | [中文](./getting-started.zh.md)
+
+<!-- I18N:END -->
+
 gffsub subsets GFF3 and GTF annotation files by region, feature ID, attribute, or gene model.
 
 ## Installation

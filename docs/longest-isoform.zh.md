@@ -1,5 +1,11 @@
 # 最长转录本选择
 
+<!-- I18N:START -->
+
+[English](./longest-isoform.md) | **中文**
+
+<!-- I18N:END -->
+
 ## 概述
 
 `-L` / `--longest` 标志为每个 gene 保留一个 isoform。所选类型下至少有两个 isoform 的 gene 归约到最长者。gene 含 CDS 时按 CDS 跨度评分，否则按 exon 跨度评分。未选中的 isoform 及其子 feature（exon、CDS）被丢弃。只有一个 isoform 的 gene 保持不变。所选类型下无 isoform 的 gene 被丢弃。

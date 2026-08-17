@@ -1,5 +1,11 @@
 # Region 与 BED 筛选
 
+<!-- I18N:START -->
+
+[English](./region-bed-filtering.md) | **中文**
+
+<!-- I18N:END -->
+
 ## Region 筛选：-r / --region
 
 语法：`-r CHR:START-END`

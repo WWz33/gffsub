@@ -1,5 +1,11 @@
 # Expression Filtering
 
+<!-- I18N:START -->
+
+**English** | [中文](./expression-filtering.zh.md)
+
+<!-- I18N:END -->
+
 gffsub filters records by field values, numeric comparisons, and attribute matching using `-I` / `--include-expr` (keep matching) and `-E` / `--exclude-expr` (drop matching).
 
 ## Syntax

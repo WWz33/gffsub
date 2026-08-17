@@ -1,5 +1,11 @@
 # window 子命令
 
+<!-- I18N:START -->
+
+[English](./window-subcommand.md) | **中文**
+
+<!-- I18N:END -->
+
 ## 语法
 
 ```
