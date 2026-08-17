@@ -9,28 +9,28 @@
 ## 用法
 
 ```
-gffsub window <input> --id ID [--up N] [--down N] [--strand-aware]
+gffsub window <input> -i ID [-u N] [-D N] [-a]
 ```
 
 快捷形式（默认模式）：
 
 ```
-gffsub <input> --id ID --up N --down N
+gffsub <input> -i ID -u N -D N
 ```
 
-## --id ID
+## -i ID
 
 目标 feature 的 ID 或 gene name。优先匹配 ID；未命中时按 gene name 查找（Name、gene_id、locus_tag、Alias、Dbxref）。必填。
 
-## --up N / --upstream N
+## -u / -u N / --upstream N
 
 feature 起始位置上游碱基数。默认 0。须为非负整数；尾部非法字符（如 `50abc`）会被拒绝。
 
-## --down N / --downstream N
+## -D / -D N / --downstream N
 
 feature 结束位置下游碱基数。默认 0。须为非负整数。
 
-## --strand-aware
+## -a / -a
 
 - 正链：上游向 start 左侧延伸，下游向 end 右侧延伸。
 - 负链：上游向 end 右侧延伸，下游向 start 左侧延伸。
@@ -56,17 +56,17 @@ chr2	src	gene	200	600	.	-	.	ID=gene02
 ```bash
 # gene01 上游 200 bp，下游 500 bp
 # window chr1:1-1500（start 100-200=-100，截断为 1；end 1000+500=1500）
-./gffsub window demo.gff3 --id gene01 --up 200 --down 500
+./gffsub window demo.gff3 -i gene01 -u 200 -D 500
 
 # 负链 gene02 的 strand-aware window
 # window chr2:1-800（下游 500 向 start 左侧：200-500=-300，截断为 1；上游 200 向 end 右侧：600+200=800）
-./gffsub window demo.gff3 --id gene02 --up 200 --down 500 --strand-aware
+./gffsub window demo.gff3 -i gene02 -u 200 -D 500 -a
 
 # 按 gene name 查找
-./gffsub window demo.gff3 --id BRCA1 --up 1000 --down 1000
+./gffsub window demo.gff3 -i BRCA1 -u 1000 -D 1000
 
 # 默认模式下的快捷形式
-./gffsub demo.gff3 --id gene01 --up 200 --down 500
+./gffsub demo.gff3 -i gene01 -u 200 -D 500
 ```
 
 快捷形式要求恰好一个 `--id`，加上 `--up`、`--down`、`--strand-aware` 任意组合。不接受其他过滤 flag；传入会被拒绝并报错，提示允许的 flag 集合。

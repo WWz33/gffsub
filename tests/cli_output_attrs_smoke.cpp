@@ -6,7 +6,6 @@
 
 #include "test_utils.hpp"
 
-using test_utils::compare_files;
 using test_utils::expect_command_failure;
 using test_utils::read_file;
 using test_utils::require_contains;
@@ -19,26 +18,23 @@ static bool write_test_annotation(const std::string& path) {
     }
 
     out << "##gff-version 3\n"
-        << "chr1\tsrc\tgene\t100\t400\t.\t+\t.\tID=gene0001;Name=ABC1;Alias=ABC-1;Dbxref=GeneID:123\n"
-        << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n";
+        << "chr1\tsrc\tgene\t100\t400\t.\t+\t.\tID=gene0001;Name=ABC1\n"
+        << "chr1\tsrc\tmRNA\t100\t400\t.\t+\t.\tID=tx1;Parent=gene0001;Name=ABC1.1\n"
+        << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=tx1\n"
+        << "chr1\tsrc\tCDS\t150\t170\t.\t+\t0\tID=cds1;Parent=tx1\n"
+        << "chr2\tsrc\tgene\t200\t600\t.\t-\t.\tID=gene0002;Name=XYZ1\n";
     return true;
 }
 
 static void cleanup_outputs() {
     std::remove("cli_output_attrs_smoke.gff3");
-    std::remove("output_attrs_main.tsv");
-    std::remove("output_attrs_verbose.tsv");
-    std::remove("output_attrs_old.tsv");
-    std::remove("output_attrs_json.json");
-    std::remove("query_output_attrs_main.tsv");
-    std::remove("query_output_attrs_verbose.tsv");
-    std::remove("query_output_attrs_old.tsv");
-    std::remove("output_attrs_help.txt");
-    std::remove("query_output_attrs_help.txt");
-    std::remove("output_attrs_regions.bed");
-    std::remove("output_attrs_bad.out");
-    std::remove("output_attrs_bad.err");
-    std::remove("output_attrs_bad.gff3");
+    std::remove("summary_gene.tsv");
+    std::remove("summary_exon.tsv");
+    std::remove("summary_query.tsv");
+    std::remove("summary_help.txt");
+    std::remove("summary_bad.out");
+    std::remove("summary_bad.err");
+    std::remove("summary_gene_out.tsv");
 }
 
 int main(int argc, char* argv[]) {
@@ -53,102 +49,47 @@ int main(int argc, char* argv[]) {
         std::cerr << "cannot write test annotation\n";
         return 1;
     }
-    {
-        std::ofstream bed{"output_attrs_regions.bed"};
-        if (!bed.is_open()) {
-            std::cerr << "cannot write BED test regions\n";
-            return 1;
-        }
-        bed << "chr1\t99\t400\n";
-    }
 
-    const std::string keys{"ID,Name,Alias,Dbxref"};
-    if (run_command(exe + " " + gff + " --help > output_attrs_help.txt 2>&1") != 0 ||
-        require_contains("output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
-        require_contains("output_attrs_help.txt", "--output-attrs") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " query --help > query_output_attrs_help.txt 2>&1") != 0 ||
-        require_contains("query_output_attrs_help.txt", "--out-attrs KEYS") != 0 ||
-        require_contains("query_output_attrs_help.txt", "selected attributes") != 0) {
+    // --help shows -s
+    if (run_command(exe + " --help > summary_help.txt 2>&1") != 0 ||
+        require_contains("summary_help.txt", "-s, --summary") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --out-attrs " + keys + " > output_attrs_main.tsv") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " " + gff + " --id gene0001 --output-attrs " + keys + " > output_attrs_verbose.tsv") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " " + gff + " --id gene0001 --attrs " + keys + " > output_attrs_old.tsv") != 0) {
-        return 1;
-    }
-    if (compare_files("output_attrs_main.tsv", "output_attrs_verbose.tsv") != 0 ||
-        compare_files("output_attrs_main.tsv", "output_attrs_old.tsv") != 0) {
+    // -f gene -s: TSV with gene rows
+    if (run_command(exe + " " + gff + " -f gene -s > summary_gene.tsv") != 0 ||
+        require_contains("summary_gene.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
+        require_contains("summary_gene.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t21") != 0 ||
+        require_contains("summary_gene.tsv", "chr2\t200\t600\t-\tgene\t401\t0\t0\t0\t0") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --summary json --out-attrs " + keys +
-                    " > output_attrs_json.json") != 0 ||
-        require_contains("output_attrs_json.json", "\"attrs\":{\"ID\":\"gene0001\",\"Name\":\"ABC1\"") != 0 ||
-        require_contains("output_attrs_json.json", "\"Alias\":\"ABC-1\"") != 0 ||
-        require_contains("output_attrs_json.json", "\"Dbxref\":\"GeneID:123\"") != 0) {
+    // multi seqid: all row with NA for start/end/strand/type
+    if (require_contains("summary_gene.tsv", "all\tNA\tNA\tNA\tNA\t702\t1\t1\t1\t21") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " query " + gff + " --id gene0001 --out-attrs " + keys + " > query_output_attrs_main.tsv") != 0) {
+    // -f exon -s: no all row when single seqid
+    if (run_command(exe + " " + gff + " -f exon -s > summary_exon.tsv") != 0 ||
+        require_contains("summary_exon.tsv", "chr1\t120\t180\t+\texon\t61") != 0) {
         return 1;
     }
-    if (run_command(exe + " query " + gff + " --id gene0001 --output-attrs " + keys + " > query_output_attrs_verbose.tsv") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " query " + gff + " --id gene0001 --attrs " + keys + " > query_output_attrs_old.tsv") != 0) {
-        return 1;
-    }
-    if (compare_files("query_output_attrs_main.tsv", "query_output_attrs_verbose.tsv") != 0 ||
-        compare_files("query_output_attrs_main.tsv", "query_output_attrs_old.tsv") != 0) {
-        return 1;
-    }
-
-    const std::string bad_redirect{" > output_attrs_bad.out 2> output_attrs_bad.err"};
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs , " + bad_redirect) != 0 ||
-        require_contains("output_attrs_bad.err", "Error: --out-attrs expects a comma-separated list of keys") != 0) {
+    // single seqid → no all row
+    const auto exon_text = read_file("summary_exon.tsv");
+    if (exon_text.find("all\t") != std::string::npos) {
+        std::cerr << "unexpected all row in single-seqid summary\n";
         return 1;
     }
 
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
-                               " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
-                               " --longest" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
-                               " --threads 2" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
-                               " --output-format gtf3" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --out-attrs " + keys +
-                               " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
-        return 1;
-    }
-    if (require_contains("output_attrs_bad.err", "Error: --summary/--summary-format/--out-attrs only supports query-style selectors") != 0) {
+    // query -i gene0001 -s
+    if (run_command(exe + " query " + gff + " -i gene0001 -s > summary_query.tsv") != 0 ||
+        require_contains("summary_query.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t21") != 0) {
         return 1;
     }
 
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary xml" + bad_redirect) != 0 ||
-        require_contains("output_attrs_bad.err", "Error: --summary expects tsv or json") != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary-format xml" + bad_redirect) != 0 ||
-        require_contains("output_attrs_bad.err", "Error: --summary-format expects tsv or json") != 0) {
-        return 1;
-    }
-
-    if (expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
-                               " --bed output_attrs_regions.bed" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
-                               " --longest" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
-                               " --threads 2" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
-                               " --output-format gtf3" + bad_redirect) != 0 ||
-        expect_command_failure(exe + " " + gff + " --id gene0001 --summary tsv" +
-                               " --output output_attrs_bad.gff3" + bad_redirect) != 0) {
+    // -s with -o writes to file
+    if (run_command(exe + " " + gff + " -f gene -s -o summary_gene_out.tsv") != 0 ||
+        require_contains("summary_gene_out.tsv", "chr1\t100\t400\t+\tgene\t301") != 0) {
         return 1;
     }
 

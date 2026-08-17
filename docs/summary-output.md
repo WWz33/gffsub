@@ -6,25 +6,25 @@
 
 <!-- I18N:END -->
 
-## --summary FMT
+## -s, --summary
 
-Values: `tsv`, `json`. Outputs tabular rows instead of feature records. Only valid with query-style selectors (`--id`, `--ids`, `--name`, `--where`, `--nearest`, query-subcommand `--region`). Cannot be combined with `--grep`, `-I`, `-E`, `--seqid`, `--source`, `--score`, `--strand`, `--phase`, `--bed`, `--longest`, `--threads`, `--format`/`--output-format`, or `--output`.
-
-## --out-attrs KEYS
-
-Comma-separated attribute keys appended as extra columns (aliases `--output-attrs`, `--attrs`). Resolves `gene_id`/`transcript_id` from record fields first, then GFF3 attributes, then GTF quoted values.
+Output a TSV summary of the filtered records instead of feature records. Works on the main subset path and the `query` subcommand. Counts (`child_count`, `transcript_count`, `exon_count`, `cds_length`) are computed from the full annotation index, not the filtered subset, so parent-child relationships remain intact.
 
 ## TSV columns
 
-`query_id`, `matched_id`, `matched_by`, `seqid`, `start`, `end`, `strand`, `type`, `parent_id`, `child_count`, `transcript_count`, `exon_count`, `cds_length`, `status`, plus one column per `--out-attrs` key. Tab, newline, and CR in values escaped as `\t`, `\n`, `\r`.
+`seqid`, `start`, `end`, `strand`, `type`, `length`, `child_count`, `transcript_count`, `exon_count`, `cds_length`.
 
-## JSON format
+- `length` = `end - start + 1`
+- `child_count` = number of direct children (records with `Parent` pointing to this record's ID)
+- `transcript_count` = number of mRNA/transcript descendants
+- `exon_count` = number of exon descendants
+- `cds_length` = sum of CDS descendant lengths
 
-Array of objects with the same fields plus an `attrs` object holding the `--out-attrs` keys.
+Tab, newline, and CR in values escaped as `\t`, `\n`, `\r`.
 
-## status field
+## all row
 
-`found` or `not_found`. On a miss, `matched_by` keeps the lookup key, numeric counts are 0, other fields empty.
+When the filtered records span more than one distinct `seqid`, a final `all` row is emitted with summed numeric columns. Its `start`, `end`, `strand`, and `type` are `NA` to distinguish it from per-record GFF rows. If all records share one `seqid`, the `all` row is omitted.
 
 ## Example
 
@@ -37,22 +37,17 @@ chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
 chr1	src	CDS	100	250	.	+	0	ID=cds01;Parent=tx01
 chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
+chr2	src	gene	500	600	.	-	.	ID=gene02;Name=XYZ1
 ```
 
 ```bash
-./gffsub demo.gff3 --id gene01 --summary tsv
-./gffsub demo.gff3 --id gene01 --summary json --out-attrs Name,biotype
+./gffsub demo.gff3 -f gene -s
 ```
 
-TSV output:
+Output:
 ```tsv
-query_id	matched_id	matched_by	seqid	start	end	strand	type	parent_id	child_count	transcript_count	exon_count	cds_length	status
-gene01	gene01	ID	chr1	100	1000	+	gene		1	1	2	402	found
-```
-
-JSON output:
-```json
-[
-  {"query_id":"gene01","matched_id":"gene01","matched_by":"ID","seqid":"chr1","start":100,"end":1000,"strand":"+","type":"gene","parent_id":"","child_count":1,"transcript_count":1,"exon_count":2,"cds_length":402,"status":"found","attrs":{"Name":"BRCA1","biotype":"protein_coding"}}
-]
+seqid	start	end	strand	type	length	child_count	transcript_count	exon_count	cds_length
+chr1	100	1000	+	gene	901	1	1	2	402
+chr2	500	600	-	gene	101	0	0	0	0
+all	NA	NA	NA	NA	1002	1	1	2	402
 ```

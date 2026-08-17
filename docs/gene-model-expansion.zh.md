@@ -28,32 +28,32 @@ chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
 
 ```bash
 # gene01 + 所有 mRNA、exon、CDS
-./gffsub demo.gff3 --id gene01 -C
+./gffsub demo.gff3 -i gene01 -C
 
 # tx01 + 其 exon 和 CDS
-./gffsub demo.gff3 --id tx01 -C
+./gffsub demo.gff3 -i tx01 -C
 ```
 
-`--id gene01 -C` 返回: gene01、tx01、ex01、cds01、ex02、cds02、tx02、ex03。
+`-i gene01 -C` 返回: gene01、tx01、ex01、cds01、ex02、cds02、tx02、ex03。
 
-`--id tx01 -C` 返回: tx01、ex01、cds01、ex02、cds02。
+`-i tx01 -C` 返回: tx01、ex01、cds01、ex02、cds02。
 
-## --parents
+## -p / -p
 
 包含选择器命中及其所有祖先，上溯到 gene。
 
 ```bash
-./gffsub demo.gff3 --id ex01 --parents
+./gffsub demo.gff3 -i ex01 -p
 ```
 
 返回: ex01、tx01、gene01。
 
-## --model
+## -m / -m
 
 包含完整 gene 模型: gene、选择器命中、所有 sibling transcript 及其所有子代。
 
 ```bash
-./gffsub demo.gff3 --id tx01 --model
+./gffsub demo.gff3 -i tx01 -m
 ```
 
 返回: gene01、tx01、ex01、cds01、ex02、cds02、tx02、ex03。
@@ -62,6 +62,6 @@ chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
 
 | Flag | 方向 | 包含 |
 |------|------|------|
-| `-C` / `--children` | 向下 | 命中 + 所有后代 |
-| `--parents` | 向上 | 命中 + 所有祖先到 gene |
-| `--model` | 双向 | 完整 gene 模型 |
+| `-C` / `-C` | 向下 | 命中 + 所有后代 |
+| `-p` | 向上 | 命中 + 所有祖先到 gene |
+| `-m` | 双向 | 完整 gene 模型 |

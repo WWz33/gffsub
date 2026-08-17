@@ -24,7 +24,7 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
 ./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
-./gffsub data/smoke.gff3 --id GeneA -C
+./gffsub data/smoke.gff3 -i GeneA -C
 ```
 
 ## Usage
@@ -42,20 +42,22 @@ See `./gffsub -h` for the full flag list.
 |------|---------|-------------|
 | `-r, --region` | — | 1-based inclusive `CHR:START-END` |
 | `-b, --bed` | — | BED intervals (0-based half-open) |
-| `--id` / `--ids` | — | exact feature ID(s) |
-| `--name` | — | gene by common naming keys |
-| `--where KEY=VALUE` | — | exact column-9 attribute |
+| `-i, --id` / `--ids` | — | exact feature ID(s) |
+| `-n, --name` | — | gene by common naming keys |
+| `-w, --where KEY=VALUE` | — | exact column-9 attribute |
 | `-C, --children` | off | include descendants of selector hits |
-| `--parents` | off | include ancestors |
-| `--model` | off | full gene model |
-| `--nearest REGION` | — | nearest gene on same seqid |
-| `--up` / `--down` | 0 | window (bp) around `--id` |
-| `--strand-aware` | off | window follows feature strand |
+| `-p, --parents` | off | include ancestors |
+| `-m, --model` | off | full gene model |
+| `-N, --nearest REGION` | — | nearest gene on same seqid |
+| `-u, --up` / `-D, --down` | 0 | window (bp) around `-i` |
+| `-a, --strand-aware` | off | window follows feature strand |
 | `-f, --feature` | — | type column filter |
 | `-L, --longest` | off | one transcript/gene: CDS length if any CDS, else exon |
-| `-@, --threads` | 1 | threads for `--longest` |
+| `-@, --threads` | 1 | threads for `-L` |
 | `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | output file |
+| `-s, --summary` | off | TSV summary of filtered records |
+| `-S, --seqid` | — | keep seqids; `^LIST` excludes |
 
 ## Input / Output
 
@@ -64,9 +66,6 @@ See `./gffsub -h` for the full flag list.
 | Annotation | GFF3/GTF-style feature records |
 | GFF/GTF / `-r` | 1-based inclusive |
 | BED | 0-based half-open |
-| `--summary` | `tsv` or `json` rows instead of features |
-
-Annotation records only. FASTA and VCF are not supported.
 
 ## Documentation
 

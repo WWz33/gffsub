@@ -26,14 +26,14 @@ GTF 没有 `ID=`/`Parent=`。gffsub 合成如下：
 | transcript / mRNA   | transcript_id  | gene_id            |
 | exon、CDS 等         | 无             | transcript_id      |
 
-由此 GTF 可用 `--children`、`--parents`、`--model`。
+由此 GTF 可用 `-C`、`-p`、`-m`。
 
 ## attribute 访问
 
 对 `--where`、`--grep`、`-I`：`gene_id` 和 `transcript_id` 从记录字段解析。其他 GTF attribute 用 `attr.` 前缀（如 `attr.gene_name`）。
 
 ```bash
-./gffsub input.gtf --where gene_id=ENSG000001
+./gffsub input.gtf -w gene_id=ENSG000001
 ./gffsub input.gtf --grep gene_id:ENSG
 ./gffsub input.gtf -I 'gene_id == "ENSG000001"'
 ```
@@ -64,8 +64,8 @@ chr1	src	CDS	100	250	.	+	0	gene_id "g1"; transcript_id "t1";
 ```
 
 ```bash
-./gffsub demo.gtf --where gene_id=g1
-./gffsub demo.gtf --id t1 -C
+./gffsub demo.gtf -w gene_id=g1
+./gffsub demo.gtf -i t1 -C
 ./gffsub demo.gtf --longest
-./gffsub demo.gtf --id g1 -C -t gff3
+./gffsub demo.gtf -i g1 -C -t gff3
 ```

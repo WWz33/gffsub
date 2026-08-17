@@ -24,7 +24,7 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
 ./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
-./gffsub data/smoke.gff3 --id GeneA -C
+./gffsub data/smoke.gff3 -i GeneA -C
 ```
 
 ## Usage
@@ -42,20 +42,22 @@ gffsub query|window <input.gff3> [options]
 |------|------|------|
 | `-r, --region` | — | 1-based 闭区间 `CHR:START-END` |
 | `-b, --bed` | — | BED 区间（0-based half-open） |
-| `--id` / `--ids` | — | 精确 feature ID |
-| `--name` | — | 常见基因命名键 |
-| `--where KEY=VALUE` | — | 第 9 列精确属性 |
+| `-i, --id` / `--ids` | — | 精确 feature ID |
+| `-n, --name` | — | 常见基因命名键 |
+| `-w, --where KEY=VALUE` | — | 第 9 列精确属性 |
 | `-C, --children` | 关 | 包含选择结果的后代 |
-| `--parents` | 关 | 包含祖先 |
-| `--model` | 关 | 完整 gene model |
-| `--nearest REGION` | — | 同 seqid 最近 gene |
-| `--up` / `--down` | 0 | 相对 `--id` 的窗口（bp） |
-| `--strand-aware` | 关 | 窗口按特征链方向 |
+| `-p, --parents` | 关 | 包含祖先 |
+| `-m, --model` | 关 | 完整 gene model |
+| `-N, --nearest REGION` | — | 同 seqid 最近 gene |
+| `-u, --up` / `-D, --down` | 0 | 相对 `-i` 的窗口（bp） |
+| `-a, --strand-aware` | 关 | 窗口按特征链方向 |
 | `-f, --feature` | — | type 列过滤 |
 | `-L, --longest` | 关 | 每基因一条转录本：有 CDS 比 CDS，否则比 exon |
-| `-@, --threads` | 1 | `--longest` 线程数 |
+| `-@, --threads` | 1 | `-L` 线程数 |
 | `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | 输出文件 |
+| `-s, --summary` | 关 | 过滤后记录的 TSV 统计摘要 |
+| `-S, --seqid` | — | 保留 seqid；`^LIST` 排除 |
 
 ## Input / Output
 
@@ -64,9 +66,6 @@ gffsub query|window <input.gff3> [options]
 | 注释 | GFF3/GTF 风格 feature |
 | GFF/GTF / `-r` | 1-based 闭区间 |
 | BED | 0-based half-open |
-| `--summary` | `tsv` / `json` 行，而非 feature 记录 |
-
-仅支持注释记录，不支持 FASTA 和 VCF。
 
 ## 文档
 

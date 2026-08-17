@@ -3,6 +3,7 @@
 #include "output.hpp"
 #include "parser.hpp"
 #include "query.hpp"
+#include "query_summary.hpp"
 #include "subset.hpp"
 #include "window.hpp"
 
@@ -44,6 +45,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     const std::string input_file = argv[1];
     QueryParams params;
     std::string id_list_file;
+    bool summary = false;
 
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -56,28 +58,28 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
             return std::string{argv[i]};
         };
 
-        if (arg == "--id") {
-            auto value = require_value("--id");
+        if (arg == "-i" || arg == "--id") {
+            auto value = require_value("-i");
             if (!value) return 1;
             params.ids.push_back(*value);
-        } else if (arg == "--name") {
-            auto value = require_value("--name");
+        } else if (arg == "-n" || arg == "--name") {
+            auto value = require_value("-n");
             if (!value) return 1;
             params.name = *value;
         } else if (arg == "--ids" || arg == "--id-list") {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
             id_list_file = *value;
-        } else if (arg == "--region") {
-            auto value = require_value("--region");
+        } else if (arg == "-r" || arg == "--region") {
+            auto value = require_value("-r");
             if (!value) return 1;
             params.region = parse_region(*value);
             if (!params.region) {
                 std::cerr << "Error: invalid region format " << *value << '\n';
                 return 1;
             }
-        } else if (arg == "--nearest" || arg == "--nearest-gene") {
-            auto value = require_value(arg.c_str());
+        } else if (arg == "-N" || arg == "--nearest" || arg == "--nearest-gene") {
+            auto value = require_value("-N");
             if (!value) return 1;
             params.nearest_region = parse_region(*value);
             if (!params.nearest_region) {
@@ -88,8 +90,8 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
             auto value = require_value("--type");
             if (!value) return 1;
             params.feature_type = *value;
-        } else if (arg == "--where" || arg == "--attr") {
-            auto value = require_value(arg.c_str());
+        } else if (arg == "-w" || arg == "--where" || arg == "--attr") {
+            auto value = require_value("-w");
             if (!value) return 1;
             const auto equal_pos = value->find('=');
             if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value->size()) {
@@ -97,28 +99,13 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             params.attr_filters.emplace_back(value->substr(0, equal_pos), value->substr(equal_pos + 1));
-        } else if (arg == "--output-attrs" || arg == "--out-attrs" || arg == "--attrs") {
-            auto value = require_value(arg.c_str());
-            if (!value) return 1;
-            const auto keys = split_attr_keys_cli(*value);
-            if (keys.empty()) {
-                std::cerr << "Error: " << arg << " expects a comma-separated list of keys\n";
-                return 1;
-            }
-            params.output_attrs.insert(params.output_attrs.end(), keys.begin(), keys.end());
-        } else if (arg == "--summary" || arg == "--summary-format") {
-            auto value = require_value(arg.c_str());
-            if (!value) return 1;
-            params.summary_format = *value;
-            if (params.summary_format != "tsv" && params.summary_format != "json") {
-                std::cerr << "Error: " << arg << " expects tsv or json\n";
-                return 1;
-            }
+        } else if (arg == "-s" || arg == "--summary") {
+            summary = true;
         } else if (arg == "-C" || arg == "--children" || arg == "--include-children") {
             params.include_children = true;
-        } else if (arg == "--parents" || arg == "--include-parents") {
+        } else if (arg == "-p" || arg == "--parents" || arg == "--include-parents") {
             params.include_parents = true;
-        } else if (arg == "--model" || arg == "--gene-model") {
+        } else if (arg == "-m" || arg == "--model" || arg == "--gene-model") {
             params.include_model = true;
         } else if (arg == "-h" || arg == "--help") {
             query_usage(prog);
@@ -156,7 +143,15 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     const auto index = try_load_index(input_file);
     if (!index) return 1;
     const auto result = query(*index, params);
-    print_query_result(std::cout, result, params);
+    if (summary) {
+        std::vector<SummaryRow> rows;
+        for (const auto& rec : result.records.records) {
+            rows.push_back(make_summary_row(*index, rec));
+        }
+        print_summary(std::cout, rows);
+    } else {
+        print_gff3(std::cout, result.records);
+    }
     return 0;
 }
 
@@ -359,7 +354,7 @@ int main(int argc, char* argv[]) {
         }
         if (!a.id_list_file.empty() || !a.name.empty() || !a.attr_filters.empty() || !a.nearest_region_str.empty() ||
             a.include_children || a.include_parents || a.include_model ||
-            !a.output_attrs.empty() || !a.summary_format.empty() || !a.region_str.empty() || !a.bed_file.empty() ||
+            a.summary || !a.region_str.empty() || !a.bed_file.empty() ||
             !a.seqid_filter.empty() || !a.source_filter.empty() || a.score_filter || a.strand_filter ||
             a.phase_filter || !a.feature.empty() || a.do_longest ||
             !a.grep_filters.empty() || !a.grep_file.empty() || !a.grep_field.empty() || a.grep_file_regex ||
@@ -374,27 +369,18 @@ int main(int argc, char* argv[]) {
     const bool has_query_style_selector = !a.ids.empty() || !a.id_list_file.empty() ||
         !a.name.empty() || !a.attr_filters.empty() || !a.nearest_region_str.empty();
 
-    // Summary or pure query-style selector (no subset filters) → dispatch to query API
-    const bool can_dispatch_to_query = no_subset_filters(a) &&
+    // Pure query-style selector (no subset filters) → dispatch to query API
+    const bool can_dispatch_to_query = !a.summary && no_subset_filters(a) &&
         a.format == OutputFormat::GFF3 && a.output_file.empty() && a.region_str.empty();
 
-    if (!a.summary_format.empty() || !a.output_attrs.empty()) {
-        if (!can_dispatch_to_query) {
-            std::cerr << "Error: --summary/--summary-format/--out-attrs only supports query-style selectors; "
-                      << "do not combine with --seqid, --source, --score, --strand, --phase, --bed, --longest, --threads, --format/--output-format, or --output\n";
-            return 1;
-        }
-    }
-
-    if (!a.summary_format.empty() || !a.output_attrs.empty() ||
-        (has_query_style_selector && can_dispatch_to_query)) {
+    if (has_query_style_selector && can_dispatch_to_query) {
         auto qparams = build_query_params(a);
         if (!qparams) return 1;
 
         const auto index = try_load_index(a.input_file);
         if (!index) return 1;
         const auto result = query(*index, *qparams);
-        print_query_result(std::cout, result, *qparams);
+        print_gff3(std::cout, result.records);
         return 0;
     }
 
@@ -407,13 +393,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Build index from full data before filtering, for summary counts.
+    const auto full_index = AnnotationIndex::from_data(GffData{data});
+
     // Query-style selectors: mark selected lines via query() API
     if (has_query_style_selector) {
         auto qparams = build_query_params(a);
         if (!qparams) return 1;
         qparams->apply_type_filter = false;
-        qparams->summary_format.clear();
-        qparams->output_attrs.clear();
         qparams->region.reset();  // region is handled by subset() filter, not query selector
 
         const auto index = AnnotationIndex::from_data(GffData{data});
@@ -442,11 +429,20 @@ int main(int argc, char* argv[]) {
         out = &out_file;
     }
 
-    switch (a.format) {
-        case OutputFormat::GFF3: print_gff3(*out, data); break;
-        case OutputFormat::GTF2: print_gtf(*out, data, a.format); break;
-        case OutputFormat::GTF3: print_gtf3(*out, data); break;
-        case OutputFormat::BED:  print_bed(*out, data); break;
+    if (a.summary) {
+        std::vector<SummaryRow> rows;
+        for (const auto& rec : data.records) {
+            if (!rec.kept) continue;
+            rows.push_back(make_summary_row(full_index, rec));
+        }
+        print_summary(*out, rows);
+    } else {
+        switch (a.format) {
+            case OutputFormat::GFF3: print_gff3(*out, data); break;
+            case OutputFormat::GTF2: print_gtf(*out, data, a.format); break;
+            case OutputFormat::GTF3: print_gtf3(*out, data); break;
+            case OutputFormat::BED:  print_bed(*out, data); break;
+        }
     }
 
     return 0;

@@ -28,32 +28,32 @@ Include the selector hit and all its descendants.
 
 ```bash
 # gene01 + all mRNAs, exons, CDS
-./gffsub demo.gff3 --id gene01 -C
+./gffsub demo.gff3 -i gene01 -C
 
 # tx01 + its exons and CDS
-./gffsub demo.gff3 --id tx01 -C
+./gffsub demo.gff3 -i tx01 -C
 ```
 
-`--id gene01 -C` returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
+`-i gene01 -C` returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
 
-`--id tx01 -C` returns: tx01, ex01, cds01, ex02, cds02.
+`-i tx01 -C` returns: tx01, ex01, cds01, ex02, cds02.
 
-## --parents
+## -p / -p
 
 Include the selector hit and all its ancestors up to the gene.
 
 ```bash
-./gffsub demo.gff3 --id ex01 --parents
+./gffsub demo.gff3 -i ex01 -p
 ```
 
 Returns: ex01, tx01, gene01.
 
-## --model
+## -m / -m
 
 Include the full gene model: the gene, the selector hit, all sibling transcripts, and all their children.
 
 ```bash
-./gffsub demo.gff3 --id tx01 --model
+./gffsub demo.gff3 -i tx01 -m
 ```
 
 Returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
@@ -62,6 +62,6 @@ Returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
 
 | Flag | Direction | Includes |
 |------|-----------|----------|
-| `-C` / `--children` | downward | selector hit + all descendants |
-| `--parents` | upward | selector hit + all ancestors to gene |
-| `--model` | both | full gene model |
+| `-C` / `-C` | downward | selector hit + all descendants |
+| `-p` | upward | selector hit + all ancestors to gene |
+| `-m` | both | full gene model |

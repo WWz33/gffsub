@@ -6,12 +6,12 @@
 
 <!-- I18N:END -->
 
-## --where KEY=VALUE
+## -w / --where KEY=VALUE
 
 Exact match on a column-9 attribute. Repeatable; multiple flags are OR'd.
 
 ```bash
-./gffsub demo.gff3 --where biotype=protein_coding
+./gffsub demo.gff3 -w biotype=protein_coding
 ```
 
 ## --grep FIELD:PATTERN

@@ -125,8 +125,6 @@ std::optional<QueryParams> build_query_params(const CliArgs& a) {
     q.include_children = a.include_children;
     q.include_parents = a.include_parents;
     q.include_model = a.include_model;
-    q.output_attrs = a.output_attrs;
-    q.summary_format = a.summary_format;
     return q;
 }
 
@@ -137,19 +135,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
     help_requested = false;
 
     enum {
-        OPT_ID = 1000,
         OPT_ID_LIST,
-        OPT_NAME,
-        OPT_ATTR,
-        OPT_OUTPUT_ATTRS,
-        OPT_SUMMARY_FORMAT,
-        OPT_PARENTS,
-        OPT_MODEL,
-        OPT_NEAREST,
-        OPT_UPSTREAM,
-        OPT_DOWNSTREAM,
-        OPT_STRAND_AWARE,
-        OPT_SEQID,
         OPT_SOURCE,
         OPT_SCORE,
         OPT_STRAND_FILTER,
@@ -166,12 +152,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         OPT_VERSION
     };
     static struct option long_options[] = {
-        {"id",            required_argument, nullptr, OPT_ID},
+        {"id",            required_argument, nullptr, 'i'},
         {"ids",           required_argument, nullptr, OPT_ID_LIST},
         {"id-list",       required_argument, nullptr, OPT_ID_LIST},
-        {"name",          required_argument, nullptr, OPT_NAME},
-        {"where",         required_argument, nullptr, OPT_ATTR},
-        {"attr",          required_argument, nullptr, OPT_ATTR},
+        {"name",          required_argument, nullptr, 'n'},
+        {"where",         required_argument, nullptr, 'w'},
+        {"attr",          required_argument, nullptr, 'w'},
         {"grep",          required_argument, nullptr, OPT_GREP},
         {"grep-regex",    required_argument, nullptr, OPT_GREP_REGEX},
         {"grep-file",     required_argument, nullptr, OPT_GREP_FILE},
@@ -181,23 +167,19 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"exclude-expr",  required_argument, nullptr, OPT_EXCLUDE_EXPR},
         {"invert-match",  no_argument,       nullptr, OPT_INVERT_MATCH},
         {"ignore-case",   no_argument,       nullptr, OPT_IGNORE_CASE},
-        {"output-attrs",  required_argument, nullptr, OPT_OUTPUT_ATTRS},
-        {"out-attrs",     required_argument, nullptr, OPT_OUTPUT_ATTRS},
-        {"attrs",         required_argument, nullptr, OPT_OUTPUT_ATTRS},
-        {"summary",       required_argument, nullptr, OPT_SUMMARY_FORMAT},
-        {"summary-format", required_argument, nullptr, OPT_SUMMARY_FORMAT},
-        {"parents",       no_argument,       nullptr, OPT_PARENTS},
-        {"include-parents", no_argument,      nullptr, OPT_PARENTS},
-        {"model",         no_argument,       nullptr, OPT_MODEL},
-        {"gene-model",    no_argument,       nullptr, OPT_MODEL},
-        {"nearest",       required_argument, nullptr, OPT_NEAREST},
-        {"nearest-gene",  required_argument, nullptr, OPT_NEAREST},
-        {"up",            required_argument, nullptr, OPT_UPSTREAM},
-        {"upstream",      required_argument, nullptr, OPT_UPSTREAM},
-        {"down",          required_argument, nullptr, OPT_DOWNSTREAM},
-        {"downstream",    required_argument, nullptr, OPT_DOWNSTREAM},
-        {"strand-aware",  no_argument,       nullptr, OPT_STRAND_AWARE},
-        {"seqid",         required_argument, nullptr, OPT_SEQID},
+        {"summary",       no_argument,       nullptr, 's'},
+        {"parents",       no_argument,       nullptr, 'p'},
+        {"include-parents", no_argument,      nullptr, 'p'},
+        {"model",         no_argument,       nullptr, 'm'},
+        {"gene-model",    no_argument,       nullptr, 'm'},
+        {"nearest",       required_argument, nullptr, 'N'},
+        {"nearest-gene",  required_argument, nullptr, 'N'},
+        {"up",            required_argument, nullptr, 'u'},
+        {"upstream",      required_argument, nullptr, 'u'},
+        {"down",          required_argument, nullptr, 'D'},
+        {"downstream",    required_argument, nullptr, 'D'},
+        {"strand-aware",  no_argument,       nullptr, 'a'},
+        {"seqid",         required_argument, nullptr, 'S'},
         {"source",        required_argument, nullptr, OPT_SOURCE},
         {"score",         required_argument, nullptr, OPT_SCORE},
         {"strand",        required_argument, nullptr, OPT_STRAND_FILTER},
@@ -220,12 +202,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:hI:E:v", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:hI:E:vi:n:w:spmN:u:D:aS:", long_options, &option_index)) != -1) {
         switch (opt) {
-            case OPT_ID: args.ids.emplace_back(optarg); break;
+            case 'i': args.ids.emplace_back(optarg); break;
             case OPT_ID_LIST: args.id_list_file = optarg; break;
-            case OPT_NAME: args.name = optarg; break;
-            case OPT_ATTR: {
+            case 'n': args.name = optarg; break;
+            case 'w': {
                 const std::string value{optarg};
                 const auto equal_pos = value.find('=');
                 if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value.size()) {
@@ -283,30 +265,17 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             case OPT_IGNORE_CASE:
                 args.ignore_case = true;
                 break;
-            case OPT_OUTPUT_ATTRS: {
-                const auto keys = split_attr_keys_cli(optarg);
-                if (keys.empty()) {
-                    std::cerr << "Error: --out-attrs expects a comma-separated list of keys\n";
-                    return std::nullopt;
-                }
-                args.output_attrs.insert(args.output_attrs.end(), keys.begin(), keys.end());
+            case 's':
+                args.summary = true;
                 break;
-            }
-            case OPT_SUMMARY_FORMAT:
-                args.summary_format = optarg;
-                if (args.summary_format != "tsv" && args.summary_format != "json") {
-                    std::cerr << "Error: --" << long_options[option_index].name << " expects tsv or json\n";
-                    return std::nullopt;
-                }
-                break;
-            case OPT_PARENTS: args.include_parents = true; break;
-            case OPT_MODEL: args.include_model = true; break;
-            case OPT_NEAREST: args.nearest_region_str = optarg; break;
+            case 'p': args.include_parents = true; break;
+            case 'm': args.include_model = true; break;
+            case 'N': args.nearest_region_str = optarg; break;
             case 'C': args.include_children = true; break;
-            case OPT_UPSTREAM: args.upstream_arg = optarg; break;
-            case OPT_DOWNSTREAM: args.downstream_arg = optarg; break;
-            case OPT_STRAND_AWARE: args.strand_aware = true; break;
-            case OPT_SEQID: args.seqid_filter = optarg; break;
+            case 'u': args.upstream_arg = optarg; break;
+            case 'D': args.downstream_arg = optarg; break;
+            case 'a': args.strand_aware = true; break;
+            case 'S': args.seqid_filter = optarg; break;
             case OPT_SOURCE: args.source_filter = optarg; break;
             case OPT_SCORE: {
                 args.score_filter = parse_score_filter(optarg);

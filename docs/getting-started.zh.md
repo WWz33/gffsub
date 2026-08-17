@@ -42,7 +42,7 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 按 ID 选择并带子 feature：
 
 ```bash
-./gffsub demo.gff3 --id tx01 -C
+./gffsub demo.gff3 -i tx01 -C
 ```
 
 按 feature 类型过滤：

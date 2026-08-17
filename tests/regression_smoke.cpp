@@ -260,45 +260,39 @@ static int test_where_url_decode(const std::string& exe, const std::string& gff)
     return 0;
 }
 
-// Group 8: summary scope. A transcript match reports its own exon_count with
-// transcript_count=0; a gene match reports whole-gene counts.
+// Group 8: summary output. -s on query produces TSV with per-record summary
+// including child/exon/cds counts.
 static int test_summary_scope(const std::string& exe, const std::string& gtf) {
-    // Transcript match: exon_count=1 (own), transcript_count=0.
-    if (run_command(exe + " " + gtf + " --id T1 --summary tsv > reg_gtf_summary.tsv") != 0 ||
-        require_contains("reg_gtf_summary.tsv", "transcript_count") != 0) {
+    // Transcript match: -i T1 -s shows transcript row with exon_count=1.
+    if (run_command(exe + " " + gtf + " -i T1 -s > reg_gtf_summary.tsv") != 0 ||
+        require_contains("reg_gtf_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength") != 0) {
         return 1;
     }
     {
         const auto text = read_file("reg_gtf_summary.tsv");
-        // Find the T1 data row (skips the header) and assert scope.
-        const auto row = text.substr(text.find("\nT1\t"));
-        if (row.find("\ttranscript\t") == std::string::npos) {
-            std::cerr << "transcript match summary missing transcript type\n";
+        if (text.find("\ttranscript\t") == std::string::npos) {
+            std::cerr << "transcript summary missing transcript type\n";
             return 1;
         }
-        // Fields: ...transcript_count exon_count cds_length status
-        // Transcript match: transcript_count=0, exon_count=1.
-        const std::string needle = "\t0\t1\t21\tfound";
-        if (row.find(needle) == std::string::npos) {
-            std::cerr << "transcript match scope wrong (expected exon_count=1, transcript_count=0)\n";
+        // transcript_count=0, exon_count=1, cds_length=21
+        if (text.find("\t0\t1\t21") == std::string::npos) {
+            std::cerr << "transcript summary scope wrong (expected exon_count=1, transcript_count=0)\n";
             return 1;
         }
     }
-    // Gene match: whole gene counts (transcript_count=1, exon_count=1).
-    if (run_command(exe + " " + gtf + " --id G1 --summary tsv > reg_gene_summary.tsv") != 0) {
+    // Gene match: -i G1 -s shows gene row with whole-gene counts.
+    if (run_command(exe + " " + gtf + " -i G1 -s > reg_gene_summary.tsv") != 0) {
         return 1;
     }
     {
         const auto text = read_file("reg_gene_summary.tsv");
-        const auto row = text.substr(text.find("\nG1\t"));
-        if (row.find("\tgene\t") == std::string::npos) {
-            std::cerr << "gene match summary missing gene type\n";
+        if (text.find("\tgene\t") == std::string::npos) {
+            std::cerr << "gene summary missing gene type\n";
             return 1;
         }
-        // Gene match: child_count=1, transcript_count=1, exon_count=1.
-        const std::string needle = "\tgene\t\t1\t1\t1\t21\tfound";
-        if (row.find(needle) == std::string::npos) {
-            std::cerr << "gene match scope wrong (expected whole-gene counts)\n";
+        // child_count=1, transcript_count=1, exon_count=1, cds_length=21
+        if (text.find("\tgene\t401\t1\t1\t1\t21") == std::string::npos) {
+            std::cerr << "gene summary scope wrong\n";
             return 1;
         }
     }
@@ -337,39 +331,11 @@ static int test_error_handling(const std::string& exe, const std::string& gtf) {
 }
 
 // Group 10: GTF attribute access. --grep attr.gene_name:X matches GTF lines
-// carrying that attribute; --out-attrs gene_id,transcript_id is populated for
-// GTF summary rows.
+// carrying that attribute.
 static int test_gtf_attr_access(const std::string& exe, const std::string& gtf) {
     if (run_command(exe + " " + gtf + " --grep 'attr.gene_name:GENE1' > reg_gtf_grep.gff3") != 0 ||
         require_contains("reg_gtf_grep.gff3", "transcript\t100\t500") != 0 ||
-        // GTF input is emitted as GFF3: col9 rewritten to tag=value form.
         require_contains("reg_gtf_grep.gff3", "gene_name=GENE1") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " " + gtf + " --id T1 --summary tsv --out-attrs gene_id,transcript_id > reg_gtf_summary.tsv") != 0 ||
-        require_contains("reg_gtf_summary.tsv", "gene_id\ttranscript_id") != 0 ||
-        require_contains("reg_gtf_summary.tsv", "\tfound\tG1\tT1") != 0) {
-        return 1;
-    }
-    return 0;
-}
-
-// Group 11: JSON output validity. --summary json produces a JSON array whose
-// members carry a "status":"found" field; an attribute containing a double
-// quote is backslash-escaped in the JSON value.
-static int test_json_output(const std::string& exe, const std::string& gtf,
-                            const std::string& quote_gff) {
-    if (run_command(exe + " " + gtf + " --id T1 --summary json > reg_json.json") != 0 ||
-        require_contains("reg_json.json", "[") != 0 ||
-        require_contains("reg_json.json", "]") != 0 ||
-        require_contains("reg_json.json", "{\"query_id\":") != 0 ||
-        require_contains("reg_json.json", "\"status\":\"found\"") != 0) {
-        return 1;
-    }
-    if (run_command(exe + " " + quote_gff + " --id g1 --summary json --out-attrs Note > reg_json_quote.json") != 0 ||
-        require_contains("reg_json_quote.json", "\"status\":\"found\"") != 0 ||
-        // The value has\"quote must be escaped to has\"quote in the JSON.
-        require_contains("reg_json_quote.json", "has\\\"quote") != 0) {
         return 1;
     }
     return 0;
@@ -441,10 +407,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_gtf_attr_access(exe, gtf_basic) != 0) {
-        cleanup_outputs();
-        return 1;
-    }
-    if (test_json_output(exe, gtf_basic, quote) != 0) {
         cleanup_outputs();
         return 1;
     }

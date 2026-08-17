@@ -6,12 +6,12 @@
 
 <!-- I18N:END -->
 
-## --where KEY=VALUE
+## -w / --where KEY=VALUE
 
 对第 9 列属性做精确匹配。可重复；多个 flag 之间为 OR。
 
 ```bash
-./gffsub demo.gff3 --where biotype=protein_coding
+./gffsub demo.gff3 -w biotype=protein_coding
 ```
 
 ## --grep FIELD:PATTERN

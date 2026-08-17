@@ -56,18 +56,18 @@ chr2	199	700
 ./gffsub demo.gff3 -b regions.bed
 ```
 
-## --seqid
+## -S / --seqid
 
-Syntax: `--seqid LIST`
+Syntax: `-S LIST` or `--seqid LIST`
 
 - Comma-separated seqid list
 - `^` prefix excludes: `--seqid ^chr1` keeps everything except chr1
 - AND with region/BED filters
 
 ```bash
-./gffsub demo.gff3 --seqid chr1
-./gffsub demo.gff3 --seqid chr1,chr2
-./gffsub demo.gff3 --seqid ^chr1
+./gffsub demo.gff3 -S chr1
+./gffsub demo.gff3 -S chr1,chr2
+./gffsub demo.gff3 -S ^chr1
 ```
 
 ## Coordinate systems

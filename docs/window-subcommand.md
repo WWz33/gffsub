@@ -9,28 +9,28 @@
 ## Usage
 
 ```
-gffsub window <input> --id ID [--up N] [--down N] [--strand-aware]
+gffsub window <input> -i ID [-u N] [-D N] [-a]
 ```
 
 Shortcut form (default mode):
 
 ```
-gffsub <input> --id ID --up N --down N
+gffsub <input> -i ID -u N -D N
 ```
 
-## --id ID
+## -i ID
 
 Target feature ID or gene name. An ID match takes priority; if none matches, gene-name lookup runs next (Name, gene_id, locus_tag, Alias, Dbxref). Required.
 
-## --up N / --upstream N
+## -u / -u N / --upstream N
 
 Bases upstream of the feature start. Default 0. Must be a non-negative integer; trailing garbage (e.g. `50abc`) is rejected.
 
-## --down N / --downstream N
+## -D / -D N / --downstream N
 
 Bases downstream of the feature end. Default 0. Must be a non-negative integer.
 
-## --strand-aware
+## -a / -a
 
 - Plus strand: upstream extends left of start, downstream extends right of end.
 - Minus strand: upstream extends right of end, downstream extends left of start.
@@ -56,17 +56,17 @@ chr2	src	gene	200	600	.	-	.	ID=gene02
 ```bash
 # 200 bp upstream, 500 bp downstream of gene01
 # window chr1:1-1500 (start 100-200=-100, clamped to 1; end 1000+500=1500)
-./gffsub window demo.gff3 --id gene01 --up 200 --down 500
+./gffsub window demo.gff3 -i gene01 -u 200 -D 500
 
 # strand-aware window for minus-strand gene02
 # window chr2:1-800 (downstream 500 left of start: 200-500=-300, clamped to 1; upstream 200 right of end: 600+200=800)
-./gffsub window demo.gff3 --id gene02 --up 200 --down 500 --strand-aware
+./gffsub window demo.gff3 -i gene02 -u 200 -D 500 -a
 
 # lookup by gene name
-./gffsub window demo.gff3 --id BRCA1 --up 1000 --down 1000
+./gffsub window demo.gff3 -i BRCA1 -u 1000 -D 1000
 
 # shortcut form in default mode
-./gffsub demo.gff3 --id gene01 --up 200 --down 500
+./gffsub demo.gff3 -i gene01 -u 200 -D 500
 ```
 
 Shortcut requires exactly one `--id` plus any of `--up`, `--down`, `--strand-aware`. No other filter flags are accepted; passing one aborts with an error naming the allowed set.

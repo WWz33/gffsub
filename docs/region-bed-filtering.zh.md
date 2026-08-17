@@ -56,7 +56,7 @@ chr2	199	700
 ./gffsub demo.gff3 -b regions.bed
 ```
 
-## --seqid
+## -S / --seqid
 
 语法：`--seqid LIST`
 
@@ -65,9 +65,9 @@ chr2	199	700
 - 与 region/BED 过滤为 AND 关系
 
 ```bash
-./gffsub demo.gff3 --seqid chr1
-./gffsub demo.gff3 --seqid chr1,chr2
-./gffsub demo.gff3 --seqid ^chr1
+./gffsub demo.gff3 -S chr1
+./gffsub demo.gff3 -S chr1,chr2
+./gffsub demo.gff3 -S ^chr1
 ```
 
 ## 坐标系统

@@ -26,19 +26,19 @@ GTF has no `ID=`/`Parent=`. gffsub synthesizes:
 | transcript / mRNA   | transcript_id  | gene_id            |
 | exon, CDS, etc.     | none           | transcript_id      |
 
-Enables `--children`, `--parents`, `--model` on GTF.
+Enables `-C`, `-p`, `-m` on GTF.
 
 ## Attribute access
 
 For `--where`, `--grep`, and `-I`: `gene_id` and `transcript_id` resolve from record fields. Other GTF attributes use the `attr.` prefix (e.g. `attr.gene_name`).
 
 ```bash
-./gffsub input.gtf --where gene_id=ENSG000001
+./gffsub input.gtf -w gene_id=ENSG000001
 ./gffsub input.gtf --grep gene_id:ENSG
 ./gffsub input.gtf -I 'gene_id == "ENSG000001"'
 ```
 
-## --longest on GTF
+## -L / --longest on GTF
 
 Auto-detects the isoform type: uses `transcript` if no `mRNA` records exist. No need for `-f transcript`.
 
@@ -64,8 +64,8 @@ chr1	src	CDS	100	250	.	+	0	gene_id "g1"; transcript_id "t1";
 ```
 
 ```bash
-./gffsub demo.gtf --where gene_id=g1
-./gffsub demo.gtf --id t1 -C
+./gffsub demo.gtf -w gene_id=g1
+./gffsub demo.gtf -i t1 -C
 ./gffsub demo.gtf --longest
-./gffsub demo.gtf --id g1 -C -t gff3
+./gffsub demo.gtf -i g1 -C -t gff3
 ```

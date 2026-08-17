@@ -42,7 +42,7 @@ Subset by region:
 Select by ID with children:
 
 ```bash
-./gffsub demo.gff3 --id tx01 -C
+./gffsub demo.gff3 -i tx01 -C
 ```
 
 Filter by feature type:

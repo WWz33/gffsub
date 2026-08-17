@@ -3,7 +3,6 @@
 
 #include "annotation.hpp"
 #include "output.hpp"
-#include "query_summary.hpp"
 #include "record.hpp"
 #include "region.hpp"
 
@@ -25,21 +24,14 @@ struct QueryParams {
     bool include_model = false;
     std::string feature_type;
     bool apply_type_filter = true;
-    std::vector<std::string> output_attrs;
-    std::string summary_format;
 };
 
 struct QueryResult {
     GffData records;
-    std::vector<SummaryRow> summary_rows;
-    bool emit_summary = false;
 };
 
-// Run a query against an index. Returns matched records and optional summary rows.
+// Run a query against an index. Returns matched records.
 QueryResult query(const AnnotationIndex& index, const QueryParams& params);
-
-// Print query result to the given stream based on params.summary_format.
-void print_query_result(std::ostream& out, const QueryResult& result, const QueryParams& params);
 
 }  // namespace gffsub
 

@@ -64,8 +64,7 @@ struct CliArgs {
     bool ignore_case = false;
 
     // summary / output
-    std::vector<std::string> output_attrs;
-    std::string summary_format;
+    bool summary = false;
     OutputFormat format = OutputFormat::GFF3;
     std::string output_file;
 };

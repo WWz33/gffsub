@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_query_help.txt", "--parents") != 0 ||
         require_contains("selector_query_help.txt", "--model") != 0 ||
         require_contains("selector_query_help.txt", "--nearest REGION") != 0 ||
-        require_contains("selector_query_help.txt", "--summary FMT") != 0) {
+        require_contains("selector_query_help.txt", "-s, --summary") != 0) {
         return 1;
     }
     if (run_command(exe + " window --help > selector_window_help.txt 2>&1") != 0 ||
@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_help.txt", "--invert-match") != 0 ||
         require_contains("selector_help.txt", "--model") != 0 ||
         require_contains("selector_help.txt", "--nearest REGION") != 0 ||
-        require_contains("selector_help.txt", "--output-attrs") != 0) {
+        require_contains("selector_help.txt", "-s, --summary") != 0) {
         return 1;
     }
 
@@ -395,30 +395,31 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --name ABC1 --summary tsv > selector_name_summary.tsv") != 0 ||
-        run_command(exe + " " + gff + " --name ABC1 --summary-format tsv > selector_name_summary_verbose.tsv") != 0 ||
+    if (run_command(exe + " " + gff + " --name ABC1 -s > selector_name_summary.tsv") != 0 ||
+        run_command(exe + " " + gff + " --name ABC1 -s > selector_name_summary_verbose.tsv") != 0 ||
         compare_files("selector_name_summary.tsv", "selector_name_summary_verbose.tsv") != 0 ||
-        require_contains("selector_name_summary.tsv", "ABC1\tgene0001\tName") != 0) {
+        require_contains("selector_name_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
+        require_contains("selector_name_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --name G1 --summary tsv > selector_gene_id_summary.tsv") != 0 ||
-        require_contains("selector_gene_id_summary.tsv", "G1\tgene0001\tgene_id") != 0) {
+    if (run_command(exe + " " + gff + " --name G1 -s > selector_gene_id_summary.tsv") != 0 ||
+        require_contains("selector_gene_id_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --name Locus1 --summary tsv > selector_locus_tag_summary.tsv") != 0 ||
-        require_contains("selector_locus_tag_summary.tsv", "Locus1\tgene0001\tlocus_tag") != 0) {
+    if (run_command(exe + " " + gff + " --name Locus1 -s > selector_locus_tag_summary.tsv") != 0 ||
+        require_contains("selector_locus_tag_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --name LegacyABC --summary tsv > selector_alias_summary.tsv") != 0 ||
-        require_contains("selector_alias_summary.tsv", "LegacyABC\tgene0001\tAlias") != 0) {
+    if (run_command(exe + " " + gff + " --name LegacyABC -s > selector_alias_summary.tsv") != 0 ||
+        require_contains("selector_alias_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --name GeneID:123 --summary tsv > selector_dbxref_summary.tsv") != 0 ||
-        require_contains("selector_dbxref_summary.tsv", "GeneID:123\tgene0001\tDbxref") != 0) {
+    if (run_command(exe + " " + gff + " --name GeneID:123 -s > selector_dbxref_summary.tsv") != 0 ||
+        require_contains("selector_dbxref_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
 
@@ -587,13 +588,14 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_nearest_seqid_drop.gff3", "ID=gene0003") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --nearest chr1:450-500 --summary tsv > selector_nearest_summary.tsv") != 0 ||
-        require_contains("selector_nearest_summary.tsv", "chr1:450-500\tgene0001\tnearest") != 0) {
+    if (run_command(exe + " " + gff + " --nearest chr1:450-500 -s > selector_nearest_summary.tsv") != 0 ||
+        require_contains("selector_nearest_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
+        require_contains("selector_nearest_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --nearest chr9:1-100 --summary tsv > selector_nearest_not_found.tsv") != 0 ||
-        require_contains("selector_nearest_not_found.tsv", "chr9:1-100\t\tnearest") != 0 ||
-        require_contains("selector_nearest_not_found.tsv", "not_found") != 0) {
+    if (run_command(exe + " " + gff + " --nearest chr9:1-100 -s > selector_nearest_not_found.tsv") != 0 ||
+        require_contains("selector_nearest_not_found.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
+        require_not_contains("selector_nearest_not_found.tsv", "chr9") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --nearest chr1-450-500 > selector_nearest_bad.out 2> selector_nearest_bad.err") == 0 ||

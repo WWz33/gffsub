@@ -105,18 +105,13 @@ struct QueryParams {
     bool include_model = false;
     std::string feature_type;
     bool apply_type_filter = true;
-    std::vector<std::string> output_attrs;
-    std::string summary_format;
 };
 
 struct QueryResult {
     GffData records;
-    std::vector<SummaryRow> summary_rows;
-    bool emit_summary = false;
 };
 
 QueryResult query(const AnnotationIndex& index, const QueryParams& params);
-void print_query_result(std::ostream& out, const QueryResult& result, const QueryParams& params);
 ```
 
 ## Window
@@ -219,27 +214,21 @@ void print_bed(std::ostream& out, const GffData& data);
 ```cpp
 // src/query_summary.hpp
 struct SummaryRow {
-    std::string query_id, matched_id, matched_by;
     std::string seqid;
-    int64_t start, end;
-    char strand;
-    std::string type, parent_id;
-    size_t child_count, transcript_count, exon_count;
-    int64_t cds_length;
-    std::string status;  // "found" or "not_found"
-    std::vector<std::string> attrs;
+    int64_t start = 0;
+    int64_t end = 0;
+    char strand = '.';
+    std::string type;
+    int64_t length = 0;
+    size_t child_count = 0;
+    size_t transcript_count = 0;
+    size_t exon_count = 0;
+    int64_t cds_length = 0;
 };
 
-SummaryRow make_summary_row(const AnnotationIndex& index,
-                            const std::string& query_id,
-                            const std::string& matched_by,
-                            const GffRecord& rec);
-SummaryRow make_not_found_row(const std::string& query_id, const std::string& matched_by);
-std::vector<std::string> extract_output_attrs(const GffRecord& rec, const std::vector<std::string>& keys);
-void print_summary_tsv(std::ostream& out, const std::vector<SummaryRow>& rows,
-                       const std::vector<std::string>& output_attrs);
-void print_summary_json(std::ostream& out, const std::vector<SummaryRow>& rows,
-                        const std::vector<std::string>& output_attrs);
+std::string record_id(const GffRecord& rec);
+SummaryRow make_summary_row(const AnnotationIndex& index, const GffRecord& rec);
+void print_summary(std::ostream& out, const std::vector<SummaryRow>& rows);
 ```
 
 ## Region

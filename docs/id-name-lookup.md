@@ -17,17 +17,17 @@ chr1	src	mRNA	100	800	.	+	.	ID=tx02;Parent=gene01
 chr1	src	exon	100	800	.	+	.	ID=ex02;Parent=tx02
 ```
 
-## --id
+## -i / --id
 
-Syntax: `--id ID` (repeatable)
+Syntax: `-i ID` or `--id ID` (repeatable)
 
 - Exact feature ID match
 - Multiple `--id` flags OR together
 
 ```bash
-./gffsub demo.gff3 --id gene01
-./gffsub demo.gff3 --id tx01 --id tx02
-./gffsub demo.gff3 --id gene01 -C
+./gffsub demo.gff3 -i gene01
+./gffsub demo.gff3 -i tx01 -i tx02
+./gffsub demo.gff3 -i gene01 -C
 ```
 
 ## --ids
@@ -48,28 +48,28 @@ tx01
 ./gffsub demo.gff3 --ids ids.txt -C
 ```
 
-## --name
+## -n / --name
 
-Syntax: `--name NAME`
+Syntax: `-n NAME` or `-n NAME`
 
 - Gene lookup by multiple keys: `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, `Dbxref`
 - Only matches gene-type features
 
 ```bash
-./gffsub demo.gff3 --name BRCA1
-./gffsub demo.gff3 --name BRCA-1
-./gffsub demo.gff3 --name GeneID:672
-./gffsub demo.gff3 --name gene01 -C
+./gffsub demo.gff3 -n BRCA1
+./gffsub demo.gff3 -n BRCA-1
+./gffsub demo.gff3 -n GeneID:672
+./gffsub demo.gff3 -n gene01 -C
 ```
 
-## --nearest REGION
+## -N / -N REGION
 
 Syntax: `--nearest CHR:START-END`
 
 - Finds nearest gene on the same seqid to a 1-based region
 
 ```bash
-./gffsub demo.gff3 --nearest chr1:1500-2000
+./gffsub demo.gff3 -N chr1:1500-2000
 ```
 
 See also: [Gene Model Expansion](gene-model-expansion.md), [Summary Output](summary-output.md).
