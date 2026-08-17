@@ -40,9 +40,6 @@ bool is_spread_feature(std::string_view type) {
     if (ends_with(lc, "cds"))  return true;
     if (ends_with(lc, "utr"))  return true;
     if (lc == "start_codon" || lc == "stop_codon" || lc == "uorf") return true;
-    // five_prime_utr / three_prime_utr / utr / 3utr / 5utr / 3'-utr / 5'-utr
-    // all end with "utr" or are caught by "cds" above; uorf handled explicitly.
-    // 3'-utr / 5'-utr end with "utr" already.
     return false;
 }
 

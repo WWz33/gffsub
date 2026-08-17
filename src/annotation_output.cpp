@@ -109,14 +109,22 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         std::string transcript_id_val;
 
         if (rec.feat_class == FeatureClass::Gene) {
-            gene_id_val = rec.id ? *rec.id : (rec.gene_id ? *rec.gene_id : "");
+            if (rec.id) {
+                gene_id_val = *rec.id;
+            } else if (rec.gene_id) {
+                gene_id_val = *rec.gene_id;
+            }
         } else if (rec.feat_class == FeatureClass::Transcript) {
             if (rec.parent_id) {
                 gene_id_val = *rec.parent_id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
-            transcript_id_val = rec.id ? *rec.id : (rec.transcript_id ? *rec.transcript_id : "");
+            if (rec.id) {
+                transcript_id_val = *rec.id;
+            } else if (rec.transcript_id) {
+                transcript_id_val = *rec.transcript_id;
+            }
         } else {
             // Child features
             if (rec.parent_id && mRNA_to_gene.count(*rec.parent_id)) {

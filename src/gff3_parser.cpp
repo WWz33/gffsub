@@ -199,21 +199,19 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                     // Guard against empty-string optionals (e.g. Ensembl transcript_id "").
                     if (!rec.id || rec.id->empty()) {
                         if (rec.feat_class == FeatureClass::Gene) {
-                            // gene: ID = gene_id
                             if (rec.gene_id && !rec.gene_id->empty()) {
                                 rec.id = rec.gene_id;
                             } else {
                                 rec.id = std::nullopt;
                             }
                         } else if (rec.feat_class == FeatureClass::Transcript) {
-                            // transcript: ID = transcript_id
                             if (rec.transcript_id && !rec.transcript_id->empty()) {
                                 rec.id = rec.transcript_id;
                             } else {
                                 rec.id = std::nullopt;
                             }
                         } else {
-                            // exon/CDS/etc: no synthesized ID — linked via parent_id only
+                            // exon/CDS/etc: no ID — linked via parent_id only
                             rec.id = std::nullopt;
                         }
                     }
