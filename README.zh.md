@@ -70,20 +70,20 @@ gffsub query|window <input.gff3> [options]
 
 ## 文档
 
-完整指南见 [`docs/`](docs/Home.md)：
+完整指南见 [`docs/`](docs/Home.zh.md)：
 
-- [快速开始](docs/getting-started.md)
-- [区域与 BED 筛选](docs/region-bed-filtering.md)
-- [Feature ID 与基因名查找](docs/id-name-lookup.md)
-- [基因模型展开](docs/gene-model-expansion.md)
-- [属性筛选](docs/attribute-filtering.md)
+- [快速开始](docs/getting-started.zh.md)
+- [区域与 BED 筛选](docs/region-bed-filtering.zh.md)
+- [Feature ID 与基因名查找](docs/id-name-lookup.zh.md)
+- [基因模型展开](docs/gene-model-expansion.zh.md)
+- [属性筛选](docs/attribute-filtering.zh.md)
 - [表达式筛选](docs/expression-filtering.zh.md)
-- [最长转录本选择](docs/longest-isoform.md)
-- [Window 子命令](docs/window-subcommand.md)
-- [输出格式](docs/output-formats.md)
-- [摘要输出](docs/summary-output.md)
-- [GTF 输入处理](docs/gtf-input.md)
-- [库 API](docs/library-api.md)
+- [最长转录本选择](docs/longest-isoform.zh.md)
+- [Window 子命令](docs/window-subcommand.zh.md)
+- [输出格式](docs/output-formats.zh.md)
+- [摘要输出](docs/summary-output.zh.md)
+- [GTF 输入处理](docs/gtf-input.zh.md)
+- [库 API](docs/library-api.zh.md)
 
 ## License
 

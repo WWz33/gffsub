@@ -6,37 +6,18 @@
 
 <!-- I18N:END -->
 
-## Overview
+## -L / --longest
 
-The `-L` / `--longest` flag keeps one isoform per gene. Genes with at least two isoforms of the chosen type are reduced to the longest. The longest is scored by CDS span when the gene has any CDS, otherwise by exon span. The non-selected isoforms and their child features (exons, CDS) are dropped. Genes with one isoform are left unchanged. Genes with no isoform of the chosen type are dropped.
+Keep one transcript per gene. Length metric:
 
-## Algorithm
+- CDS length (sum of CDS segments) if the gene has CDS, otherwise exon length (sum of exon segments).
+- Discontinuous CDS (same ID, multiple lines): segments summed.
+- Alternative CDS variants (distinct IDs under one transcript): longest variant used, not summed.
+- Ties keep the first encountered.
+- Auto-detects isoform type: `mRNA` if present, else `transcript`. No need for `-f transcript`.
+- Genes with one isoform are left unchanged.
 
-1. Group isoform-type records (mRNA or transcript) by their parent gene.
-2. Group genes by chromosome.
-3. For each gene:
-   - If the gene has no isoform children of the chosen type, drop the gene.
-   - If the gene has exactly one isoform, keep it and its children unchanged.
-   - Otherwise compute a per-gene flag: does any isoform of this gene have a CDS child.
-   - For each isoform, compute a span:
-     - When the gene has CDS: CDS length. Distinct CDS IDs under one transcript are alternative protein variants; the isoform is scored by its LONGEST variant (lines sharing a CDS ID are one discontinuous CDS and are summed). Isoforms without CDS children are skipped, so they cannot be selected.
-     - When the gene has no CDS: sum of exon lengths. Isoforms without exon children are skipped, so they cannot be selected.
-   - Keep the isoform with the maximum span. Ties keep the first encountered (strict greater-than comparison).
-   - Drop non-kept isoforms and their children. Children of the kept isoform stay.
-4. Threads (`-@` / `--threads`) parallelize across chromosomes. Each chromosome is processed independently.
-
-## Isoform type auto-detection
-
-When `-f` / `--feature` is not specified:
-- If the data has `mRNA` records, use `mRNA`.
-- Otherwise, if the data has `transcript` records, use `transcript`.
-- If neither exists, default to `mRNA`. All genes are then dropped because no isoform matches.
-
-Covers both GFF3 (typically mRNA) and GTF (typically transcript).
-
-When `-f TYPE` is specified, that type is the isoform type, and the run additionally drops every record whose type is not TYPE (genes, CDS, exons, and others). Longest selection runs first, then the feature filter keeps only TYPE records.
-
-## Sample data
+Sample data (demo.gff3):
 
 ```
 ##gff-version 3
@@ -52,33 +33,19 @@ chr2	src	exon	200	400	.	-	.	ID=ex04;Parent=tx03
 chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 ```
 
-tx01 CDS span: 151 + 251 = 402 bp.
-tx02 CDS span: 301 bp.
-tx03 exon span: 201 + 151 = 352 bp (no CDS).
-
-## Commands
+- tx01 CDS length: 151 + 251 = 402 bp.
+- tx02 CDS length: 301 bp.
+- tx03 exon length: 201 + 151 = 352 bp (no CDS).
 
 ```bash
-# keep one isoform per gene (tx01 for gene01, tx03 for gene02)
+# keep tx01 for gene01 (402 bp), tx03 for gene02 (only isoform)
 ./gffsub demo.gff3 --longest
-
-# use 4 threads
-./gffsub demo.gff3 --longest -@ 4
-
-# restrict to a specific isoform type
-./gffsub demo.gff3 --longest -f transcript
 ```
 
-## Result for the sample
+## -@ / --threads
 
-- gene01: tx01 kept (CDS span 402), tx02 and cds03 dropped.
-- gene02: tx03 kept and unchanged (only one isoform).
-- Gene records are kept when they have at least one isoform of the chosen type.
-
-## Combining with other filters
-
-Region, feature type, and attribute filters apply before longest selection. To longest-select within a region:
+Parallelize by chromosome. Default 1, max 256.
 
 ```bash
-./gffsub demo.gff3 -r chr1:1-1000 --longest
+./gffsub demo.gff3 --longest --threads 4
 ```

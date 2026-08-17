@@ -6,67 +6,70 @@
 
 <!-- I18N:END -->
 
-## By ID: --id
+Sample data (`demo.gff3`):
 
-Syntax: `--id ID` (repeatable)
-
-- Exact match on the feature's ID attribute (column 9 `ID=` in GFF3, synthesized from gene_id/transcript_id in GTF)
-- Multiple --id flags are OR'd: a record matching any ID is kept
-- Without -C/--children/--parents/--model, only the exact ID match returns
-
-Sample data (demo.gff3):
 ```
 ##gff-version 3
 chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1;Alias=BRCA-1;Dbxref=GeneID:672
-chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01;Name=BRCA1.1
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
 chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
 chr1	src	mRNA	100	800	.	+	.	ID=tx02;Parent=gene01
 chr1	src	exon	100	800	.	+	.	ID=ex02;Parent=tx02
 ```
 
-Commands:
-1. `./gffsub demo.gff3 --id gene01` — the gene record only
-2. `./gffsub demo.gff3 --id tx01 --id tx02` — both mRNA records
-3. `./gffsub demo.gff3 --id gene01 -C` — gene plus all descendants (see [Gene Model Expansion](gene-model-expansion.md))
+## --id
 
-## By ID file: --ids
+Syntax: `--id ID` (repeatable)
+
+- Exact feature ID match
+- Multiple `--id` flags OR together
+
+```bash
+./gffsub demo.gff3 --id gene01
+./gffsub demo.gff3 --id tx01 --id tx02
+./gffsub demo.gff3 --id gene01 -C
+```
+
+## --ids
 
 Syntax: `--ids FILE`
 
-- One ID per non-empty line
-- Equivalent to multiple --id flags
-- Blank lines and lines starting with # are skipped
+- One ID per line
+- Blank lines and lines starting with `#` skipped
 
-Example file (ids.txt):
+Example file (`ids.txt`):
+
 ```
 gene01
 tx01
 ```
-Command: `./gffsub demo.gff3 --ids ids.txt -C`
 
-## By gene name: --name
+```bash
+./gffsub demo.gff3 --ids ids.txt -C
+```
+
+## --name
 
 Syntax: `--name NAME`
 
-- Searches gene records by multiple naming keys, not just the ID attribute
-- Lookup keys: ID, gene_id, Name, locus_tag, Alias, Dbxref (any may match; on collisions the first gene in file order wins)
-- Matches only gene-type features (type == "gene")
-- Returns the gene record; add -C or --model to expand
+- Gene lookup by multiple keys: `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, `Dbxref`
+- Only matches gene-type features
 
-Commands:
-1. `./gffsub demo.gff3 --name BRCA1` — gene with Name=BRCA1
-2. `./gffsub demo.gff3 --name BRCA-1` — gene with Alias=BRCA-1
-3. `./gffsub demo.gff3 --name GeneID:672` — gene with Dbxref=GeneID:672
-4. `./gffsub demo.gff3 --name gene01 -C` — gene by ID, with children
-
-## query subcommand
-
-The `query` subcommand is the preferred interface for ID/name lookup. It adds summary output support.
-
+```bash
+./gffsub demo.gff3 --name BRCA1
+./gffsub demo.gff3 --name BRCA-1
+./gffsub demo.gff3 --name GeneID:672
+./gffsub demo.gff3 --name gene01 -C
 ```
-./gffsub query demo.gff3 --id gene01 -C
-./gffsub query demo.gff3 --name BRCA1 --summary tsv
-./gffsub query demo.gff3 --ids ids.txt --summary json
+
+## --nearest REGION
+
+Syntax: `--nearest CHR:START-END`
+
+- Finds nearest gene on the same seqid to a 1-based region
+
+```bash
+./gffsub demo.gff3 --nearest chr1:1500-2000
 ```
 
 See also: [Gene Model Expansion](gene-model-expansion.md), [Summary Output](summary-output.md).

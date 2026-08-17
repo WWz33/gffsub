@@ -6,7 +6,7 @@
 
 <!-- I18N:END -->
 
-`libgffsub_core.a` exposes the same functionality the `gffsub` binary uses. Link it from C++17 code to subset, query, or convert GFF3/GTF annotations in-process.
+`libgffsub_core.a` provides the same functions the `gffsub` binary uses. Link from C++17.
 
 ## Linking
 
@@ -15,40 +15,39 @@ CXXFLAGS = -std=c++17 -I/path/to/gffsub/src
 LDFLAGS = -L/path/to/gffsub -lgffsub_core -pthread
 ```
 
-Include the specific headers from `src/`. `src/gff3.hpp` is an umbrella that pulls in the common set (`annotation`, `filter`, `output`, `parser`, `record`, `region`).
-
 ## Data model
 
 ```cpp
 // src/record.hpp
 struct GffRecord {
     std::string seqid, source, type;
+    FeatureClass feat_class = FeatureClass::Unknown;
     int64_t start, end;
     std::optional<double> score;
     std::string score_raw;
     char strand, phase;
-    std::string attr_raw;                 // raw column 9
-    std::optional<std::string> id;         // ID= or synthesized from gene_id/transcript_id
-    std::optional<std::string> parent_id; // Parent= or synthesized
-    std::optional<std::string> gene_id;   // GTF gene_id
-    std::optional<std::string> transcript_id; // GTF transcript_id
+    std::string attr_raw;
+    std::optional<std::string> id;
+    std::optional<std::string> parent_id;
+    std::optional<std::string> gene_id;
+    std::optional<std::string> transcript_id;
     int line_idx;
     bool kept;
-    InputFormat src_fmt;                   // GFF3, GTF, or BED
+    InputFormat src_fmt;
 };
 
 class GffData {
 public:
     std::vector<GffRecord> records;
+    std::vector<std::string> directives;
     void append(const GffRecord&);
+    void append(GffRecord&&);
     size_t size() const;
     iterator begin(), end();
     void clear();
     void reserve(size_t n);
 };
 ```
-
-`GffData` holds records in input order.
 
 ## Parsing
 
@@ -59,7 +58,7 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
 InputFormat infer_input_format(const std::string& path);
 ```
 
-`parse_file` reads a GFF3, GTF, or BED file, populates `data`, returns 0 on success or -1 on open failure. `infer_input_format` maps `.gtf`/`.GTF` to GTF, `.bed`/`.BED` to BED, everything else to GFF3. `parse_attributes` splits a GFF3 column-9 string into key to list-of-values, URL-decoding each value. Comma is the value-list separator (GFF3 spec), `%2C` decodes to a literal comma.
+`infer_input_format` sniffs file content: column 9 with `=` and `;` is GFF3, with `"` is GTF, 3-12 integer columns is BED, default GFF3.
 
 ## AnnotationIndex
 
@@ -89,11 +88,7 @@ struct GeneModel {
 };
 ```
 
-> **Migration (IdIndex removed).** The standalone `IdIndex` class and the `IdIndex&` parameter of `parse_file` are gone. The ID-to-record index is now built inside `AnnotationIndex`. Replace `parse_file(path, data, idx, fmt)` with `parse_file(path, data, fmt)`, and `idx.lookup(id)` with `AnnotationIndex::from_data(std::move(data)).find_by_id(id)`.
-
-`from_file` infers format from the extension (`.gtf` -> GTF, `.bed` -> BED, else GFF3) and builds the index. `from_gff3` forces GFF3 parsing. `from_data` takes an already-parsed `GffData`. The index stores ID to record, parent/child links, gene-name lookup keys (ID, gene_id, Name, locus_tag, Alias, Dbxref), and attribute indices.
-
-`find_gene` searches gene-type records by any of the naming keys. `gene_model` returns the gene plus all transcripts and their children. `find_all_by_id` returns every line sharing an ID (multi-line CDS, discontinuous features).
+`find_gene` searches gene-type records by ID, gene_id, Name, locus_tag, Alias, Dbxref. `find_all_by_id` returns every line sharing an ID (multi-line CDS).
 
 ## Query
 
@@ -102,7 +97,7 @@ struct GeneModel {
 struct QueryParams {
     std::vector<std::string> ids;
     std::string name;
-    std::vector<std::pair<std::string, std::string>> attr_filters; // --where KEY=VALUE
+    std::vector<std::pair<std::string, std::string>> attr_filters;
     std::optional<Region> region;
     std::optional<Region> nearest_region;
     bool include_children = false;
@@ -111,7 +106,7 @@ struct QueryParams {
     std::string feature_type;
     bool apply_type_filter = true;
     std::vector<std::string> output_attrs;
-    std::string summary_format; // "tsv", "json", or empty
+    std::string summary_format;
 };
 
 struct QueryResult {
@@ -123,8 +118,6 @@ struct QueryResult {
 QueryResult query(const AnnotationIndex& index, const QueryParams& params);
 void print_query_result(std::ostream& out, const QueryResult& result, const QueryParams& params);
 ```
-
-`query` resolves the selectors (ids, name, attr_filters, nearest_region), expands along the hierarchy per the include flags, and returns matched records. When `summary_format` is set, `summary_rows` is populated and `emit_summary` is true. `print_query_result` writes GFF3 or summary output based on `params.summary_format`.
 
 ## Window
 
@@ -140,8 +133,6 @@ struct WindowParams {
 GffData window(const AnnotationIndex& index, const WindowParams& params);
 ```
 
-Finds the feature by ID (falls back to gene-name lookup), builds a window around it, returns all overlapping records. Without `strand_aware`, upstream extends left of the start and downstream extends right of the end. With `strand_aware` on a minus-strand feature, the extensions swap. Start below 1 is clamped to 1.
-
 ## Subset
 
 ```cpp
@@ -149,7 +140,7 @@ Finds the feature by ID (falls back to gene-name lookup), builds a window around
 struct SubsetParams {
     std::optional<Region> region;
     std::string bed_file;
-    std::string seqid_filter;  // ^-prefixed for exclude
+    std::string seqid_filter;
     std::string source_filter;
     std::optional<std::optional<double>> score_filter;
     std::optional<char> strand_filter;
@@ -166,21 +157,21 @@ struct SubsetParams {
 void subset(GffData& data, const SubsetParams& params);
 ```
 
-Applies region, BED, seqid, source, score, strand, phase, grep, expr, and feature filters in sequence. Modifies `data` in place. `longest` selects one isoform per gene (see [Longest Isoform Selection](longest-isoform.md)). `threads` parallelizes longest selection across chromosomes.
-
-Individual filters are also callable directly (`src/filter.hpp`, `src/selector_filter.hpp`):
+## Filters
 
 ```cpp
+// src/filter.hpp
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
-void filter_by_feature(GffData& data, std::string_view feature_type);
+void filter_by_feature(GffData& data, const std::unordered_set<std::string>& types, bool exclude);
 void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude);
-void filter_by_source(GffData& data, std::string_view source);
+void filter_by_source(GffData& data, const std::unordered_set<std::string>& sources, bool exclude);
 void filter_by_score(GffData& data, std::optional<double> score);
 void filter_by_strand(GffData& data, char strand);
 void filter_by_phase(GffData& data, char phase);
 void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t num_threads = 1);
 
+// src/selector_filter.hpp
 void filter_by_grep(GffData& data, const std::vector<GrepFilter>& filters, bool invert);
 void filter_by_expr(GffData& data, const std::vector<ExprNode>& filters, bool include);
 ```
@@ -191,7 +182,7 @@ void filter_by_expr(GffData& data, const std::vector<ExprNode>& filters, bool in
 // src/expr_parser.hpp
 struct ExprFilter {
     std::string field;
-    ExprOp op;      // Equal, NotEqual, Regex, NotRegex, Less, LessEqual, Greater, GreaterEqual
+    ExprOp op;  // Equal, NotEqual, Regex, NotRegex, Less, LessEqual, Greater, GreaterEqual
     std::string value;
     bool ignore_case = false;
     std::optional<std::regex> compiled;
@@ -211,7 +202,7 @@ bool compile_filter_regexes(std::vector<GrepFilter>& grep_filters,
                             bool ignore_case, std::string& error);
 ```
 
-Parse expression strings like `length >= 100 && strand == "+"` into an `ExprNode` tree. Compile regexes once before passing to `filter_by_expr`. See [Expression Filtering](expression-filtering.md) for field names and operators.
+See [Expression Filtering](expression-filtering.md) for field names and operators.
 
 ## Output
 
@@ -222,8 +213,6 @@ void print_gtf3(std::ostream& out, const GffData& data);
 void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);  // GTF2 or GTF3
 void print_bed(std::ostream& out, const GffData& data);
 ```
-
-`print_gtf` with `OutputFormat::GTF2` emits GTF2.2; with `GTF3` emits GTF2.2.1 with mRNA renamed to transcript. GFF3 output preserves column 9 as-is unless records came from GTF input (`src_fmt == GTF`), in which case column 9 is rewritten as `tag=value` with synthesized `ID=`/`Parent=` and URL escaping.
 
 ## Summary
 
@@ -253,14 +242,12 @@ void print_summary_json(std::ostream& out, const std::vector<SummaryRow>& rows,
                         const std::vector<std::string>& output_attrs);
 ```
 
-Counts in `make_summary_row` come from `descendants_of` the matched feature. `extract_output_attrs` pulls selected column-9 attributes, resolving `gene_id`/`transcript_id` from the record fields first, then GFF3 attributes, then GTF quoted values.
-
-## Region helpers
+## Region
 
 ```cpp
 // src/region.hpp
-struct Region { std::string seqid; int64_t start; int64_t end; };
-struct BedRegion { std::string seqid; int64_t start; int64_t end; };
+struct Region { std::string seqid; int64_t start, end; };
+struct BedRegion { std::string seqid; int64_t start, end; };
 
 std::optional<Region> parse_region(std::string_view region_str);  // "chr1:100-1000"
 BedRegion to_bed_region(const GffRecord& rec);      // 1-based GFF3 to 0-based BED
@@ -277,11 +264,9 @@ std::string gtf_attrs_to_gff3(const GffRecord& rec);
 void apply_gtf_attributes(GffRecord& rec);
 ```
 
-`extract_quoted_value` pulls a `key "value";` pair from a GTF column-9 string, handling escaped quotes. `gtf_attrs_to_gff3` rewrites GTF column 9 as GFF3 `tag=value` pairs, synthesizing `ID=`/`Parent=` from `gene_id`/`transcript_id` and URL-escaping values. `apply_gtf_attributes` populates `rec.gene_id` and `rec.transcript_id` from column 9.
+## Examples
 
-## Example
-
-Build an index, query by gene name with children, and print GTF:
+Query by gene name with children, output GTF:
 
 ```cpp
 #include "annotation.hpp"
@@ -297,11 +282,10 @@ int main() {
     gffsub::QueryResult res = gffsub::query(idx, qp);
 
     gffsub::print_gtf(std::cout, res.records, gffsub::OutputFormat::GTF2);
-    return 0;
 }
 ```
 
-Subset by region then keep longest isoform:
+Subset by region, keep longest isoform:
 
 ```cpp
 #include "annotation.hpp"
@@ -320,7 +304,6 @@ int main() {
     gffsub::subset(data, sp);
 
     gffsub::print_gff3(std::cout, data);
-    return 0;
 }
 ```
 
@@ -342,7 +325,6 @@ int main() {
     gffsub::GffData res = gffsub::window(idx, wp);
 
     gffsub::print_gff3(std::cout, res);
-    return 0;
 }
 ```
 

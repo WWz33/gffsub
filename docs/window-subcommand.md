@@ -6,44 +6,44 @@
 
 <!-- I18N:END -->
 
-## Syntax
+## Usage
 
 ```
-gffsub window <input.gff3> --id ID [--up N] [--down N] [--strand-aware]
+gffsub window <input> --id ID [--up N] [--down N] [--strand-aware]
 ```
 
-Returns all records overlapping the genomic window around one feature.
+Shortcut form (default mode):
 
-## Parameters
+```
+gffsub <input> --id ID --up N --down N
+```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--id ID` | required | target feature by ID or gene name |
-| `--up N` | 0 | bases upstream of the feature start |
-| `--down N` | 0 | bases downstream of the feature end |
-| `--strand-aware` | off | window follows feature strand |
+## --id ID
 
-The `--up` flag has the long alias `--upstream`; `--down` has `--downstream`.
+Target feature ID or gene name. An ID match takes priority; if none matches, gene-name lookup runs next (Name, gene_id, locus_tag, Alias, Dbxref). Required.
 
-## Window construction
+## --up N / --upstream N
 
-Without --strand-aware (default):
-- Window start = feature start - upstream
-- Window end = feature end + downstream
-- Direction-independent: window extends left and right
+Bases upstream of the feature start. Default 0. Must be a non-negative integer; trailing garbage (e.g. `50abc`) is rejected.
 
-With --strand-aware:
-- Plus strand: upstream extends left of the start, downstream extends right of the end
-- Minus strand: the two extensions swap. Upstream extends right of the end, downstream extends left of the start
+## --down N / --downstream N
 
-Any computed start below 1 is clamped to 1 before overlap lookup.
+Bases downstream of the feature end. Default 0. Must be a non-negative integer.
 
-## --id lookup
+## --strand-aware
 
---id accepts feature IDs and gene-name keys, using the same lookup as --name. An ID match takes priority. If no ID matches, the gene-name lookup runs next. The indexed gene-name attributes are Name, gene_id, locus_tag, Alias, and Dbxref.
+- Plus strand: upstream extends left of start, downstream extends right of end.
+- Minus strand: upstream extends right of end, downstream extends left of start.
+- Without the flag: upstream always left, downstream always right.
+- Window start below 1 is clamped to 1.
 
-## Sample data
+## Discontinuous features
 
+Multi-line CDS sharing one ID: window covers the full span across all segments.
+
+## Example
+
+Sample input (demo.gff3):
 ```
 ##gff-version 3
 chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
@@ -53,33 +53,20 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 chr2	src	gene	200	600	.	-	.	ID=gene02
 ```
 
-## Commands
-
 ```bash
 # 200 bp upstream, 500 bp downstream of gene01
+# window chr1:1-1500 (start 100-200=-100, clamped to 1; end 1000+500=1500)
 ./gffsub window demo.gff3 --id gene01 --up 200 --down 500
-# window: chr1:1 to 1500 (start 100 - 200 = -100, clamped to 1; end 1000 + 500 = 1500)
 
-# strand-aware window for a minus-strand gene
+# strand-aware window for minus-strand gene02
+# window chr2:1-800 (downstream 500 left of start: 200-500=-300, clamped to 1; upstream 200 right of end: 600+200=800)
 ./gffsub window demo.gff3 --id gene02 --up 200 --down 500 --strand-aware
-# window: chr2:1 to 800 (downstream 500 extends left of start: 200 - 500 = -300, clamped to 1; upstream 200 extends right of end: 600 + 200 = 800)
 
 # lookup by gene name
 ./gffsub window demo.gff3 --id BRCA1 --up 1000 --down 1000
-```
 
-## Window shortcut in default mode
-
-In default (non-subcommand) mode, --up and --down with exactly one --id trigger a window query internally:
-
-```bash
+# shortcut form in default mode
 ./gffsub demo.gff3 --id gene01 --up 200 --down 500
 ```
 
-Requires exactly one --id, plus any of --up, --down, or --strand-aware. No other filter flags are accepted. Passing another filter flag aborts with an error naming the allowed set: --id, --up/--upstream, --down/--downstream, and --strand-aware.
-
-## Validation
-
-- --up and --down must be non-negative integers
-- Trailing garbage after the integer (e.g. "50abc") is rejected
-- --id is required
+Shortcut requires exactly one `--id` plus any of `--up`, `--down`, `--strand-aware`. No other filter flags are accepted; passing one aborts with an error naming the allowed set.

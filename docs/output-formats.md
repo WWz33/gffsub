@@ -6,48 +6,48 @@
 
 <!-- I18N:END -->
 
-## -t / --format flag
+## -t / --format
 
-Syntax: `-t FMT` or `--format FMT` (alias: `--output-format FMT`)
+Syntax: `-t FMT` or `--format FMT` (alias `--output-format FMT`).
 
-| Format | Value | Description |
-|--------|-------|-------------|
-| GFF3 | `gff3` | GFF3 with original column 9 attributes (default) |
-| GTF | `gtf` | GTF2.2 with gene_id and transcript_id |
-| GTF2 | `gtf2` | alias for gtf |
-| GTF3 | `gtf3` | GTF2.2.1 with type renaming (mRNA to transcript) |
-| BED | `bed` | 6-column BED (chrom, start, end, name, score, strand) |
+| Value   | Output |
+|---------|--------|
+| `gff3`  | GFF3, original column 9 (default) |
+| `gtf`   | GTF2.2, gene_id + transcript_id |
+| `gtf2`  | alias for `gtf` |
+| `gtf3`  | GTF2.2.1, mRNA renamed to transcript, type whitelist |
+| `bed`   | 6-column BED: chrom, start, end, name, score, strand |
 
-## GFF3 output
+## GFF3
 
 - Header: `##gff-version 3`
-- Column 9 preserved as-is from input
-- Records output in input order
+- Column 9 preserved from input.
+- GTF input: column 9 rewritten as `tag=value` with `ID=`/`Parent=` and URL escaping.
 
-## GTF output
+## GTF
 
 - Header: `##gtf-version 2`
-- Every feature line has gene_id (required by GTF2.2)
-- transcript_id on non-gene features only (GTF2.2: gene_id on all lines, transcript_id on all except gene)
-- gene_id resolved from Parent chain: child features (exon, CDS) look up their mRNA's gene via an internal mRNA-to-gene map
-- When gene_id cannot be resolved, an empty value is emitted (`gene_id "";`) rather than dropping the feature
-- mRNA type stays as "mRNA" in gtf/gtf2, renamed to "transcript" in gtf3
-- Attribute values are escaped (backslash and quote)
+- `gene_id` on every line.
+- `transcript_id` on non-gene lines only.
+- `mRNA` stays as `mRNA` in `gtf`/`gtf2`.
+- Values escaped: backslash, quote, tab, newline, CR.
+- When `gene_id` cannot be resolved, an empty value is emitted (`gene_id "";`).
 
-## GTF3 output
+## GTF3
 
 - Header: `##gtf-version 2.2.1`
-- Only GTF3-compatible feature types pass through: gene, transcript, exon, CDS, start_codon, stop_codon, five_prime_utr, three_prime_utr, Selenocysteine, mRNA
-- mRNA renamed to transcript
+- Type whitelist: `gene`, `transcript`, `exon`, `CDS`, `start_codon`, `stop_codon`, `five_prime_utr`, `three_prime_utr`, `Selenocysteine`, `mRNA`, `5UTR`, `3UTR`, `inter`, `inter_CNS`, `intron_CNS`.
+- `mRNA` renamed to `transcript`.
+- UTR normalized to `five_prime_utr`/`three_prime_utr`.
 
-## BED output
+## BED
 
-- 6 columns: chrom, start (0-based), end, name, score, strand
-- start = record start - 1 (GFF3 is 1-based, BED is 0-based)
-- score from column 6, or `0` when missing or `.`
-- name from ID attribute, or the feature type when ID is missing
+- 6 columns: chrom, start (0-based), end, name, score, strand.
+- `start` = record start - 1.
+- `score` from column 6, or `0` when missing or `.`.
+- `name` from `ID`, or the feature type when `ID` is missing.
 
-## Format conversion examples
+## Example
 
 Sample input (demo.gff3):
 ```
@@ -82,21 +82,10 @@ chr1	99	250	ex01	0	+
 chr1	99	250	cds01	0	+
 ```
 
-## Commands
-
 ```bash
-# GFF3 to GTF
 ./gffsub demo.gff3 -t gtf
-
-# GFF3 to GTF3 (rename mRNA to transcript)
 ./gffsub demo.gff3 -t gtf3
-
-# GFF3 to BED
 ./gffsub demo.gff3 -t bed
-
-# GTF to GFF3
 ./gffsub input.gtf -t gff3
-
-# output to file
 ./gffsub demo.gff3 -t gtf -o output.gtf
 ```
