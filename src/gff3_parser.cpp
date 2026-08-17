@@ -1,4 +1,5 @@
 #include "annotation.hpp"
+#include "feature_types.hpp"
 #include "parser.hpp"
 #include "record.hpp"
 #include "region.hpp"
@@ -149,6 +150,7 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                 rec.seqid = std::move(cols[0]);
                 rec.source = std::move(cols[1]);
                 rec.type = std::move(cols[2]);
+                rec.feat_class = classify_type(rec.type);
                 {
                     // GFF3 requires positive integer coordinates, start <= end;
                     // reject trailing garbage. Invalid lines are skipped.
@@ -196,14 +198,14 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                     // gene_id/transcript_id so the index can build parent/child links.
                     // Guard against empty-string optionals (e.g. Ensembl transcript_id "").
                     if (!rec.id || rec.id->empty()) {
-                        if (rec.type == "gene") {
+                        if (rec.feat_class == FeatureClass::Gene) {
                             // gene: ID = gene_id
                             if (rec.gene_id && !rec.gene_id->empty()) {
                                 rec.id = rec.gene_id;
                             } else {
                                 rec.id = std::nullopt;
                             }
-                        } else if (rec.type == "transcript" || rec.type == "mRNA") {
+                        } else if (rec.feat_class == FeatureClass::Transcript) {
                             // transcript: ID = transcript_id
                             if (rec.transcript_id && !rec.transcript_id->empty()) {
                                 rec.id = rec.transcript_id;
@@ -216,9 +218,9 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                         }
                     }
                     if (!rec.parent_id || rec.parent_id->empty()) {
-                        if (rec.type == "gene") {
+                        if (rec.feat_class == FeatureClass::Gene) {
                             rec.parent_id = std::nullopt;
-                        } else if ((rec.type == "transcript" || rec.type == "mRNA") &&
+                        } else if (rec.feat_class == FeatureClass::Transcript &&
                                    rec.gene_id && !rec.gene_id->empty()) {
                             rec.parent_id = rec.gene_id;
                         } else if (rec.transcript_id && !rec.transcript_id->empty()) {
@@ -250,7 +252,8 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                     rec.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
                 }
                 rec.source = "gffsub";
-                rec.type = "region";
+                rec.type = std::string(kRegionType);
+                rec.feat_class = FeatureClass::Region;
                 rec.score_raw = (cols.size() > 4) ? cols[4] : ".";
                 if (cols.size() > 4 && cols[4] != ".") {
                     try {

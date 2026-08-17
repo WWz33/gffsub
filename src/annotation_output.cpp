@@ -1,3 +1,4 @@
+#include "feature_types.hpp"
 #include "output.hpp"
 #include "gtf_parser.hpp"
 #include "record.hpp"
@@ -82,26 +83,24 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
     std::unordered_map<std::string, std::string> mRNA_to_gene;
     std::unordered_set<std::string> gene_ids;
     for (const auto& rec : data) {
-        if ((rec.type == "mRNA" || rec.type == "transcript") && rec.parent_id && rec.id) {
+        if ((rec.feat_class == FeatureClass::Transcript) && rec.parent_id && rec.id) {
             mRNA_to_gene[*rec.id] = *rec.parent_id;
         }
-        if (rec.type == "gene" && rec.id) {
+        if (rec.feat_class == FeatureClass::Gene && rec.id) {
             gene_ids.insert(*rec.id);
         }
     }
 
-    // GTF3 feature types (static to avoid recreation on each call)
-    static const std::unordered_set<std::string> gtf3_types = {
-        "gene", "transcript", "exon", "CDS", "start_codon", "stop_codon",
-        "five_prime_utr", "three_prime_utr", "Selenocysteine", "mRNA"
-    };
-
     for (const auto& rec : data) {
         if (!rec.kept) continue;
 
-        // Filter by GTF3 feature types if using GTF3
+        // Normalize the type label first, then filter — so that aliases
+        // like "5'-utr" or "five_prime_UTR" pass the GTF3 whitelist after
+        // being normalized to "five_prime_utr".
+        std::string gtf_type{gtf_type_label(rec.type, fmt)};
+
         if (fmt == OutputFormat::GTF3) {
-            if (gtf3_types.count(rec.type) == 0) continue;
+            if (!gtf_type_emittable(gtf_type, fmt)) continue;
         }
 
         const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
@@ -109,9 +108,9 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         std::string gene_id_val;
         std::string transcript_id_val;
 
-        if (rec.type == "gene") {
+        if (rec.feat_class == FeatureClass::Gene) {
             gene_id_val = rec.id ? *rec.id : (rec.gene_id ? *rec.gene_id : "");
-        } else if (rec.type == "mRNA" || rec.type == "transcript") {
+        } else if (rec.feat_class == FeatureClass::Transcript) {
             if (rec.parent_id) {
                 gene_id_val = *rec.parent_id;
             } else if (rec.gene_id) {
@@ -139,12 +138,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         // GTF2.2 requires gene_id on every feature line. When it cannot be
         // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
         // convention rather than dropping the feature silently.
-        std::string gtf_type = rec.type;
-        if (rec.type == "mRNA") {
-            gtf_type = (fmt == OutputFormat::GTF3) ? "transcript" : "mRNA";
-        }
-
-        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.type == "gene");
+        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.feat_class == FeatureClass::Gene);
 
         out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'

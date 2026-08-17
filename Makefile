@@ -6,7 +6,8 @@ PREFIX ?= /usr/local
 TARGET = gffsub
 LIB = libgffsub_core.a
 
-LIB_SRCS = src/selector_filter.cpp \
+LIB_SRCS = src/feature_types.cpp \
+       src/selector_filter.cpp \
        src/gtf_parser.cpp \
        src/query_summary.cpp \
        src/attributes.cpp \
@@ -30,6 +31,7 @@ HDRS = src/annotation.hpp \
        src/cli.hpp \
        src/cli_usage.hpp \
        src/expr_parser.hpp \
+       src/feature_types.hpp \
        src/filter.hpp \
        src/gff3.hpp \
        src/gtf_parser.hpp \
@@ -51,6 +53,7 @@ ANNOTATION_INDEX_SMOKE = annotation_index_smoke
 CLI_OUTPUT_ATTRS_SMOKE = cli_output_attrs_smoke
 CLI_SELECTOR_SMOKE = cli_selector_smoke
 REGRESSION_SMOKE = regression_smoke
+FEATURE_TYPES_SMOKE = feature_types_smoke
 
 .PHONY: all clean test install uninstall
 
@@ -65,8 +68,8 @@ $(TARGET): $(CLI_OBJS) $(LIB)
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp
+$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp
 
 $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp
@@ -77,14 +80,18 @@ $(CLI_SELECTOR_SMOKE): tests/cli_selector_smoke.cpp
 $(REGRESSION_SMOKE): tests/regression_smoke.cpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/regression_smoke.cpp
 
-clean:
-	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE)
+$(FEATURE_TYPES_SMOKE): tests/feature_types_smoke.cpp src/feature_types.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/feature_types_smoke.cpp src/feature_types.cpp
 
-test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE)
+clean:
+	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE)
+
+test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE)
 	./$(ANNOTATION_INDEX_SMOKE)
 	./$(CLI_OUTPUT_ATTRS_SMOKE) ./$(TARGET)
 	./$(CLI_SELECTOR_SMOKE) ./$(TARGET)
 	./$(REGRESSION_SMOKE) ./$(TARGET)
+	./$(FEATURE_TYPES_SMOKE)
 
 install: $(TARGET)
 	install -d $(PREFIX)/bin

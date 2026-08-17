@@ -43,7 +43,7 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
             id_to_records_[*rec.id].push_back(i);
         }
 
-        if (rec.type != "gene") {
+        if (rec.feat_class != FeatureClass::Gene) {
             continue;
         }
 
@@ -223,7 +223,7 @@ std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, i
     int64_t nearest_distance = std::numeric_limits<int64_t>::max();
 
     for (const auto& rec : data_.records) {
-        if (rec.type != "gene" || rec.seqid != seqid) {
+        if (rec.feat_class != FeatureClass::Gene || rec.seqid != seqid) {
             continue;
         }
 
@@ -295,7 +295,7 @@ std::optional<GeneModel> AnnotationIndex::gene_model(std::string_view id) const 
     if (!gene) {
         auto rec = find_by_id(id);
         std::unordered_set<std::string> visited;
-        while (rec && rec->type != "gene" && rec->id && visited.insert(*rec->id).second) {
+        while (rec && rec->feat_class != FeatureClass::Gene && rec->id && visited.insert(*rec->id).second) {
             const auto parents = parents_of(*rec->id);
             if (parents.empty()) {
                 rec = std::nullopt;
@@ -303,7 +303,7 @@ std::optional<GeneModel> AnnotationIndex::gene_model(std::string_view id) const 
                 rec = parents.front();
             }
         }
-        if (rec && rec->type == "gene") {
+        if (rec && rec->feat_class == FeatureClass::Gene) {
             gene = rec;
         }
     }

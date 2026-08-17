@@ -1,6 +1,8 @@
 #ifndef GFFSUB_RECORD_HPP
 #define GFFSUB_RECORD_HPP
 
+#include "feature_types.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -9,13 +11,11 @@
 
 namespace gffsub {
 
-enum class OutputFormat { GFF3, GTF2, GTF3, BED };
-enum class InputFormat { GFF3, GTF, BED };
-
 struct GffRecord {
     std::string seqid;
     std::string source;
     std::string type;
+    FeatureClass feat_class = FeatureClass::Unknown;
     int64_t start = 0;
     int64_t end = 0;
     std::optional<double> score;

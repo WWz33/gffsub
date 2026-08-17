@@ -69,7 +69,7 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
-        if (rec.type == "gene" && rec.id) {
+        if (rec.feat_class == FeatureClass::Gene && rec.id) {
             chrom_to_gene_idx[rec.seqid].push_back(i);
         }
     }
@@ -104,7 +104,7 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
                 auto child_it = isoform_to_children.find(*iso.id);
                 if (child_it != isoform_to_children.end()) {
                     for (int child_idx : child_it->second) {
-                        if (data.records[child_idx].type == "CDS") {
+                        if (data.records[child_idx].feat_class == FeatureClass::CDS) {
                             gene_has_cds = true;
                             break;
                         }
@@ -135,7 +135,7 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
                     std::unordered_map<std::string, int64_t> variant_len;
                     for (int child_idx : child_it->second) {
                         const auto& child = data.records[child_idx];
-                        if (child.type == "CDS") {
+                        if (child.feat_class == FeatureClass::CDS) {
                             const std::string key = child.id ? *child.id : std::string{};
                             variant_len[key] += child.end - child.start + 1;
                         }
@@ -148,7 +148,7 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
                 } else {
                     for (int child_idx : child_it->second) {
                         const auto& child = data.records[child_idx];
-                        if (child.type == "exon") {
+                        if (child.feat_class == FeatureClass::Exon) {
                             len += child.end - child.start + 1;
                             found = true;
                         }

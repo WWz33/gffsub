@@ -12,11 +12,11 @@ namespace {
 
 void add_feature_counts(SummaryRow& row, const std::vector<GffRecord>& records) {
     for (const auto& rec : records) {
-        if (rec.type == "mRNA" || rec.type == "transcript") {
+        if (rec.feat_class == FeatureClass::Transcript) {
             ++row.transcript_count;
-        } else if (rec.type == "exon") {
+        } else if (rec.feat_class == FeatureClass::Exon) {
             ++row.exon_count;
-        } else if (rec.type == "CDS") {
+        } else if (rec.feat_class == FeatureClass::CDS) {
             row.cds_length += rec.end - rec.start + 1;
         }
     }

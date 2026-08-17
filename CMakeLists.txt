@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(gffsub_core STATIC
+    src/feature_types.cpp
     src/selector_filter.cpp
     src/gtf_parser.cpp
     src/query_summary.cpp
@@ -45,6 +46,7 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(annotation_index_smoke
         tests/annotation_index_smoke.cpp
+        src/feature_types.cpp
         src/attributes.cpp
         src/annotation_index.cpp
         src/gff3_parser.cpp
@@ -81,6 +83,31 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME cli_selector_smoke COMMAND cli_selector_smoke $<TARGET_FILE:gffsub>)
+
+    add_executable(regression_smoke
+        tests/regression_smoke.cpp
+    )
+
+    target_compile_options(regression_smoke PRIVATE
+        -Wall -O2
+    )
+
+    add_test(NAME regression_smoke COMMAND regression_smoke $<TARGET_FILE:gffsub>)
+
+    add_executable(feature_types_smoke
+        tests/feature_types_smoke.cpp
+        src/feature_types.cpp
+    )
+
+    target_include_directories(feature_types_smoke PRIVATE
+        src
+    )
+
+    target_compile_options(feature_types_smoke PRIVATE
+        -Wall -O2
+    )
+
+    add_test(NAME feature_types_smoke COMMAND feature_types_smoke)
 endif()
 
 # Installation
