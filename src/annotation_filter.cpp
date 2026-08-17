@@ -64,10 +64,10 @@ void filter_by_regions_from_file(GffData& data, const std::string& bed_file) {
     }
 }
 
-void filter_by_feature(GffData& data, const std::unordered_set<std::string>& feature_types, bool exclude) {
+void filter_by_type(GffData& data, const std::unordered_set<std::string>& types, bool exclude) {
     for (auto& rec : data) {
         if (!rec.kept) continue;
-        bool found = feature_types.count(rec.type) > 0;
+        bool found = types.count(rec.type) > 0;
         if (exclude ? found : !found) {
             rec.kept = false;
         }

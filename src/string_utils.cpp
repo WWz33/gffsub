@@ -29,4 +29,21 @@ std::vector<std::string> split_line(const std::string& line, char delimiter) {
     return cols;
 }
 
+std::unordered_set<std::string> parse_list(std::string_view sv, bool& exclude) {
+    exclude = false;
+    if (!sv.empty() && sv.front() == '^') {
+        exclude = true;
+        sv.remove_prefix(1);
+    }
+    std::unordered_set<std::string> result;
+    size_t pos = 0;
+    while (pos < sv.size()) {
+        auto comma = sv.find(',', pos);
+        if (comma == std::string_view::npos) comma = sv.size();
+        if (comma > pos) result.emplace(sv.substr(pos, comma - pos));
+        pos = comma + 1;
+    }
+    return result;
+}
+
 }  // namespace gffsub

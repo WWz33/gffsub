@@ -8,30 +8,24 @@
 
 ## -s, --summary
 
-Output a TSV summary of the filtered records instead of feature records. Works on the main subset path and the `query` subcommand. Counts (`child_count`, `transcript_count`, `exon_count`, `cds_length`) are computed from the full annotation index, not the filtered subset, so parent-child relationships remain intact.
+Output an aggregated TSV summary of the filtered records instead of feature records. Works on the main subset path and the `query` subcommand.
 
 ## TSV columns
 
-`seqid`, `start`, `end`, `strand`, `type`, `length`, `child_count`, `transcript_count`, `exon_count`, `cds_length`.
+`seqid`, `type`, `count`, `sum_len`, `min_len`, `avg_len`, `max_len`, `Q1`, `Q2`, `Q3`, `coverage`.
 
-- `length` = `end - start + 1`
-- `child_count` = number of direct children (records with `Parent` pointing to this record's ID)
-- `transcript_count` = number of mRNA/transcript descendants
-- `exon_count` = number of exon descendants
-- `cds_length` = sum of CDS descendant lengths
+One row per distinct (seqid, type). `length` = `end - start + 1`. `avg_len` is truncated to one decimal. `Q1`/`Q2`/`Q3` are Tukey hinges (lower/upper half medians). `coverage` is the union bp: intervals of the group are merged when overlapping or book-ended (bedtools merge semantics), so bases shared by overlapping records (e.g. one exon in two isoforms) count once. Rows are sorted by seqid, then type.
 
-Tab, newline, and CR in values escaped as `\t`, `\n`, `\r`.
+## all rows
 
-## all row
-
-When the filtered records span more than one distinct `seqid`, a final `all` row is emitted with summed numeric columns. Its `start`, `end`, `strand`, and `type` are `NA` to distinguish it from per-record GFF rows. If all records share one `seqid`, the `all` row is omitted.
+When the filtered records span more than one distinct `seqid`, one `all` row per type is appended: `count`/`sum_len` are totals, `min_len`/`max_len` are global extremes, `avg_len` is the overall mean, `Q1`/`Q2`/`Q3` are computed over all lengths, `coverage` is the sum of per-seqid unions (intervals on different seqids never merge). If all records share one `seqid`, `all` rows are omitted.
 
 ## Example
 
 Sample input (demo.gff3):
 ```
 ##gff-version 3
-chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1;biotype=protein_coding
+chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
 chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
 chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
 chr1	src	CDS	100	250	.	+	0	ID=cds01;Parent=tx01
@@ -41,13 +35,19 @@ chr2	src	gene	500	600	.	-	.	ID=gene02;Name=XYZ1
 ```
 
 ```bash
-./gffsub demo.gff3 -f gene -s
+./gffsub demo.gff3 -s
 ```
 
 Output:
 ```tsv
-seqid	start	end	strand	type	length	child_count	transcript_count	exon_count	cds_length
-chr1	100	1000	+	gene	901	1	1	2	402
-chr2	500	600	-	gene	101	0	0	0	0
-all	NA	NA	NA	NA	1002	1	1	2	402
+seqid	type	count	sum_len	min_len	avg_len	max_len	Q1	Q2	Q3	coverage
+chr1	CDS	2	402	151	201	251	151	201	251	402
+chr1	exon	2	402	151	201	251	151	201	251	402
+chr1	gene	1	901	901	901	901	901	901	901	901
+chr1	mRNA	1	901	901	901	901	901	901	901	901
+chr2	gene	1	101	101	101	101	101	101	101	101
+all	CDS	2	402	151	201	251	151	201	251	402
+all	exon	2	402	151	201	251	151	201	251	402
+all	gene	2	1002	101	501	901	101	501	901	1002
+all	mRNA	1	901	901	901	901	901	901	901	901
 ```

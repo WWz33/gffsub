@@ -125,6 +125,19 @@ static void cleanup_outputs() {
     std::remove("selector_nearest_not_found.tsv");
     std::remove("selector_nearest_bad.out");
     std::remove("selector_nearest_bad.err");
+    std::remove("cli_selector_tie.gff3");
+    std::remove("cli_selector_tie_rev.gff3");
+    std::remove("selector_tie_a.gff3");
+    std::remove("selector_tie_b.gff3");
+    std::remove("selector_type_repeat.gff3");
+    std::remove("selector_type_list.gff3");
+    std::remove("selector_query_type_list.gff3");
+    std::remove("selector_query_type_exclude.gff3");
+    std::remove("cli_selector_nc.gff3");
+    std::remove("selector_longest_nc_auto.gff3");
+    std::remove("selector_lt_requires.out");
+    std::remove("selector_lt_requires.err");
+    std::remove("selector_longest_nc_type.gff3");
     std::remove("selector_query_nearest_bad.out");
     std::remove("selector_query_nearest_bad.err");
     std::remove("selector_region_intersection.gff3");
@@ -249,7 +262,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_grep_regex_id.gff3", "ID=tx1") != 0) {
         return 1;
     }
-    if (run_command(exe_raw + " " + gff + " --grep-regex seqid:chr[0-9]+ -f gene > selector_grep_regex_seqid.gff3") != 0 ||
+    if (run_command(exe_raw + " " + gff + " --grep-regex seqid:chr[0-9]+ -t gene > selector_grep_regex_seqid.gff3") != 0 ||
         require_contains("selector_grep_regex_seqid.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_grep_regex_seqid.gff3", "ID=gene0002") != 0 ||
         require_contains("selector_grep_regex_seqid.gff3", "ID=gene0003") != 0 ||
@@ -317,7 +330,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_include_expr_score.gff3", "ID=gene0001") != 0) {
         return 1;
     }
-    if (run_command(exe_raw + " " + gff + " -E \"attr.Note~transposon|retroelement\" -f gene > selector_exclude_expr_note.gff3") != 0 ||
+    if (run_command(exe_raw + " " + gff + " -E \"attr.Note~transposon|retroelement\" -t gene > selector_exclude_expr_note.gff3") != 0 ||
         require_contains("selector_exclude_expr_note.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_exclude_expr_note.gff3", "ID=gene0003") != 0 ||
         require_not_contains("selector_exclude_expr_note.gff3", "ID=gene0002") != 0) {
@@ -398,28 +411,28 @@ int main(int argc, char* argv[]) {
     if (run_command(exe + " " + gff + " --name ABC1 -s > selector_name_summary.tsv") != 0 ||
         run_command(exe + " " + gff + " --name ABC1 -s > selector_name_summary_verbose.tsv") != 0 ||
         compare_files("selector_name_summary.tsv", "selector_name_summary_verbose.tsv") != 0 ||
-        require_contains("selector_name_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
-        require_contains("selector_name_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_name_summary.tsv", "seqid\ttype\tcount\tsum_len\tmin_len\tavg_len\tmax_len") != 0 ||
+        require_contains("selector_name_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
     if (run_command(exe + " " + gff + " --name G1 -s > selector_gene_id_summary.tsv") != 0 ||
-        require_contains("selector_gene_id_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_gene_id_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
     if (run_command(exe + " " + gff + " --name Locus1 -s > selector_locus_tag_summary.tsv") != 0 ||
-        require_contains("selector_locus_tag_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_locus_tag_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
     if (run_command(exe + " " + gff + " --name LegacyABC -s > selector_alias_summary.tsv") != 0 ||
-        require_contains("selector_alias_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_alias_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
     if (run_command(exe + " " + gff + " --name GeneID:123 -s > selector_dbxref_summary.tsv") != 0 ||
-        require_contains("selector_dbxref_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_dbxref_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
@@ -465,7 +478,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (run_command(exe + " " + gff + " --id gene0001 --include-children -f mRNA > selector_children_type.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --id gene0001 --include-children -t mRNA > selector_children_type.gff3") != 0 ||
         run_command(exe + " query " + gff + " --id gene0001 --include-children --type mRNA > selector_query_children_type.gff3") != 0 ||
         compare_files("selector_children_type.gff3", "selector_query_children_type.gff3") != 0 ||
         require_contains("selector_children_type.gff3", "ID=tx1") != 0 ||
@@ -487,7 +500,7 @@ int main(int argc, char* argv[]) {
         compare_files("selector_query_parents.gff3", "selector_query_parents_alias.gff3") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --id exon1 --parents -f gene > selector_parents_gene.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --id exon1 --parents -t gene > selector_parents_gene.gff3") != 0 ||
         run_command(exe + " query " + gff + " --id exon1 --parents --type gene > selector_query_parents_gene.gff3") != 0 ||
         compare_files("selector_parents_gene.gff3", "selector_query_parents_gene.gff3") != 0 ||
         require_contains("selector_parents_gene.gff3", "ID=gene0001") != 0 ||
@@ -529,7 +542,7 @@ int main(int argc, char* argv[]) {
         compare_files("selector_query_model.gff3", "selector_query_gene_model_alias.gff3") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --id exon1 --model -f CDS > selector_model_gene.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --id exon1 --model -t CDS > selector_model_gene.gff3") != 0 ||
         run_command(exe + " query " + gff + " --id exon1 --model --type CDS > selector_query_model_gene.gff3") != 0 ||
         compare_files("selector_model_gene.gff3", "selector_query_model_gene.gff3") != 0 ||
         require_contains("selector_model_gene.gff3", "ID=cds1") != 0 ||
@@ -589,12 +602,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --nearest chr1:450-500 -s > selector_nearest_summary.tsv") != 0 ||
-        require_contains("selector_nearest_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
-        require_contains("selector_nearest_summary.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t63") != 0) {
+        require_contains("selector_nearest_summary.tsv", "seqid\ttype\tcount\tsum_len\tmin_len\tavg_len\tmax_len") != 0 ||
+        require_contains("selector_nearest_summary.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
     if (run_command(exe + " " + gff + " --nearest chr9:1-100 -s > selector_nearest_not_found.tsv") != 0 ||
-        require_contains("selector_nearest_not_found.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
+        require_contains("selector_nearest_not_found.tsv", "seqid\ttype\tcount\tsum_len\tmin_len\tavg_len\tmax_len") != 0 ||
         require_not_contains("selector_nearest_not_found.tsv", "chr9") != 0) {
         return 1;
     }
@@ -604,6 +617,86 @@ int main(int argc, char* argv[]) {
     }
     if (run_command(exe + " query " + gff + " --nearest chr1-450-500 > selector_query_nearest_bad.out 2> selector_query_nearest_bad.err") == 0 ||
         require_contains("selector_query_nearest_bad.err", "Error: invalid nearest region format chr1-450-500") != 0) {
+        return 1;
+    }
+
+    // nearest tie: two genes equidistant from the query region must resolve
+    // deterministically to the one with the smaller start, independent of
+    // record order in the file.
+    {
+        std::ofstream tie{"cli_selector_tie.gff3"};
+        if (!tie.is_open()) return 1;
+        tie << "##gff-version 3\n"
+            << "chr1\tsrc\tgene\t400\t500\t.\t+\t.\tID=gb\n"
+            << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=ga\n";
+    }
+    {
+        std::ofstream tie_rev{"cli_selector_tie_rev.gff3"};
+        if (!tie_rev.is_open()) return 1;
+        tie_rev << "##gff-version 3\n"
+                << "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=ga\n"
+                << "chr1\tsrc\tgene\t400\t500\t.\t+\t.\tID=gb\n";
+    }
+    if (run_command(exe + " cli_selector_tie.gff3 --nearest chr1:280-320 > selector_tie_a.gff3") != 0 ||
+        run_command(exe + " cli_selector_tie_rev.gff3 --nearest chr1:280-320 > selector_tie_b.gff3") != 0 ||
+        compare_files("selector_tie_a.gff3", "selector_tie_b.gff3") != 0 ||
+        require_contains("selector_tie_a.gff3", "ID=ga") != 0 ||
+        require_not_contains("selector_tie_a.gff3", "ID=gb") != 0) {
+        return 1;
+    }
+
+    // -t repeatable: -t A -t B equals -t A,B
+    if (run_command(exe + " " + gff + " -t gene -t mRNA > selector_type_repeat.gff3") != 0 ||
+        run_command(exe + " " + gff + " -t gene,mRNA > selector_type_list.gff3") != 0 ||
+        compare_files("selector_type_repeat.gff3", "selector_type_list.gff3") != 0 ||
+        require_contains("selector_type_repeat.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_type_repeat.gff3", "ID=tx1") != 0 ||
+        require_not_contains("selector_type_repeat.gff3", "ID=exon1") != 0) {
+        return 1;
+    }
+
+    // query -t supports comma list and ^ exclusion (same semantics as main path)
+    if (run_command(exe + " query " + gff + " --id gene0001 --children -t mRNA,exon > selector_query_type_list.gff3") != 0 ||
+        require_contains("selector_query_type_list.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_query_type_list.gff3", "ID=exon1") != 0 ||
+        require_not_contains("selector_query_type_list.gff3", "ID=cds1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query " + gff + " --id gene0001 --children --type ^mRNA > selector_query_type_exclude.gff3") != 0 ||
+        require_contains("selector_query_type_exclude.gff3", "ID=exon1") != 0 ||
+        require_contains("selector_query_type_exclude.gff3", "ID=cds1") != 0 ||
+        require_not_contains("selector_query_type_exclude.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+
+    // --longest-type: isoform selection independent of output type filter
+    {
+        std::ofstream nc{"cli_selector_nc.gff3"};
+        if (!nc.is_open()) return 1;
+        nc << "##gff-version 3\n"
+           << "chr1\tsrc\tgene\t100\t500\t.\t+\t.\tID=gnc\n"
+           << "chr1\tsrc\tncRNA\t100\t300\t.\t+\t.\tID=n1;Parent=gnc\n"
+           << "chr1\tsrc\tncRNA\t200\t500\t.\t+\t.\tID=n2;Parent=gnc\n"
+           << "chr1\tsrc\texon\t100\t300\t.\t+\t.\tID=ne1;Parent=n1\n"
+           << "chr1\tsrc\texon\t200\t500\t.\t+\t.\tID=ne2;Parent=n2\n";
+    }
+    // auto-detect now recognizes ncRNA via transcript class
+    if (run_command(exe + " cli_selector_nc.gff3 --longest > selector_longest_nc_auto.gff3") != 0 ||
+        require_contains("selector_longest_nc_auto.gff3", "ID=n2") != 0 ||
+        require_not_contains("selector_longest_nc_auto.gff3", "ID=n1") != 0 ||
+        require_contains("selector_longest_nc_auto.gff3", "ID=ne2") != 0) {
+        return 1;
+    }
+    // --longest-type requires --longest
+    if (run_command(exe + " cli_selector_nc.gff3 --longest-type ncRNA > selector_lt_requires.out 2> selector_lt_requires.err") == 0 ||
+        require_contains("selector_lt_requires.err", "Error: --longest-type requires --longest") != 0) {
+        return 1;
+    }
+    // --longest --longest-type + -t output filter compose independently
+    if (run_command(exe + " cli_selector_nc.gff3 --longest --longest-type ncRNA -t ncRNA > selector_longest_nc_type.gff3") != 0 ||
+        require_contains("selector_longest_nc_type.gff3", "ID=n2") != 0 ||
+        require_not_contains("selector_longest_nc_type.gff3", "ID=gnc") != 0 ||
+        require_not_contains("selector_longest_nc_type.gff3", "ID=ne2") != 0) {
         return 1;
     }
 
@@ -619,7 +712,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_seqid_chr2.gff3", "ID=gene0001") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --seqid chr1 -f gene > selector_seqid_gene.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --seqid chr1 -t gene > selector_seqid_gene.gff3") != 0 ||
         require_contains("selector_seqid_gene.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_seqid_gene.gff3", "ID=gene0002") != 0 ||
         require_not_contains("selector_seqid_gene.gff3", "ID=gene0003") != 0 ||
@@ -636,7 +729,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_source_other.gff3", "ID=gene0001") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --source src -f gene > selector_source_gene.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --source src -t gene > selector_source_gene.gff3") != 0 ||
         require_contains("selector_source_gene.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_source_gene.gff3", "ID=gene0002") != 0 ||
         require_not_contains("selector_source_gene.gff3", "ID=gene0003") != 0 ||
@@ -658,7 +751,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_score_missing.gff3", "ID=tx1") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --score . -f gene > selector_score_feature.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --score . -t gene > selector_score_feature.gff3") != 0 ||
         require_contains("selector_score_feature.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_score_feature.gff3", "ID=tx1") != 0 ||
         require_not_contains("selector_score_feature.gff3", "ID=exon1") != 0) {
@@ -682,7 +775,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_strand_dot.gff3", "ID=gene0001") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --strand - -f gene > selector_strand_gene.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --strand - -t gene > selector_strand_gene.gff3") != 0 ||
         require_contains("selector_strand_gene.gff3", "ID=gene0002") != 0 ||
         require_not_contains("selector_strand_gene.gff3", "ID=gene0001") != 0 ||
         require_not_contains("selector_strand_gene.gff3", "ID=exon2") != 0) {
@@ -704,7 +797,7 @@ int main(int argc, char* argv[]) {
         require_not_contains("selector_phase_dot.gff3", "ID=cds1") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " --phase 1 -f CDS > selector_phase_cds.gff3") != 0 ||
+    if (run_command(exe + " " + gff + " --phase 1 -t CDS > selector_phase_cds.gff3") != 0 ||
         require_contains("selector_phase_cds.gff3", "ID=cds2") != 0 ||
         require_not_contains("selector_phase_cds.gff3", "ID=cds1") != 0 ||
         require_not_contains("selector_phase_cds.gff3", "ID=gene0001") != 0) {
@@ -714,7 +807,7 @@ int main(int argc, char* argv[]) {
         require_contains("selector_phase_bad.err", "Error: --phase expects one of 0, 1, 2, .") != 0) {
         return 1;
     }
-    if (run_command(exe + " " + gff + " -r chr1:100-400 -t bed > selector_bed_short.bed") != 0 ||
+    if (run_command(exe + " " + gff + " -r chr1:100-400 --format bed > selector_bed_short.bed") != 0 ||
         run_command(exe + " " + gff + " -r chr1:100-400 --format bed > selector_bed_format.bed") != 0 ||
         run_command(exe + " " + gff + " -r chr1:100-400 --output-format bed > selector_bed_output_format.bed") != 0 ||
         compare_files("selector_bed_short.bed", "selector_bed_format.bed") != 0 ||

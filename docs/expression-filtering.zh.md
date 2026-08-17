@@ -83,7 +83,7 @@ GTF 输入: `gene_id` / `transcript_id` 从记录字段解析。其他属性用 
 ## 示例
 
 ```bash
-gffsub ann.gff3 -f exon -I 'length >= 100'
+gffsub ann.gff3 -t exon -I 'length >= 100'
 gffsub ann.gff3 -E 'length < 10'
-gffsub ann.gff3 -f exon -I 'length >= 200 && strand == "+"'
+gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
 ```

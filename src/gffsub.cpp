@@ -86,10 +86,12 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
                 std::cerr << "Error: invalid nearest region format " << *value << '\n';
                 return 1;
             }
-        } else if (arg == "--type") {
+        } else if (arg == "-t" || arg == "--type") {
             auto value = require_value("--type");
             if (!value) return 1;
-            params.feature_type = *value;
+            // repeatable: append with comma
+            if (params.type.empty()) params.type = *value;
+            else params.type += "," + *value;
         } else if (arg == "-w" || arg == "--where" || arg == "--attr") {
             auto value = require_value("-w");
             if (!value) return 1;
@@ -144,11 +146,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     if (!index) return 1;
     const auto result = query(*index, params);
     if (summary) {
-        std::vector<SummaryRow> rows;
-        for (const auto& rec : result.records.records) {
-            rows.push_back(make_summary_row(*index, rec));
-        }
-        print_summary(std::cout, rows);
+        print_summary(std::cout, result.records.records);
     } else {
         print_gff3(std::cout, result.records);
     }
@@ -301,7 +299,7 @@ int run_window_from_args(const CliArgs& a) {
 bool no_subset_filters(const CliArgs& a) {
     return a.seqid_filter.empty() && a.source_filter.empty() &&
            !a.score_filter && !a.strand_filter && !a.phase_filter && a.bed_file.empty() &&
-           !a.do_longest && !a.threads_set &&
+           !a.do_longest && !a.threads_set && a.longest_type.empty() &&
            a.grep_filters.empty() && a.grep_file.empty() && a.grep_field.empty() && !a.grep_file_regex &&
            a.include_expr_filters.empty() && a.exclude_expr_filters.empty() && !a.invert_grep && !a.ignore_case;
 }
@@ -318,7 +316,8 @@ SubsetParams build_subset_params(const CliArgs& a) {
     s.score_filter = a.score_filter;
     s.strand_filter = a.strand_filter;
     s.phase_filter = a.phase_filter;
-    s.feature = a.feature;
+    s.type = a.type_filter;
+    s.longest_type = a.longest_type;
     s.longest = a.do_longest;
     s.threads = a.num_threads;
     s.grep_filters = a.grep_filters;
@@ -356,7 +355,7 @@ int main(int argc, char* argv[]) {
             a.include_children || a.include_parents || a.include_model ||
             a.summary || !a.region_str.empty() || !a.bed_file.empty() ||
             !a.seqid_filter.empty() || !a.source_filter.empty() || a.score_filter || a.strand_filter ||
-            a.phase_filter || !a.feature.empty() || a.do_longest ||
+            a.phase_filter || !a.type_filter.empty() || a.do_longest || !a.longest_type.empty() ||
             !a.grep_filters.empty() || !a.grep_file.empty() || !a.grep_field.empty() || a.grep_file_regex ||
             !a.include_expr_filters.empty() || !a.exclude_expr_filters.empty() || a.invert_grep || a.ignore_case ||
             a.format != OutputFormat::GFF3 || !a.output_file.empty()) {
@@ -393,9 +392,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Build index from full data before filtering, for summary counts.
-    const auto full_index = AnnotationIndex::from_data(GffData{data});
-
     // Query-style selectors: mark selected lines via query() API
     if (has_query_style_selector) {
         auto qparams = build_query_params(a);
@@ -430,12 +426,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (a.summary) {
-        std::vector<SummaryRow> rows;
+        std::vector<GffRecord> kept_records;
         for (const auto& rec : data.records) {
-            if (!rec.kept) continue;
-            rows.push_back(make_summary_row(full_index, rec));
+            if (rec.kept) kept_records.push_back(rec);
         }
-        print_summary(*out, rows);
+        print_summary(*out, kept_records);
     } else {
         switch (a.format) {
             case OutputFormat::GFF3: print_gff3(*out, data); break;

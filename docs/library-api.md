@@ -213,22 +213,8 @@ void print_bed(std::ostream& out, const GffData& data);
 
 ```cpp
 // src/query_summary.hpp
-struct SummaryRow {
-    std::string seqid;
-    int64_t start = 0;
-    int64_t end = 0;
-    char strand = '.';
-    std::string type;
-    int64_t length = 0;
-    size_t child_count = 0;
-    size_t transcript_count = 0;
-    size_t exon_count = 0;
-    int64_t cds_length = 0;
-};
-
 std::string record_id(const GffRecord& rec);
-SummaryRow make_summary_row(const AnnotationIndex& index, const GffRecord& rec);
-void print_summary(std::ostream& out, const std::vector<SummaryRow>& rows);
+void print_summary(std::ostream& out, const std::vector<GffRecord>& records);
 ```
 
 ## Region

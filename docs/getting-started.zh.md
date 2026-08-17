@@ -48,13 +48,13 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 按 feature 类型过滤：
 
 ```bash
-./gffsub demo.gff3 -f exon
+./gffsub demo.gff3 -t exon
 ```
 
 转 GTF：
 
 ```bash
-./gffsub demo.gff3 -t gtf
+./gffsub demo.gff3 --format gtf
 ```
 
 每个 gene 取最长 isoform：

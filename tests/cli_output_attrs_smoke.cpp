@@ -56,22 +56,22 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // -f gene -s: TSV with gene rows
-    if (run_command(exe + " " + gff + " -f gene -s > summary_gene.tsv") != 0 ||
-        require_contains("summary_gene.tsv", "seqid\tstart\tend\tstrand\ttype\tlength\tchild_count\ttranscript_count\texon_count\tcds_length") != 0 ||
-        require_contains("summary_gene.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t21") != 0 ||
-        require_contains("summary_gene.tsv", "chr2\t200\t600\t-\tgene\t401\t0\t0\t0\t0") != 0) {
+    // -t gene -s: aggregated TSV by seqid × type
+    if (run_command(exe + " " + gff + " -t gene -s > summary_gene.tsv") != 0 ||
+        require_contains("summary_gene.tsv", "seqid\ttype\tcount\tsum_len\tmin_len\tavg_len\tmax_len") != 0 ||
+        require_contains("summary_gene.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0 ||
+        require_contains("summary_gene.tsv", "chr2\tgene\t1\t401\t401\t401\t401") != 0) {
         return 1;
     }
 
-    // multi seqid: all row with NA for start/end/strand/type
-    if (require_contains("summary_gene.tsv", "all\tNA\tNA\tNA\tNA\t702\t1\t1\t1\t21") != 0) {
+    // multi seqid: all row per type with summed counts
+    if (require_contains("summary_gene.tsv", "all\tgene\t2\t702\t301\t351\t401") != 0) {
         return 1;
     }
 
-    // -f exon -s: no all row when single seqid
-    if (run_command(exe + " " + gff + " -f exon -s > summary_exon.tsv") != 0 ||
-        require_contains("summary_exon.tsv", "chr1\t120\t180\t+\texon\t61") != 0) {
+    // -t exon -s: no all row when single seqid
+    if (run_command(exe + " " + gff + " -t exon -s > summary_exon.tsv") != 0 ||
+        require_contains("summary_exon.tsv", "chr1\texon\t1\t61\t61\t61\t61") != 0) {
         return 1;
     }
     // single seqid → no all row
@@ -83,13 +83,13 @@ int main(int argc, char* argv[]) {
 
     // query -i gene0001 -s
     if (run_command(exe + " query " + gff + " -i gene0001 -s > summary_query.tsv") != 0 ||
-        require_contains("summary_query.tsv", "chr1\t100\t400\t+\tgene\t301\t1\t1\t1\t21") != 0) {
+        require_contains("summary_query.tsv", "chr1\tgene\t1\t301\t301\t301\t301") != 0) {
         return 1;
     }
 
     // -s with -o writes to file
-    if (run_command(exe + " " + gff + " -f gene -s -o summary_gene_out.tsv") != 0 ||
-        require_contains("summary_gene_out.tsv", "chr1\t100\t400\t+\tgene\t301") != 0) {
+    if (run_command(exe + " " + gff + " -t gene -s -o summary_gene_out.tsv") != 0 ||
+        require_contains("summary_gene_out.tsv", "chr1\tgene\t1\t301") != 0) {
         return 1;
     }
 

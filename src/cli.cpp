@@ -27,24 +27,6 @@ static std::string trim_copy(std::string_view value) {
     return std::string{value.substr(start, end - start)};
 }
 
-std::vector<std::string> split_attr_keys_cli(std::string_view keys) {
-    std::vector<std::string> result;
-    size_t pos = 0;
-    while (pos <= keys.size()) {
-        const size_t comma = keys.find(',', pos);
-        const size_t end = (comma == std::string_view::npos) ? keys.size() : comma;
-        const auto key = trim_copy(keys.substr(pos, end - pos));
-        if (!key.empty()) {
-            result.push_back(key);
-        }
-        if (comma == std::string_view::npos) {
-            break;
-        }
-        pos = comma + 1;
-    }
-    return result;
-}
-
 static std::optional<char> parse_strand_filter(std::string_view value) {
     if (value.size() != 1) return std::nullopt;
     const char strand = value[0];
@@ -121,7 +103,7 @@ std::optional<QueryParams> build_query_params(const CliArgs& a) {
             return std::nullopt;
         }
     }
-    q.feature_type = a.feature;
+    q.type = a.type_filter;
     q.include_children = a.include_children;
     q.include_parents = a.include_parents;
     q.include_model = a.include_model;
@@ -149,6 +131,8 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         OPT_EXCLUDE_EXPR,
         OPT_INVERT_MATCH,
         OPT_IGNORE_CASE,
+        OPT_FORMAT,
+        OPT_LONGEST_TYPE,
         OPT_VERSION
     };
     static struct option long_options[] = {
@@ -188,12 +172,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
         {"bed",           required_argument, nullptr, 'b'},
-        {"feature",       required_argument, nullptr, 'f'},
-        {"type",          required_argument, nullptr, 'f'},
+        {"type",          required_argument, nullptr, 't'},
         {"longest",       no_argument,       nullptr, 'L'},
+        {"longest-type",  required_argument, nullptr, OPT_LONGEST_TYPE},
         {"threads",       required_argument, nullptr, '@'},
-        {"format",        required_argument, nullptr, 't'},
-        {"output-format", required_argument, nullptr, 't'},
+        {"format",        required_argument, nullptr, OPT_FORMAT},
+        {"output-format", required_argument, nullptr, OPT_FORMAT},
         {"output",        required_argument, nullptr, 'o'},
         {"help",          no_argument,       nullptr, 'h'},
         {"version",       no_argument,       nullptr, OPT_VERSION},
@@ -202,7 +186,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "r:b:f:CL@:t:o:hI:E:vi:n:w:spmN:u:D:aS:", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'i': args.ids.emplace_back(optarg); break;
             case OPT_ID_LIST: args.id_list_file = optarg; break;
@@ -309,8 +293,13 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 }
                 break;
             case 'b': args.bed_file = optarg; break;
-            case 'f': args.feature = optarg; break;
+            case 't':
+                // repeatable: later -t append with comma
+                if (args.type_filter.empty()) args.type_filter = optarg;
+                else args.type_filter += "," + std::string{optarg};
+                break;
             case 'L': args.do_longest = true; break;
+            case OPT_LONGEST_TYPE: args.longest_type = optarg; break;
             case '@': {
                 args.threads_set = true;
                 // stoul accepts a leading '-' and wraps, so reject it explicitly.
@@ -332,7 +321,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 args.num_threads = t;
                 break;
             }
-            case 't': {
+            case OPT_FORMAT: {
                 const std::string fmt_str = optarg;
                 if (fmt_str == "gff3") args.format = OutputFormat::GFF3;
                 else if (fmt_str == "gtf" || fmt_str == "gtf2") args.format = OutputFormat::GTF2;
@@ -363,6 +352,11 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
     args.input_file = argv[optind];
 
     // --- post-parse validation ---
+
+    if (!args.longest_type.empty() && !args.do_longest) {
+        std::cerr << "Error: --longest-type requires --longest\n";
+        return std::nullopt;
+    }
 
     if (!args.grep_file.empty()) {
         if (args.grep_field.empty()) {

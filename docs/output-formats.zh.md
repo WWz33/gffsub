@@ -45,7 +45,7 @@
 - 6 列：chrom、start（0-based）、end、name、score、strand。
 - `start` = 记录起始 - 1。
 - `score` 取第 6 列，缺失或 `.` 时为 `0`。
-- `name` 取 `ID`，缺失时取 feature type。
+- `name` 取 `ID`，缺失时取 type。
 
 ## 示例
 
@@ -83,9 +83,9 @@ chr1	99	250	cds01	0	+
 ```
 
 ```bash
-./gffsub demo.gff3 -t gtf
-./gffsub demo.gff3 -t gtf3
-./gffsub demo.gff3 -t bed
-./gffsub input.gtf -t gff3
-./gffsub demo.gff3 -t gtf -o output.gtf
+./gffsub demo.gff3 --format gtf
+./gffsub demo.gff3 --format gtf3
+./gffsub demo.gff3 --format bed
+./gffsub input.gtf --format gff3
+./gffsub demo.gff3 --format gtf -o output.gtf
 ```

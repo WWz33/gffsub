@@ -3,26 +3,38 @@
 #include "record.hpp"
 #include <algorithm>
 #include <future>
+#include <map>
 #include <unordered_map>
 
 namespace gffsub {
 
-void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t num_threads) {
-    std::string isoform_type{feature_type};
+void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, size_t num_threads) {
+    std::string isoform_type{longest_type_sv};
     if (isoform_type.empty()) {
-        // Auto-detect: GFF3 uses "mRNA", GTF uses "transcript".
-        // Pick whichever exists in the data, preferring mRNA.
-        bool has_mrna = false;
-        bool has_transcript = false;
+        // Auto-detect: pick the most frequent transcript-class type among
+        // kept records (mRNA, transcript, ncRNA, tRNA, ...). Ties prefer
+        // mRNA, then transcript, then lexicographic order for determinism.
+        std::map<std::string, size_t> counts;
         for (const auto& rec : data.records) {
             if (!rec.kept) continue;
-            if (rec.type == "mRNA") has_mrna = true;
-            else if (rec.type == "transcript") has_transcript = true;
+            if (rec.feat_class == FeatureClass::Transcript) ++counts[rec.type];
         }
-        if (!has_mrna && has_transcript) {
-            isoform_type = "transcript";
-        } else {
-            isoform_type = "mRNA";
+        if (!counts.empty()) {
+            const auto best = std::max_element(
+                counts.begin(), counts.end(),
+                [](const auto& a, const auto& b) {
+                    if (a.second != b.second) return a.second < b.second;
+                    const auto rank = [](const std::string& t) {
+                        if (t == "mRNA") return 0;
+                        if (t == "transcript") return 1;
+                        return 2;
+                    };
+                    const int ra = rank(a.first);
+                    const int rb = rank(b.first);
+                    if (ra != rb) return ra > rb;
+                    return a.first > b.first;
+                });
+            isoform_type = best->first;
         }
     }
 
@@ -216,11 +228,6 @@ void filter_longest_isoform(GffData& data, std::string_view feature_type, size_t
         for (auto& f : futures) {
             f.get();
         }
-    }
-
-    if (!feature_type.empty()) {
-        std::unordered_set<std::string> types{std::string(feature_type)};
-        filter_by_feature(data, types, false);
     }
 }
 

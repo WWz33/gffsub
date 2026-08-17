@@ -22,7 +22,10 @@ struct SubsetParams {
     std::optional<std::optional<double>> score_filter;
     std::optional<char> strand_filter;
     std::optional<char> phase_filter;
-    std::string feature;
+    std::string type;
+    // isoform type for --longest; empty means auto-detect. Independent of
+    // type: -t filters output rows, --longest-type picks competing isoforms.
+    std::string longest_type;
     bool longest = false;
     size_t threads = 1;
     std::vector<GrepFilter> grep_filters;
@@ -32,7 +35,7 @@ struct SubsetParams {
 };
 
 // Apply region, bed, seqid, source, score, strand, phase, grep, expr, and
-// feature filters in sequence. Modifies data in place.
+// type filters in sequence. Modifies data in place.
 void subset(GffData& data, const SubsetParams& params);
 
 }  // namespace gffsub

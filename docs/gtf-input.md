@@ -40,14 +40,14 @@ For `--where`, `--grep`, and `-I`: `gene_id` and `transcript_id` resolve from re
 
 ## -L / --longest on GTF
 
-Auto-detects the isoform type: uses `transcript` if no `mRNA` records exist. No need for `-f transcript`.
+Auto-detects the isoform type: the most frequent transcript-class type (`transcript` for GTF). No need for `-t transcript`.
 
 ## GTF to GFF3 conversion
 
 Column 9 rewritten as `tag=value`. `ID=`/`Parent=` synthesized from `gene_id`/`transcript_id`. Other attributes URL-escaped.
 
 ```bash
-./gffsub input.gtf -t gff3
+./gffsub input.gtf --format gff3
 ```
 
 ## GTF to GTF
@@ -67,5 +67,5 @@ chr1	src	CDS	100	250	.	+	0	gene_id "g1"; transcript_id "t1";
 ./gffsub demo.gtf -w gene_id=g1
 ./gffsub demo.gtf -i t1 -C
 ./gffsub demo.gtf --longest
-./gffsub demo.gtf -i g1 -C -t gff3
+./gffsub demo.gtf -i g1 -C --format gff3
 ```

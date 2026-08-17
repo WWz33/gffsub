@@ -23,7 +23,7 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
-./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
+./gffsub data/smoke.gff3 -r chr1:1-100 -t gene
 ./gffsub data/smoke.gff3 -i GeneA -C
 ```
 
@@ -51,12 +51,13 @@ gffsub query|window <input.gff3> [options]
 | `-N, --nearest REGION` | — | 同 seqid 最近 gene |
 | `-u, --up` / `-D, --down` | 0 | 相对 `-i` 的窗口（bp） |
 | `-a, --strand-aware` | 关 | 窗口按特征链方向 |
-| `-f, --feature` | — | type 列过滤 |
+| `-t, --type` | — | type 列过滤；逗号列表，`^LIST` 排除；可重复 |
 | `-L, --longest` | 关 | 每基因一条转录本：有 CDS 比 CDS，否则比 exon |
+| `--longest-type` | 自动 | `-L` 的 isoform 类型；自动检测 transcript 类 |
 | `-@, --threads` | 1 | `-L` 线程数 |
-| `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
+| `--format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | 输出文件 |
-| `-s, --summary` | 关 | 过滤后记录的 TSV 统计摘要 |
+| `-s, --summary` | 关 | 按 seqid × type 的 TSV 统计（类似 `seqkit stats`） |
 | `-S, --seqid` | — | 保留 seqid；`^LIST` 排除 |
 
 ## Input / Output

@@ -1,30 +1,11 @@
 #include "subset.hpp"
 
+#include "string_utils.hpp"
+
 #include <string>
-#include <string_view>
 #include <unordered_set>
 
 namespace gffsub {
-
-// Parse comma-separated list with optional ^ prefix for exclusion mode.
-// e.g. "exon,CDS" -> {"exon","CDS"}, exclude=false
-//      "^gene" -> {"gene"}, exclude=true
-static std::unordered_set<std::string> parse_list(std::string_view sv, bool& exclude) {
-    exclude = false;
-    if (!sv.empty() && sv.front() == '^') {
-        exclude = true;
-        sv.remove_prefix(1);
-    }
-    std::unordered_set<std::string> result;
-    size_t pos = 0;
-    while (pos < sv.size()) {
-        auto comma = sv.find(',', pos);
-        if (comma == std::string_view::npos) comma = sv.size();
-        if (comma > pos) result.emplace(sv.substr(pos, comma - pos));
-        pos = comma + 1;
-    }
-    return result;
-}
 
 void subset(GffData& data, const SubsetParams& params) {
     if (params.region) {
@@ -72,11 +53,12 @@ void subset(GffData& data, const SubsetParams& params) {
     }
 
     if (params.longest) {
-        filter_longest_isoform(data, params.feature, params.threads);
-    } else if (!params.feature.empty()) {
-        bool feature_exclude = false;
-        auto features = parse_list(params.feature, feature_exclude);
-        filter_by_feature(data, features, feature_exclude);
+        filter_longest_isoform(data, params.longest_type, params.threads);
+    }
+    if (!params.type.empty()) {
+        bool type_exclude = false;
+        auto types = parse_list(params.type, type_exclude);
+        filter_by_type(data, types, type_exclude);
     }
 }
 

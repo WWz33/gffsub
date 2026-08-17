@@ -48,7 +48,9 @@ struct CliArgs {
     std::optional<char> strand_filter;
     std::optional<char> phase_filter;
     std::string bed_file;
-    std::string feature;
+    std::string type_filter;
+    // isoform type for --longest; empty = auto-detect
+    std::string longest_type;
     bool do_longest = false;
     size_t num_threads = 6;
     bool threads_set = false;
@@ -75,7 +77,6 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
 // Helpers used by cli and main
 AnnotationIndex load_index(const std::string& path);
-std::vector<std::string> split_attr_keys_cli(std::string_view keys);
 
 // Load one ID per non-empty line from a file. Returns nullopt on open failure.
 std::optional<std::vector<std::string>> load_id_list_file(const std::string& path);

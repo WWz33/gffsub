@@ -234,7 +234,21 @@ std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, i
             distance = start - rec.end;
         }
 
+        // Ties broken deterministically: smaller start, then smaller ID,
+        // independent of record order in the file.
+        bool better = false;
         if (distance < nearest_distance) {
+            better = true;
+        } else if (distance == nearest_distance && nearest) {
+            if (rec.start != nearest->start) {
+                better = rec.start < nearest->start;
+            } else {
+                const std::string rec_id = rec.id ? *rec.id : "";
+                const std::string near_id = nearest->id ? *nearest->id : "";
+                better = rec_id < near_id;
+            }
+        }
+        if (better) {
             nearest_distance = distance;
             nearest = rec;
         }

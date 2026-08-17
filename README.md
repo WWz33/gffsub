@@ -23,7 +23,7 @@ printf '%s\n' '##gff-version 3' \
   $'chr1\t.\tmRNA\t1\t100\t.\t+\t.\tID=mRNA1;Parent=GeneA' \
   $'chr1\t.\texon\t1\t100\t.\t+\t.\tID=exon1;Parent=mRNA1' > data/smoke.gff3
 
-./gffsub data/smoke.gff3 -r chr1:1-100 -f gene
+./gffsub data/smoke.gff3 -r chr1:1-100 -t gene
 ./gffsub data/smoke.gff3 -i GeneA -C
 ```
 
@@ -51,12 +51,13 @@ See `./gffsub -h` for the full flag list.
 | `-N, --nearest REGION` | — | nearest gene on same seqid |
 | `-u, --up` / `-D, --down` | 0 | window (bp) around `-i` |
 | `-a, --strand-aware` | off | window follows feature strand |
-| `-f, --feature` | — | type column filter |
+| `-t, --type` | — | type column filter; comma list, `^LIST` excludes; repeatable |
 | `-L, --longest` | off | one transcript/gene: CDS length if any CDS, else exon |
+| `--longest-type` | auto | isoform type for `-L`; auto-detects transcript class |
 | `-@, --threads` | 1 | threads for `-L` |
-| `-t, --format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
+| `--format` | gff3 | `gff3\|gtf\|gtf2\|gtf3\|bed` |
 | `-o, --output` | stdout | output file |
-| `-s, --summary` | off | TSV summary of filtered records |
+| `-s, --summary` | off | TSV stats by seqid × type (like `seqkit stats`) |
 | `-S, --seqid` | — | keep seqids; `^LIST` excludes |
 
 ## Input / Output

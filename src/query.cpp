@@ -1,5 +1,6 @@
 #include "query.hpp"
 #include "query_summary.hpp"
+#include "string_utils.hpp"
 
 #include <algorithm>
 #include <string>
@@ -23,9 +24,19 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
     QueryResult result;
     std::unordered_set<int> seen;
 
+    // Parse -t value once: comma list with optional ^ exclusion.
+    bool type_exclude = false;
+    std::unordered_set<std::string> type_set;
+    if (!params.type.empty()) {
+        type_set = parse_list(params.type, type_exclude);
+    }
+    const bool use_type_filter = params.apply_type_filter && !params.type.empty();
+
     auto add_match = [&](const GffRecord& rec) {
         const auto type_ok = [&](const GffRecord& r) {
-            return !params.apply_type_filter || params.feature_type.empty() || r.type == params.feature_type;
+            if (!use_type_filter) return true;
+            const bool found = type_set.count(r.type) > 0;
+            return type_exclude ? !found : found;
         };
         if (params.include_model) {
             const auto model = index.gene_model(record_id(rec));

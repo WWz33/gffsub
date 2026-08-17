@@ -83,7 +83,7 @@ GTF input: `gene_id` / `transcript_id` resolve from record fields. Other attribu
 ## Examples
 
 ```bash
-gffsub ann.gff3 -f exon -I 'length >= 100'
+gffsub ann.gff3 -t exon -I 'length >= 100'
 gffsub ann.gff3 -E 'length < 10'
-gffsub ann.gff3 -f exon -I 'length >= 200 && strand == "+"'
+gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
 ```

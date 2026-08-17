@@ -14,7 +14,7 @@
 - 不连续 CDS (同 ID 多行): 片段累加。
 - 同一 transcript 下多个 CDS 变体 (不同 ID): 取最长变体，不累加。
 - 长度相同取第一个遇到的。
-- 自动检测 isoform 类型: 有 `mRNA` 用 `mRNA`，否则用 `transcript`。无需 `-f transcript`。
+- 自动检测 isoform 类型: 取文件中最多的 transcript 类类型（`mRNA`、`transcript`、`ncRNA`、`tRNA` 等）。数量并列时优先 `mRNA`，其次 `transcript`。
 - 单 isoform 的 gene 保持不变。
 
 示例数据 (demo.gff3):
@@ -40,6 +40,21 @@ chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 ```bash
 # gene01 保留 tx01 (402 bp)，gene02 保留 tx03 (唯一 isoform)
 ./gffsub demo.gff3 --longest
+
+# 只输出最长 transcript 行 (去掉 gene/exon)
+./gffsub demo.gff3 --longest -t mRNA
+```
+
+## --longest-type TYPE
+
+`--longest` 选择 isoform 时用的类型。与 `-t` 相互独立: `--longest-type` 决定哪些记录参与最长竞争，`-t` 过滤输出行。需要 `--longest`。
+
+```bash
+# ncRNA 文件: 每 gene 选最长 ncRNA，保留层级
+./gffsub lnc.gff3 --longest --longest-type ncRNA
+
+# 同上，但只输出 ncRNA 行
+./gffsub lnc.gff3 --longest --longest-type ncRNA -t ncRNA
 ```
 
 ## -@ / --threads

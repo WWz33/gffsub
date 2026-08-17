@@ -45,16 +45,16 @@ Select by ID with children:
 ./gffsub demo.gff3 -i tx01 -C
 ```
 
-Filter by feature type:
+Filter by type:
 
 ```bash
-./gffsub demo.gff3 -f exon
+./gffsub demo.gff3 -t exon
 ```
 
 Convert to GTF:
 
 ```bash
-./gffsub demo.gff3 -t gtf
+./gffsub demo.gff3 --format gtf
 ```
 
 Longest isoform per gene:

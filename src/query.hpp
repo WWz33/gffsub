@@ -22,7 +22,7 @@ struct QueryParams {
     bool include_children = false;
     bool include_parents = false;
     bool include_model = false;
-    std::string feature_type;
+    std::string type;
     bool apply_type_filter = true;
 };
 

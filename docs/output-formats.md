@@ -45,7 +45,7 @@ Syntax: `-t FMT` or `--format FMT` (alias `--output-format FMT`).
 - 6 columns: chrom, start (0-based), end, name, score, strand.
 - `start` = record start - 1.
 - `score` from column 6, or `0` when missing or `.`.
-- `name` from `ID`, or the feature type when `ID` is missing.
+- `name` from `ID`, or the type when `ID` is missing.
 
 ## Example
 
@@ -83,9 +83,9 @@ chr1	99	250	cds01	0	+
 ```
 
 ```bash
-./gffsub demo.gff3 -t gtf
-./gffsub demo.gff3 -t gtf3
-./gffsub demo.gff3 -t bed
-./gffsub input.gtf -t gff3
-./gffsub demo.gff3 -t gtf -o output.gtf
+./gffsub demo.gff3 --format gtf
+./gffsub demo.gff3 --format gtf3
+./gffsub demo.gff3 --format bed
+./gffsub input.gtf --format gff3
+./gffsub demo.gff3 --format gtf -o output.gtf
 ```

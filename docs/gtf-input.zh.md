@@ -40,14 +40,14 @@ GTF 没有 `ID=`/`Parent=`。gffsub 合成如下：
 
 ## GTF 上的 --longest
 
-自动检测 isoform 类型：不存在 `mRNA` 记录时使用 `transcript`。无需 `-f transcript`。
+自动检测 isoform 类型：取最多的 transcript 类类型（GTF 为 `transcript`）。无需 `-t transcript`。
 
 ## GTF 转 GFF3
 
 第 9 列重写为 `tag=value`。`ID=`/`Parent=` 由 `gene_id`/`transcript_id` 合成。其他 attribute 做 URL 转义。
 
 ```bash
-./gffsub input.gtf -t gff3
+./gffsub input.gtf --format gff3
 ```
 
 ## GTF 转 GTF
@@ -67,5 +67,5 @@ chr1	src	CDS	100	250	.	+	0	gene_id "g1"; transcript_id "t1";
 ./gffsub demo.gtf -w gene_id=g1
 ./gffsub demo.gtf -i t1 -C
 ./gffsub demo.gtf --longest
-./gffsub demo.gtf -i g1 -C -t gff3
+./gffsub demo.gtf -i g1 -C --format gff3
 ```

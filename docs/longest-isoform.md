@@ -14,7 +14,7 @@ Keep one transcript per gene. Length metric:
 - Discontinuous CDS (same ID, multiple lines): segments summed.
 - Alternative CDS variants (distinct IDs under one transcript): longest variant used, not summed.
 - Ties keep the first encountered.
-- Auto-detects isoform type: `mRNA` if present, else `transcript`. No need for `-f transcript`.
+- Auto-detects isoform type: the most frequent transcript-class type in the file (`mRNA`, `transcript`, `ncRNA`, `tRNA`, ...). Ties prefer `mRNA`, then `transcript`.
 - Genes with one isoform are left unchanged.
 
 Sample data (demo.gff3):
@@ -40,6 +40,21 @@ chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 ```bash
 # keep tx01 for gene01 (402 bp), tx03 for gene02 (only isoform)
 ./gffsub demo.gff3 --longest
+
+# keep only the longest transcript rows (drop gene/exon)
+./gffsub demo.gff3 --longest -t mRNA
+```
+
+## --longest-type TYPE
+
+Isoform type for `--longest` selection. Independent of `-t`: `--longest-type` picks which records compete as isoforms, `-t` filters output rows. Requires `--longest`.
+
+```bash
+# ncRNA file: select longest ncRNA per gene, keep hierarchy
+./gffsub lnc.gff3 --longest --longest-type ncRNA
+
+# same, but output only the ncRNA rows
+./gffsub lnc.gff3 --longest --longest-type ncRNA -t ncRNA
 ```
 
 ## -@ / --threads

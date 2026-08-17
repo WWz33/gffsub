@@ -47,7 +47,7 @@ static bool write_gtf_unsorted(const std::string& path) {
 static bool write_gtf_mrna(const std::string& path) {
     std::ofstream out{path};
     if (!out.is_open()) return false;
-    // Input uses "mRNA"; -t gtf3 must rename it to "transcript".
+    // Input uses "mRNA"; --format gtf3 must rename it to "transcript".
     out << "chr1\tsrc\tgene\t100\t500\t.\t+\t.\tgene_id \"G1\";\n"
         << "chr1\tsrc\tmRNA\t100\t500\t.\t+\t.\tgene_id \"G1\"; transcript_id \"T1\";\n"
         << "chr1\tsrc\texon\t120\t180\t.\t+\t.\tgene_id \"G1\"; transcript_id \"T1\";\n";
@@ -166,7 +166,7 @@ static int test_gtf_no_id_collision(const std::string& exe, const std::string& g
 }
 
 // Group 3: GTF output. Gene line has NO transcript_id; transcript/exon have
-// both gene_id and transcript_id. -t gtf3 renames mRNA -> transcript.
+// both gene_id and transcript_id. --format gtf3 renames mRNA -> transcript.
 static int test_gtf_output(const std::string& exe, const std::string& gtf_basic,
                            const std::string& gtf_mrna) {
     if (run_command(exe + " " + gtf_basic + " --name G1 --model --output-format gtf > reg_gtf_out.gtf") != 0 ||
@@ -263,36 +263,30 @@ static int test_where_url_decode(const std::string& exe, const std::string& gff)
 // Group 8: summary output. -s on query produces TSV with per-record summary
 // including child/exon/cds counts.
 static int test_summary_scope(const std::string& exe, const std::string& gtf) {
-    // Transcript match: -i T1 -s shows transcript row with exon_count=1.
+    // Transcript match: -i T1 -s aggregates the transcript record.
     if (run_command(exe + " " + gtf + " -i T1 -s > reg_gtf_summary.tsv") != 0 ||
-        require_contains("reg_gtf_summary.tsv", "seqid\tstart\tend\tstrand\ttype\tlength") != 0) {
+        require_contains("reg_gtf_summary.tsv", "seqid\ttype\tcount\tsum_len") != 0) {
         return 1;
     }
     {
         const auto text = read_file("reg_gtf_summary.tsv");
-        if (text.find("\ttranscript\t") == std::string::npos) {
-            std::cerr << "transcript summary missing transcript type\n";
+        if (text.find("all\t") != std::string::npos) {
+            std::cerr << "unexpected all row in single-seqid summary\n";
             return 1;
         }
-        // transcript_count=0, exon_count=1, cds_length=21
-        if (text.find("\t0\t1\t21") == std::string::npos) {
-            std::cerr << "transcript summary scope wrong (expected exon_count=1, transcript_count=0)\n";
+        if (text.find("chr1\ttranscript\t1\t401\t401\t401\t401") == std::string::npos) {
+            std::cerr << "transcript summary row wrong\n";
             return 1;
         }
     }
-    // Gene match: -i G1 -s shows gene row with whole-gene counts.
+    // Gene match: -i G1 -s aggregates the gene record.
     if (run_command(exe + " " + gtf + " -i G1 -s > reg_gene_summary.tsv") != 0) {
         return 1;
     }
     {
         const auto text = read_file("reg_gene_summary.tsv");
-        if (text.find("\tgene\t") == std::string::npos) {
-            std::cerr << "gene summary missing gene type\n";
-            return 1;
-        }
-        // child_count=1, transcript_count=1, exon_count=1, cds_length=21
-        if (text.find("\tgene\t401\t1\t1\t1\t21") == std::string::npos) {
-            std::cerr << "gene summary scope wrong\n";
+        if (text.find("chr1\tgene\t1\t401\t401\t401\t401") == std::string::npos) {
+            std::cerr << "gene summary row wrong\n";
             return 1;
         }
     }
