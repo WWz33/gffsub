@@ -5,12 +5,18 @@
 
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace gffsub {
 
 // Extract a `key "value";` attribute from a GTF column-9 string.
 // Handles escaped quotes in the value. Returns nullopt when absent.
 std::optional<std::string> extract_quoted_value(const std::string& attrs, const std::string& key);
+
+// Parse all `key "value";` pairs in original order, values unescaped.
+// Fragments without a quoted value are skipped.
+std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(const std::string& attrs);
 
 // Rewrite a GTF record's column 9 as GFF3 `tag=value` pairs, synthesizing
 // ID=/Parent= from the resolved gene_id/transcript_id (AGAT gxf2gxf semantics).

@@ -68,7 +68,7 @@ class AnnotationIndex {
 public:
     static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
-    static AnnotationIndex from_data(GffData data);
+    static AnnotationIndex from_data(const GffData& data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     std::vector<GffRecord> find_all_by_id(std::string_view id) const;

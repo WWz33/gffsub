@@ -32,6 +32,7 @@ Syntax: `-t FMT` or `--format FMT` (alias `--output-format FMT`).
 - `mRNA` stays as `mRNA` in `gtf`/`gtf2`.
 - Values escaped: backslash, quote, tab, newline, CR.
 - When `gene_id` cannot be resolved, an empty value is emitted (`gene_id "";`).
+- Other GFF3 attributes are preserved after the mandatory pair, URL-decoded and quoted (GTF2.2 allows extra attributes; AGAT preserves them too).
 
 ## GTF3
 

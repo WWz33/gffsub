@@ -9,32 +9,6 @@
 
 namespace gffsub {
 
-static std::string url_decode(std::string_view input) {
-    std::string out;
-    out.reserve(input.size());
-    for (size_t i = 0; i < input.size(); ++i) {
-        if (input[i] == '%' && i + 2 < input.size()) {
-            auto hex_val = [](char c) -> int {
-                if (c >= '0' && c <= '9') return c - '0';
-                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-                return -1;
-            };
-            const int hi = hex_val(input[i + 1]);
-            const int lo = hex_val(input[i + 2]);
-            if (hi >= 0 && lo >= 0) {
-                out.push_back(static_cast<char>(hi * 16 + lo));
-                i += 2;
-            } else {
-                out.push_back('%');
-            }
-        } else {
-            out.push_back(input[i]);
-        }
-    }
-    return out;
-}
-
 static std::optional<std::string> extract_attr_value(std::string_view attrs, std::string_view key) {
     size_t pos = 0;
     while (pos < attrs.size()) {
@@ -270,8 +244,11 @@ namespace {
 // over the filename extension, so a GFF3 file renamed .gtf is still parsed as
 // GFF3.
 //
-//   GFF3: >=8 cols, col9 contains both '=' and ';'
-//   GTF:  >=8 cols, col9 contains '"' (quoted attribute values)
+//   GTF:  >=9 cols, col9 contains '"' — quoted values are GTF's defining
+//         feature and are forbidden raw in GFF3 (spec: encode as %22), so
+//         this is checked before '=' to keep GTF values that contain '='
+//         (legal in GTF) from being misread as GFF3.
+//   GFF3: >=9 cols, col9 contains '='
 //   BED:  3..12 cols, no col9, cols[1] and cols[2] are integers
 //   default: GFF3
 InputFormat sniff_format(const std::string& path) {
@@ -295,12 +272,11 @@ InputFormat sniff_format(const std::string& path) {
         const auto cols = split_line(line, '\t');
         if (cols.size() >= 9) {
             const auto& a = cols[8];
-            if (a.find('=') != std::string::npos &&
-                a.find(';') != std::string::npos) {
-                return InputFormat::GFF3;
-            }
             if (a.find('"') != std::string::npos) {
                 return InputFormat::GTF;
+            }
+            if (a.find('=') != std::string::npos) {
+                return InputFormat::GFF3;
             }
             // Col9 present but neither GFF3 nor GTF shape; fall back to GFF3
             // (lenient) rather than guessing BED from a 9-column line.

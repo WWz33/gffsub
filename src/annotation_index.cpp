@@ -29,13 +29,82 @@ AnnotationIndex AnnotationIndex::from_gff3(const std::string& path) {
     return AnnotationIndex{std::move(data)};
 }
 
-AnnotationIndex AnnotationIndex::from_data(GffData data) {
-    return AnnotationIndex{std::move(data)};
+AnnotationIndex AnnotationIndex::from_data(const GffData& data) {
+    // Borrowed view: no record copy, maps index into the caller's vector.
+    // Valid while the caller's GffData lives and keeps its record order.
+    AnnotationIndex index{GffData{}};
+    index.recs_ = &data.records;
+    index.build_maps(data.records);
+    return index;
 }
 
 AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
-    for (int i = 0; i < static_cast<int>(data_.records.size()); ++i) {
-        const auto& rec = data_.records[i];
+    build_maps(data_.records);
+}
+
+AnnotationIndex::AnnotationIndex(const AnnotationIndex& other)
+    : data_(other.data_),
+      id_to_record_(other.id_to_record_),
+      id_to_records_(other.id_to_records_),
+      gene_lookup_(other.gene_lookup_),
+      parents_by_child_id_(other.parents_by_child_id_),
+      children_by_parent_id_(other.children_by_parent_id_) {
+    if (other.recs_ == &other.data_.records) {
+        recs_ = &data_.records;
+    } else {
+        recs_ = other.recs_;
+    }
+}
+
+AnnotationIndex::AnnotationIndex(AnnotationIndex&& other) noexcept
+    : data_(std::move(other.data_)),
+      id_to_record_(std::move(other.id_to_record_)),
+      id_to_records_(std::move(other.id_to_records_)),
+      gene_lookup_(std::move(other.gene_lookup_)),
+      parents_by_child_id_(std::move(other.parents_by_child_id_)),
+      children_by_parent_id_(std::move(other.children_by_parent_id_)) {
+    if (other.recs_ == &other.data_.records) {
+        recs_ = &data_.records;
+    } else {
+        recs_ = other.recs_;
+    }
+}
+
+AnnotationIndex& AnnotationIndex::operator=(const AnnotationIndex& other) {
+    if (this == &other) return *this;
+    data_ = other.data_;
+    id_to_record_ = other.id_to_record_;
+    id_to_records_ = other.id_to_records_;
+    gene_lookup_ = other.gene_lookup_;
+    parents_by_child_id_ = other.parents_by_child_id_;
+    children_by_parent_id_ = other.children_by_parent_id_;
+    if (other.recs_ == &other.data_.records) {
+        recs_ = &data_.records;
+    } else {
+        recs_ = other.recs_;
+    }
+    return *this;
+}
+
+AnnotationIndex& AnnotationIndex::operator=(AnnotationIndex&& other) noexcept {
+    if (this == &other) return *this;
+    data_ = std::move(other.data_);
+    id_to_record_ = std::move(other.id_to_record_);
+    id_to_records_ = std::move(other.id_to_records_);
+    gene_lookup_ = std::move(other.gene_lookup_);
+    parents_by_child_id_ = std::move(other.parents_by_child_id_);
+    children_by_parent_id_ = std::move(other.children_by_parent_id_);
+    if (other.recs_ == &other.data_.records) {
+        recs_ = &data_.records;
+    } else {
+        recs_ = other.recs_;
+    }
+    return *this;
+}
+
+void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
+    for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+        const auto& rec = records[i];
         if (rec.id) {
             id_to_record_.emplace(*rec.id, i);
             // GFF3 discontinuous features: the same ID may appear on multiple
@@ -74,8 +143,8 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
         }
     }
 
-    for (int i = 0; i < static_cast<int>(data_.records.size()); ++i) {
-        const auto& rec = data_.records[i];
+    for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+        const auto& rec = records[i];
         const auto attrs = parse_attributes(rec.attr_raw);
         const auto parent_it = attrs.find("Parent");
 
@@ -113,7 +182,7 @@ std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const 
     if (it == id_to_record_.end()) {
         return std::nullopt;
     }
-    return data_.records[it->second];
+    return (*recs_)[it->second];
 }
 
 std::vector<GffRecord> AnnotationIndex::find_all_by_id(std::string_view id) const {
@@ -124,7 +193,7 @@ std::vector<GffRecord> AnnotationIndex::find_all_by_id(std::string_view id) cons
     }
     records.reserve(it->second.size());
     for (const int idx : it->second) {
-        records.push_back(data_.records[idx]);
+        records.push_back((*recs_)[idx]);
     }
     return records;
 }
@@ -134,7 +203,7 @@ std::optional<GffRecord> AnnotationIndex::find_gene(std::string_view id) const {
     if (it == gene_lookup_.end() || it->second.empty()) {
         return std::nullopt;
     }
-    return data_.records[it->second.front()];
+    return (*recs_)[it->second.front()];
 }
 
 std::vector<GffRecord> AnnotationIndex::find_all_genes(std::string_view id) const {
@@ -144,7 +213,7 @@ std::vector<GffRecord> AnnotationIndex::find_all_genes(std::string_view id) cons
         return result;
     }
     for (int idx : it->second) {
-        result.push_back(data_.records[idx]);
+        result.push_back((*recs_)[idx]);
     }
     return result;
 }
@@ -157,7 +226,7 @@ std::vector<GffRecord> AnnotationIndex::parents_of(std::string_view id) const {
     }
     parents.reserve(it->second.size());
     for (const int idx : it->second) {
-        parents.push_back(data_.records[idx]);
+        parents.push_back((*recs_)[idx]);
     }
     return parents;
 }
@@ -170,7 +239,7 @@ std::vector<GffRecord> AnnotationIndex::children_of(std::string_view parent_id) 
     }
     children.reserve(it->second.size());
     for (const int idx : it->second) {
-        children.push_back(data_.records[idx]);
+        children.push_back((*recs_)[idx]);
     }
     return children;
 }
@@ -197,7 +266,7 @@ std::vector<GffRecord> AnnotationIndex::descendants_of(std::string_view parent_i
             if (!visited_indices.insert(child_idx).second) {
                 continue;
             }
-            const auto& child = data_.records[child_idx];
+            const auto& child = (*recs_)[child_idx];
             descendants.push_back(child);
             if (child.id) {
                 pending.push_back(*child.id);
@@ -210,7 +279,7 @@ std::vector<GffRecord> AnnotationIndex::descendants_of(std::string_view parent_i
 
 std::vector<GffRecord> AnnotationIndex::overlap(std::string_view seqid, int64_t start, int64_t end) const {
     std::vector<GffRecord> matches;
-    for (const auto& rec : data_.records) {
+    for (const auto& rec : *recs_) {
         if (rec.seqid == seqid && rec.end >= start && rec.start <= end) {
             matches.push_back(rec);
         }
@@ -222,7 +291,7 @@ std::optional<GffRecord> AnnotationIndex::nearest_gene(std::string_view seqid, i
     std::optional<GffRecord> nearest;
     int64_t nearest_distance = std::numeric_limits<int64_t>::max();
 
-    for (const auto& rec : data_.records) {
+    for (const auto& rec : *recs_) {
         if (rec.feat_class != FeatureClass::Gene || rec.seqid != seqid) {
             continue;
         }
@@ -265,7 +334,7 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
         skey = skey.substr(5);
     }
     const std::string svalue{value};
-    for (const auto& rec : data_.records) {
+    for (const auto& rec : *recs_) {
         // Check synthesized rec fields first (needed for GTF where attr_raw
         // uses key "value"; format that parse_attributes cannot parse).
         if (skey == "gene_id" && rec.gene_id && *rec.gene_id == svalue) {

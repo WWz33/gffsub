@@ -22,8 +22,9 @@ std::string tsv_escape(const std::string& s) {
     return out;
 }
 
-// Integer when integral, one decimal otherwise.
+// Integer when integral, one decimal otherwise. Lengths are non-negative.
 std::string fmt_len(double v) {
+    if (v < 0) v = 0;
     const int64_t whole = static_cast<int64_t>(v);
     if (static_cast<double>(whole) == v) return std::to_string(whole);
     return std::to_string(whole) + "." + std::to_string(static_cast<int64_t>((v - whole) * 10));

@@ -216,14 +216,20 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
             process_chromosome(chrom, gene_indices);
         }
     } else {
+        // Cap in-flight threads at num_threads; scaffold-heavy files can
+        // have thousands of chromosomes, one future each would exhaust
+        // thread limits. Batch: launch up to num_threads, then wait.
         std::vector<std::future<void>> futures;
         for (auto& kv : chrom_to_gene_idx) {
             const std::string& chrom = kv.first;
             std::vector<int> gene_indices = kv.second;
-            auto f = std::async(std::launch::async, [&, chrom, gene_indices]() {
+            futures.push_back(std::async(std::launch::async, [&, chrom, gene_indices]() {
                 process_chromosome(chrom, gene_indices);
-            });
-            futures.push_back(std::move(f));
+            }));
+            if (futures.size() >= num_threads) {
+                for (auto& f : futures) f.get();
+                futures.clear();
+            }
         }
         for (auto& f : futures) {
             f.get();

@@ -399,7 +399,7 @@ int main(int argc, char* argv[]) {
         qparams->apply_type_filter = false;
         qparams->region.reset();  // region is handled by subset() filter, not query selector
 
-        const auto index = AnnotationIndex::from_data(GffData{data});
+        const auto index = AnnotationIndex::from_data(data);
         const auto result = query(index, *qparams);
 
         std::unordered_set<int> selected_lines;

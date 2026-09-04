@@ -25,6 +25,10 @@ Quote values with spaces or special characters using double quotes.
 | `!=` | string not equal |
 | `~` | regex match |
 | `!~` | regex not match |
+
+Regexes use the C++ standard ECMAScript engine. Patterns with nested
+quantifiers (e.g. `(a+)+b`) on long values can backtrack heavily;
+prefer simpler patterns on `attr.*` fields.
 | `<` | numeric less than |
 | `<=` | numeric less or equal |
 | `>` | numeric greater than |

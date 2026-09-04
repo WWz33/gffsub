@@ -46,4 +46,31 @@ std::unordered_set<std::string> parse_list(std::string_view sv, bool& exclude) {
     return result;
 }
 
+// URL-decode a GFF3 attribute value per spec: %XX -> byte.
+std::string url_decode(std::string_view input) {
+    std::string out;
+    out.reserve(input.size());
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '%' && i + 2 < input.size()) {
+            auto hex_val = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
+            const int hi = hex_val(input[i + 1]);
+            const int lo = hex_val(input[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                out.push_back(static_cast<char>(hi * 16 + lo));
+                i += 2;
+            } else {
+                out.push_back('%');
+            }
+        } else {
+            out.push_back(input[i]);
+        }
+    }
+    return out;
+}
+
 }  // namespace gffsub

@@ -15,6 +15,9 @@ std::string to_lower(std::string_view sv);
 // including empty ones (like split on '\t' for sparse GFF columns).
 std::vector<std::string> split_line(const std::string& line, char delimiter);
 
+// URL-decode a GFF3 attribute value per spec: %XX -> byte.
+std::string url_decode(std::string_view input);
+
 // Parse comma-separated list with optional ^ prefix for exclusion mode.
 // e.g. "exon,CDS" -> {"exon","CDS"}, exclude=false
 //      "^gene" -> {"gene"}, exclude=true

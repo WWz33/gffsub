@@ -19,7 +19,9 @@ class AnnotationIndex {
 public:
     static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
-    static AnnotationIndex from_data(GffData data);
+    // Borrow the caller's records (no copy). The caller's GffData must
+    // outlive the index and keep its record order.
+    static AnnotationIndex from_data(const GffData& data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     // All lines sharing an ID (GFF3 discontinuous features, e.g. multi-line CDS).
@@ -34,8 +36,19 @@ public:
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
 
+    // Re-point recs_ after a move/copy: owned mode follows data_ into the
+    // new object; borrowed mode keeps pointing at the external vector.
+    AnnotationIndex(const AnnotationIndex& other);
+    AnnotationIndex(AnnotationIndex&& other) noexcept;
+    AnnotationIndex& operator=(const AnnotationIndex& other);
+    AnnotationIndex& operator=(AnnotationIndex&& other) noexcept;
+
 private:
+    // Owning copy (from_data(GffData) / from_file), or a borrowed view into
+    // caller-owned records (from_data(const GffData&)). recs_ always points
+    // at the record vector the maps index into.
     GffData data_;
+    const std::vector<GffRecord>* recs_ = &data_.records;
     std::unordered_map<std::string, int> id_to_record_;
     std::unordered_map<std::string, std::vector<int>> id_to_records_;
     std::unordered_map<std::string, std::vector<int>> gene_lookup_;
@@ -43,6 +56,8 @@ private:
     std::unordered_map<std::string, std::vector<int>> children_by_parent_id_;
 
     explicit AnnotationIndex(GffData data);
+    // Build the lookup maps over a record vector (owned or borrowed).
+    void build_maps(const std::vector<GffRecord>& records);
 };
 
 }  // namespace gffsub

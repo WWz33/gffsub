@@ -1,6 +1,7 @@
 #include "feature_types.hpp"
 #include "output.hpp"
 #include "gtf_parser.hpp"
+#include "parser.hpp"
 #include "record.hpp"
 #include <iostream>
 #include <sstream>
@@ -31,12 +32,13 @@ void print_gff3(std::ostream& out, const GffData& data) {
     }
 }
 
-static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val, bool is_gene) {
-    // GTF2.2: gene_id required on every line. transcript_id only on non-gene features.
-    // Escape quotes and backslashes in values (GTF attributes are quoted strings).
+static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val,
+                                   bool is_gene, const GffRecord& rec) {
+    // GTF2.2: gene_id required on every line, transcript_id on non-gene
+    // features; other attributes may follow (spec: "Any other attributes or
+    // comments must appear after these two"). Preserve them like AGAT does
+    // ("attribute conserved: All"): URL-decode GFF3 values, quote, escape.
     auto gtf_escape = [](const std::string& s) {
-        // GTF2.2 / GFF2: escape quotes, backslashes, and control chars
-        // using C-style backslash-escaped representation.
         std::string out;
         out.reserve(s.size());
         for (const char ch : s) {
@@ -58,6 +60,31 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
         result += " transcript_id \"";
         result += gtf_escape(transcript_id_val);
         result += "\";";
+    }
+    // Pass through the remaining attributes. Skip keys already emitted above.
+    // GTF-source col9 is `key "value";`, which parse_attributes (tag=value)
+    // cannot read — it would drop or corrupt every attribute. Use the GTF
+    // pair parser for GTF-source records.
+    if (rec.src_fmt == InputFormat::GTF) {
+        for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
+            if (key == "gene_id" || key == "transcript_id") continue;
+            result += ' ';
+            result += key;
+            result += " \"";
+            result += gtf_escape(value);
+            result += "\";";
+        }
+    } else {
+        for (const auto& [key, values] : parse_attributes(rec.attr_raw)) {
+            if (key == "gene_id" || key == "transcript_id" || key == "Parent" || key == "ID") continue;
+            for (const auto& v : values) {
+                result += ' ';
+                result += key;
+                result += " \"";
+                result += gtf_escape(v);
+                result += "\";";
+            }
+        }
     }
     return result;
 }
@@ -136,7 +163,10 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
                 // convention instead of fabricating one from the gene ID.
                 gene_id_val = *rec.parent_id;
             } else if (rec.parent_id) {
-                gene_id_val = *rec.parent_id;
+                // Parent unresolvable to a gene/transcript record in this file
+                // (flat GTF with only exon/CDS lines): trust the source's
+                // gene_id attribute over the parent ID.
+                gene_id_val = rec.gene_id ? *rec.gene_id : *rec.parent_id;
                 transcript_id_val = *rec.parent_id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
@@ -146,7 +176,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         // GTF2.2 requires gene_id on every feature line. When it cannot be
         // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
         // convention rather than dropping the feature silently.
-        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.feat_class == FeatureClass::Gene);
+        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.feat_class == FeatureClass::Gene, rec);
 
         out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
