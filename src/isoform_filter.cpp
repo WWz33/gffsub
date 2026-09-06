@@ -17,7 +17,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         std::map<std::string, size_t> counts;
         for (const auto& rec : data.records) {
             if (!rec.kept) continue;
-            if (rec.feat_class == FeatureClass::Transcript) ++counts[rec.type];
+            if (rec.feat_class == FeatureClass::Transcript) ++counts[std::string{rec.type}];
         }
         if (!counts.empty()) {
             const auto best = std::max_element(
@@ -86,7 +86,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
         if (rec.feat_class == FeatureClass::Gene && rec.id) {
-            chrom_to_gene_idx[rec.seqid].push_back(i);
+            chrom_to_gene_idx[std::string{rec.seqid}].push_back(i);
         }
     }
 

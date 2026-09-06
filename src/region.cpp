@@ -36,7 +36,7 @@ std::optional<Region> parse_region(std::string_view region_str) {
 }
 
 BedRegion to_bed_region(const GffRecord& rec) {
-    return BedRegion{rec.seqid, rec.start - 1, rec.end};
+    return BedRegion{std::string{rec.seqid}, rec.start - 1, rec.end};
 }
 
 Region from_bed_region(const BedRegion& region) {
@@ -55,7 +55,7 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
     if (start < 1) {
         start = 1;
     }
-    return Region{rec.seqid, start, rec.end + right_extension};
+    return Region{std::string{rec.seqid}, start, rec.end + right_extension};
 }
 
 }  // namespace gffsub

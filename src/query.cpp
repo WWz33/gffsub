@@ -35,7 +35,7 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
     auto add_match = [&](const GffRecord& rec) {
         const auto type_ok = [&](const GffRecord& r) {
             if (!use_type_filter) return true;
-            const bool found = type_set.count(r.type) > 0;
+            const bool found = type_set.count(std::string{r.type}) > 0;
             return type_exclude ? !found : found;
         };
         if (params.include_model) {

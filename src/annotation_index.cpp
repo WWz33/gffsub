@@ -29,6 +29,10 @@ AnnotationIndex AnnotationIndex::from_gff3(const std::string& path) {
     return AnnotationIndex{std::move(data)};
 }
 
+AnnotationIndex AnnotationIndex::from_owned(GffData data) {
+    return AnnotationIndex{std::move(data)};
+}
+
 AnnotationIndex AnnotationIndex::from_data(const GffData& data) {
     // Borrowed view: no record copy, maps index into the caller's vector.
     // Valid while the caller's GffData lives and keeps its record order.

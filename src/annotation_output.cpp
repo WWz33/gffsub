@@ -21,11 +21,22 @@ void print_gff3(std::ostream& out, const GffData& data) {
     }
     for (const auto& rec : data) {
         if (!rec.kept) continue;
-        const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
-        // GTF attr_raw is `key "value";` which is invalid GFF3 column 9;
-        // rewrite it as tag=value with synthesized ID=/Parent=.
-        const std::string& raw_col9 = (rec.src_fmt == InputFormat::GTF) ? gtf_attrs_to_gff3(rec) : rec.attr_raw;
-        const std::string& col9 = raw_col9.empty() ? std::string{"."} : raw_col9;
+        const std::string_view score_str = rec.score_raw.empty() ? std::string_view{"."} : rec.score_raw;
+        std::string col9_storage;  // only used when col9 must be synthesized
+        std::string_view col9;
+        if (rec.src_fmt == InputFormat::GTF) {
+            // GTF attr_raw is `key "value";` which is invalid GFF3 column 9;
+            // rewrite it as tag=value with synthesized ID=/Parent=.
+            col9_storage = gtf_attrs_to_gff3(rec);
+            col9 = col9_storage;
+        } else if (rec.attr_raw.empty() && rec.id) {
+            // BED-sourced record: attr_raw was left empty at parse time.
+            col9_storage = "ID=" + *rec.id;
+            col9 = col9_storage;
+        } else {
+            col9 = rec.attr_raw;
+        }
+        if (col9.empty()) col9 = ".";
         out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << col9 << '\n';
@@ -130,7 +141,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
             if (!gtf_type_emittable(gtf_type, fmt)) continue;
         }
 
-        const std::string& score_str = rec.score_raw.empty() ? std::string{"."} : rec.score_raw;
+        const std::string score_str = rec.score_raw.empty() ? std::string{"."} : std::string{rec.score_raw};
 
         std::string gene_id_val;
         std::string transcript_id_val;
@@ -194,8 +205,8 @@ void print_bed(std::ostream& out, const GffData& data) {
     for (const auto& rec : data) {
         if (!rec.kept) continue;
 
-        std::string name = rec.id ? *rec.id : rec.type;
-        const std::string& score_str = (rec.score_raw.empty() || rec.score_raw == ".") ? std::string{"0"} : rec.score_raw;
+        std::string name = rec.id ? *rec.id : std::string{rec.type};
+        const std::string score_str = (rec.score_raw.empty() || rec.score_raw == ".") ? std::string{"0"} : std::string{rec.score_raw};
 
         out << rec.seqid << '\t'
             << (rec.start - 1) << '\t'

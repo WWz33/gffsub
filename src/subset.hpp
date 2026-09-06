@@ -38,6 +38,11 @@ struct SubsetParams {
 // type filters in sequence. Modifies data in place.
 void subset(GffData& data, const SubsetParams& params);
 
+// Stable-sort records by comma-separated keys: seqid, natural-seqid, start,
+// end, length, type. Output order changes only; membership (kept flags) is
+// untouched. Returns 0, or -1 on an unknown key.
+int sort_records(GffData& data, std::string_view keys, bool reverse);
+
 }  // namespace gffsub
 
 #endif  // SUBSET_HPP

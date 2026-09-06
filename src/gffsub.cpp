@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) {
             a.phase_filter || !a.type_filter.empty() || a.do_longest || !a.longest_type.empty() ||
             !a.grep_filters.empty() || !a.grep_file.empty() || !a.grep_field.empty() || a.grep_file_regex ||
             !a.include_expr_filters.empty() || !a.exclude_expr_filters.empty() || a.invert_grep || a.ignore_case ||
-            a.format != OutputFormat::GFF3 || !a.output_file.empty()) {
+            a.format != OutputFormat::GFF3 || !a.output_file.empty() || !a.sort_keys.empty() || a.sort_reverse) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
@@ -370,7 +370,8 @@ int main(int argc, char* argv[]) {
 
     // Pure query-style selector (no subset filters) → dispatch to query API
     const bool can_dispatch_to_query = !a.summary && no_subset_filters(a) &&
-        a.format == OutputFormat::GFF3 && a.output_file.empty() && a.region_str.empty();
+        a.format == OutputFormat::GFF3 && a.output_file.empty() && a.region_str.empty() &&
+        a.sort_keys.empty() && !a.sort_reverse;
 
     if (has_query_style_selector && can_dispatch_to_query) {
         auto qparams = build_query_params(a);
@@ -386,10 +387,18 @@ int main(int argc, char* argv[]) {
     // --- main subset path ---
 
     GffData data;
-    const InputFormat input_fmt = infer_input_format(a.input_file);
-    if (parse_file(a.input_file, data, input_fmt) != 0) {
-        std::cerr << "Error: cannot parse " << a.input_file << '\n';
-        return 1;
+    InputFormat input_fmt = InputFormat::GFF3;
+    if (a.input_file == "-") {
+        if (parse_stdin(data, input_fmt) != 0) {
+            std::cerr << "Error: cannot parse stdin\n";
+            return 1;
+        }
+    } else {
+        input_fmt = infer_input_format(a.input_file);
+        if (parse_file(a.input_file, data, input_fmt) != 0) {
+            std::cerr << "Error: cannot parse " << a.input_file << '\n';
+            return 1;
+        }
     }
 
     // Query-style selectors: mark selected lines via query() API
@@ -412,6 +421,25 @@ int main(int argc, char* argv[]) {
     }
 
     subset(data, build_subset_params(a));
+
+    // Sort after filtering: only order changes, membership does not.
+    if (a.sort_keys.empty() && a.sort_reverse) {
+        std::cerr << "Error: --reverse requires --sort\n";
+        return 1;
+    }
+    if (!a.sort_keys.empty() && a.summary) {
+        // Summary output order is determined by (seqid, type) aggregation,
+        // not record order; sorting would have no observable effect.
+        std::cerr << "Error: --sort has no effect with --summary\n";
+        return 1;
+    }
+    if (!a.sort_keys.empty()) {
+        if (sort_records(data, a.sort_keys, a.sort_reverse) != 0) {
+            std::cerr << "Error: unknown sort key in \"" << a.sort_keys
+                      << "\" (valid: seqid, natural-seqid, start, end, length, type)\n";
+            return 1;
+        }
+    }
 
     // Output
     std::ofstream out_file;

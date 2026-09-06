@@ -11,9 +11,14 @@ namespace gffsub {
 // Lowercase a string view, returning a new std::string.
 std::string to_lower(std::string_view sv);
 
-// Split a string on a single-character delimiter. Returns all fields
-// including empty ones (like split on '\t' for sparse GFF columns).
-std::vector<std::string> split_line(const std::string& line, char delimiter);
+// Split a string view on a single-character delimiter. Returns views into
+// the input, including empty fields (like split on '\t' for sparse GFF
+// columns). The input must outlive the returned views.
+std::vector<std::string_view> split_line(std::string_view line, char delimiter);
+
+// Natural-order compare: embedded digit runs compare by value, so "Gm2"
+// sorts before "Gm10". Returns <0/0/>0 like strcmp.
+int natural_compare(std::string_view a, std::string_view b);
 
 // URL-decode a GFF3 attribute value per spec: %XX -> byte.
 std::string url_decode(std::string_view input);

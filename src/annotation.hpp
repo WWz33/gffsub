@@ -22,6 +22,9 @@ public:
     // Borrow the caller's records (no copy). The caller's GffData must
     // outlive the index and keep its record order.
     static AnnotationIndex from_data(const GffData& data);
+    // Take ownership of the records (used by load_index for stdin, where
+    // there is no long-lived caller GffData).
+    static AnnotationIndex from_owned(GffData data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     // All lines sharing an ID (GFF3 discontinuous features, e.g. multi-line CDS).

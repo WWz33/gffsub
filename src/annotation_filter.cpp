@@ -32,13 +32,13 @@ static std::vector<Region> load_regions(const std::string& filename, bool is_bed
             Region r;
             try {
                 size_t pos = 0;
-                const int64_t bed_start = std::stoll(cols[1], &pos);
+                const int64_t bed_start = std::stoll(std::string{cols[1]}, &pos);
                 if (pos != cols[1].size()) continue;
                 pos = 0;
-                r.end = std::stoll(cols[2], &pos);
+                r.end = std::stoll(std::string{cols[2]}, &pos);
                 if (pos != cols[2].size()) continue;
                 if (bed_start < 0 || r.end <= bed_start) continue;
-                r.seqid = cols[0];
+                r.seqid = std::string{cols[0]};
                 r.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
             } catch (const std::exception&) {
                 continue;
@@ -67,7 +67,7 @@ void filter_by_regions_from_file(GffData& data, const std::string& bed_file) {
 void filter_by_type(GffData& data, const std::unordered_set<std::string>& types, bool exclude) {
     for (auto& rec : data) {
         if (!rec.kept) continue;
-        bool found = types.count(rec.type) > 0;
+        bool found = types.count(std::string{rec.type}) > 0;
         if (exclude ? found : !found) {
             rec.kept = false;
         }
@@ -77,7 +77,7 @@ void filter_by_type(GffData& data, const std::unordered_set<std::string>& types,
 void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude) {
     for (auto& rec : data) {
         if (!rec.kept) continue;
-        bool found = seqids.count(rec.seqid) > 0;
+        bool found = seqids.count(std::string{rec.seqid}) > 0;
         if (exclude ? found : !found) {
             rec.kept = false;
         }
@@ -87,7 +87,7 @@ void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqid
 void filter_by_source(GffData& data, const std::unordered_set<std::string>& sources, bool exclude) {
     for (auto& rec : data) {
         if (!rec.kept) continue;
-        bool found = sources.count(rec.source) > 0;
+        bool found = sources.count(std::string{rec.source}) > 0;
         if (exclude ? found : !found) {
             rec.kept = false;
         }

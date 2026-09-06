@@ -69,6 +69,11 @@ struct CliArgs {
     bool summary = false;
     OutputFormat format = OutputFormat::GFF3;
     std::string output_file;
+
+    // sort: comma-separated keys (seqid, natural-seqid, start, end, length,
+    // type) applied to kept records after filtering, before output.
+    std::string sort_keys;
+    bool sort_reverse = false;
 };
 
 // Parse command-line arguments for the default (non-subcommand) path.

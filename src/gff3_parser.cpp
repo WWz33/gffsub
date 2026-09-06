@@ -6,6 +6,8 @@
 #include "gtf_parser.hpp"
 #include "string_utils.hpp"
 #include <fstream>
+#include <iostream>
+#include <iterator>
 
 namespace gffsub {
 
@@ -53,37 +55,52 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
 }
 
 int parse_file(const std::string& filename, GffData& data, InputFormat format) {
-    std::ifstream file(filename);
+    // Read the whole input into data.buffer; record fields are string_views
+    // into it. stdin ("-") goes through parse_stdin instead: the format must
+    // be sniffed from the buffer after the single read.
+    std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) return -1;
-
-    // Reserve records capacity from file size to avoid ~20 reallocations
-    // when pushing 1M+ records. Average GFF3 line is ~130 bytes. Only run
-    // the seek optimization on seekable regular files; on a FIFO/pipe the
-    // seeks fail and would leave failbit set, silently zeroing the output.
     {
-        const auto pos = file.tellg();
         file.seekg(0, std::ios::end);
         const auto end = file.tellg();
-        if (file && end > pos) {
-            // Cap to avoid bad_alloc on sparse / comment-heavy files where the
-            // byte/record ratio is far lower than 130.
-            size_t hint = static_cast<size_t>(end - pos) / 130;
-            if (hint > 1u << 20) hint = 1u << 20;
-            data.reserve(hint);
-            file.seekg(pos);  // restore (only valid when seeks succeeded)
+        if (file && end > 0) {
+            data.buffer.resize(static_cast<size_t>(end));
+            file.seekg(0);
+            file.read(data.buffer.data(), end);
+            data.buffer.resize(static_cast<size_t>(file.gcount()));
         } else {
-            file.clear();  // non-seekable input (FIFO/pipe): drop failbit, stay at pos 0
+            // Non-seekable input (FIFO/pipe): fall back to a streaming read.
+            file.clear();
+            file.seekg(0);
+            file.clear();
+            std::string chunk{std::istreambuf_iterator<char>(file),
+                              std::istreambuf_iterator<char>()};
+            data.buffer = std::move(chunk);
         }
     }
+    // Reserve records capacity: average GFF3 line ~130 bytes. Cap to avoid
+    // bad_alloc on comment-heavy files.
+    size_t hint = data.buffer.size() / 130;
+    if (hint > 1u << 20) hint = 1u << 20;
+    data.reserve(hint);
+    return parse_content(data, format);
+}
 
-    std::string line;
+int parse_content(GffData& data, InputFormat format) {
+    const std::string_view content{data.buffer};
     bool in_fasta = false;
+    size_t pos = 0;
 
-    while (std::getline(file, line)) {
+    while (pos < content.size()) {
+        size_t eol = content.find('\n', pos);
+        if (eol == std::string_view::npos) eol = content.size();
+        std::string_view line = content.substr(pos, eol - pos);
+        pos = eol + 1;
+
         if (in_fasta) continue;
 
         // Strip CR from CRLF line endings before any column parsing.
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
 
         if (line.rfind("##FASTA", 0) == 0) { in_fasta = true; continue; }
         if (line.empty()) continue;
@@ -91,7 +108,7 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
             // Capture ## directives (##gff-version, ##sequence-region, etc.)
             // for re-emission on output. Single-line # comments are skipped.
             if (line.size() > 1 && line[1] == '#') {
-                data.directives.push_back(line);
+                data.directives.emplace_back(line);
             }
             continue;
         }
@@ -106,18 +123,18 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
             if (cols.size() < 9) continue;
 
             try {
-                rec.seqid = std::move(cols[0]);
-                rec.source = std::move(cols[1]);
-                rec.type = std::move(cols[2]);
+                rec.seqid = cols[0];
+                rec.source = cols[1];
+                rec.type = cols[2];
                 rec.feat_class = classify_type(rec.type);
                 {
                     // GFF3 requires positive integer coordinates, start <= end;
                     // reject trailing garbage. Invalid lines are skipped.
                     size_t pos = 0;
-                    rec.start = std::stoll(cols[3], &pos);
+                    rec.start = std::stoll(std::string{cols[3]}, &pos);
                     if (pos != cols[3].size()) throw std::invalid_argument{"start"};
                     pos = 0;
-                    rec.end = std::stoll(cols[4], &pos);
+                    rec.end = std::stoll(std::string{cols[4]}, &pos);
                     if (pos != cols[4].size()) throw std::invalid_argument{"end"};
                     if (rec.start < 1 || rec.end < 1 || rec.start > rec.end) {
                         throw std::invalid_argument{"coordinates"};
@@ -127,13 +144,13 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                 if (cols[5] != ".") {
                     try {
                         size_t spos = 0;
-                        const double s = std::stod(cols[5], &spos);
+                        const double s = std::stod(std::string{cols[5]}, &spos);
                         if (spos == cols[5].size()) rec.score = s;
                     } catch (...) { rec.score = std::nullopt; }
                 }
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
-                rec.attr_raw = std::move(cols[8]);
+                rec.attr_raw = cols[8];
 
                 // Extract ID and Parent from col9. gene_id and transcript_id
                 // are GTF conventions but also appear in some GFF3 files, so
@@ -198,24 +215,24 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                 rec.seqid = cols[0];
                 {
                     size_t pos = 0;
-                    const int64_t bed_start = std::stoll(cols[1], &pos);
+                    const int64_t bed_start = std::stoll(std::string{cols[1]}, &pos);
                     if (pos != cols[1].size()) throw std::invalid_argument{"start"};
                     pos = 0;
-                    rec.end = std::stoll(cols[2], &pos);
+                    rec.end = std::stoll(std::string{cols[2]}, &pos);
                     if (pos != cols[2].size()) throw std::invalid_argument{"end"};
                     if (bed_start < 0 || rec.end <= bed_start) {
                         throw std::invalid_argument{"coordinates"};
                     }
                     rec.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
                 }
-                rec.source = "gffsub";
-                rec.type = std::string(kRegionType);
+                rec.source = "gffsub";  // string literal: static storage, no allocation
+                rec.type = kRegionType;
                 rec.feat_class = FeatureClass::Region;
                 rec.score_raw = (cols.size() > 4) ? cols[4] : ".";
                 if (cols.size() > 4 && cols[4] != ".") {
                     try {
                         size_t spos = 0;
-                        const double s = std::stod(cols[4], &spos);
+                        const double s = std::stod(std::string{cols[4]}, &spos);
                         if (spos == cols[4].size()) rec.score = s;
                     } catch (...) { rec.score = std::nullopt; }
                 }
@@ -225,7 +242,7 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
                 rec.parent_id = std::nullopt;
                 rec.gene_id = std::nullopt;
                 rec.transcript_id = std::nullopt;
-                rec.attr_raw = rec.id ? "ID=" + *rec.id : "";
+                rec.attr_raw = {};  // synthesized as "ID=..." at print_gff3 time
             } catch (const std::exception&) {
                 continue;
             }
@@ -251,6 +268,41 @@ namespace {
 //   GFF3: >=9 cols, col9 contains '='
 //   BED:  3..12 cols, no col9, cols[1] and cols[2] are integers
 //   default: GFF3
+// Decide the format from one feature line. Returns nullopt when the line is
+// not recognizable and the caller should keep scanning.
+std::optional<InputFormat> sniff_line(std::string_view line) {
+    const auto cols = split_line(line, '\t');
+    if (cols.size() >= 9) {
+        const auto& a = cols[8];
+        if (a.find('"') != std::string_view::npos) {
+            return InputFormat::GTF;
+        }
+        if (a.find('=') != std::string_view::npos) {
+            return InputFormat::GFF3;
+        }
+        // Col9 present but neither GFF3 nor GTF shape; fall back to GFF3
+        // (lenient) rather than guessing BED from a 9-column line.
+        return InputFormat::GFF3;
+    }
+    if (cols.size() >= 3 && cols.size() <= 12) {
+        // Tentative BED: require integer start/end.
+        const auto is_int = [](std::string_view s) {
+            if (s.empty()) return false;
+            size_t pos = 0;
+            try {
+                std::stoll(std::string{s}, &pos);
+            } catch (...) {
+                return false;
+            }
+            return pos == s.size();
+        };
+        if (is_int(cols[1]) && is_int(cols[2])) {
+            return InputFormat::BED;
+        }
+    }
+    return std::nullopt;
+}
+
 InputFormat sniff_format(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) return InputFormat::GFF3;
@@ -268,37 +320,7 @@ InputFormat sniff_format(const std::string& path) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty() || line[0] == '#') continue;
         if (line.rfind("##FASTA", 0) == 0) break;
-
-        const auto cols = split_line(line, '\t');
-        if (cols.size() >= 9) {
-            const auto& a = cols[8];
-            if (a.find('"') != std::string::npos) {
-                return InputFormat::GTF;
-            }
-            if (a.find('=') != std::string::npos) {
-                return InputFormat::GFF3;
-            }
-            // Col9 present but neither GFF3 nor GTF shape; fall back to GFF3
-            // (lenient) rather than guessing BED from a 9-column line.
-            return InputFormat::GFF3;
-        }
-        if (cols.size() >= 3 && cols.size() <= 12) {
-            // Tentative BED: require integer start/end.
-            const auto is_int = [](const std::string& s) {
-                if (s.empty()) return false;
-                size_t pos = 0;
-                try {
-                    std::stoll(s, &pos);
-                } catch (...) {
-                    return false;
-                }
-                return pos == s.size();
-            };
-            if (is_int(cols[1]) && is_int(cols[2])) {
-                return InputFormat::BED;
-            }
-        }
-        // Not a recognizable feature line; keep scanning.
+        if (const auto fmt = sniff_line(line)) return *fmt;
     }
     return InputFormat::GFF3;
 }
@@ -307,6 +329,48 @@ InputFormat sniff_format(const std::string& path) {
 
 InputFormat infer_input_format(const std::string& path) {
     return sniff_format(path);
+}
+
+InputFormat infer_format_from_content(std::string_view content) {
+    size_t pos = 0;
+    while (pos < content.size()) {
+        size_t eol = content.find('\n', pos);
+        if (eol == std::string_view::npos) eol = content.size();
+        std::string_view line = content.substr(pos, eol - pos);
+        pos = eol + 1;
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind("##FASTA", 0) == 0) break;
+        if (const auto fmt = sniff_line(line)) return *fmt;
+    }
+    return InputFormat::GFF3;
+}
+
+namespace {
+
+// istreambuf_iterator reads byte-by-byte through virtual calls; chunked reads
+// are ~10x faster on 100MB+ streams.
+std::string read_stream_chunked(std::istream& in) {
+    std::string out;
+    constexpr size_t kChunk = 1u << 20;
+    while (in) {
+        const auto old = out.size();
+        out.resize(old + kChunk);
+        in.read(out.data() + old, kChunk);
+        out.resize(old + static_cast<size_t>(in.gcount()));
+    }
+    return out;
+}
+
+}  // namespace
+
+int parse_stdin(GffData& data, InputFormat& format_out) {
+    data.buffer = read_stream_chunked(std::cin);
+    format_out = infer_format_from_content(data.buffer);
+    size_t hint = data.buffer.size() / 130;
+    if (hint > 1u << 20) hint = 1u << 20;
+    data.reserve(hint);
+    return parse_content(data, format_out);
 }
 
 }  // namespace gffsub

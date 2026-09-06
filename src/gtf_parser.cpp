@@ -6,7 +6,7 @@
 
 namespace gffsub {
 
-std::optional<std::string> extract_quoted_value(const std::string& attrs, const std::string& key) {
+std::optional<std::string> extract_quoted_value(std::string_view attrs, std::string_view key) {
     // GTF attributes are "; "-delimited: key "value";
     // Match the key as a whole token, not as a substring of a longer name.
     size_t pos = 0;
@@ -53,7 +53,7 @@ std::optional<std::string> extract_quoted_value(const std::string& attrs, const 
             return std::nullopt;
         }
         // Unescape: remove backslash before quotes and backslashes
-        std::string value = attrs.substr(q1 + 1, q2 - q1 - 1);
+        std::string value{attrs.substr(q1 + 1, q2 - q1 - 1)};
         std::string unescaped;
         unescaped.reserve(value.size());
         for (size_t j = 0; j < value.size(); ++j) {
@@ -102,7 +102,7 @@ std::string gtf_unescape(const std::string& s) {
 
 }  // namespace
 
-std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(const std::string& attrs) {
+std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs) {
     std::vector<std::pair<std::string, std::string>> result;
     size_t pos = 0;
     while (pos < attrs.size()) {
@@ -110,7 +110,7 @@ std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(const std:
         if (end == std::string::npos) {
             end = attrs.size();
         }
-        std::string frag = attrs.substr(pos, end - pos);
+        std::string frag{attrs.substr(pos, end - pos)};
         pos = (end < attrs.size()) ? end + 1 : attrs.size();
 
         const auto first = frag.find_first_not_of(" \t");

@@ -40,17 +40,17 @@ std::string join_filter_values(const std::vector<std::string>& values) {
 }
 
 std::optional<std::string> record_field_value(const GffRecord& rec, std::string_view field) {
-    if (field == "seqid") return rec.seqid;
-    if (field == "source") return rec.source;
-    if (field == "type") return rec.type;
+    if (field == "seqid") return std::string{rec.seqid};
+    if (field == "source") return std::string{rec.source};
+    if (field == "type") return std::string{rec.type};
     if (field == "start") return std::to_string(rec.start);
     if (field == "end") return std::to_string(rec.end);
     if (field == "length") return std::to_string(rec.end - rec.start + 1);
-    if (field == "score") return rec.score_raw.empty() ? "." : rec.score_raw;
+    if (field == "score") return std::string{rec.score_raw.empty() ? std::string_view{"."} : rec.score_raw};
     if (field == "strand") return std::string(1, rec.strand);
     if (field == "phase") return std::string(1, rec.phase);
-    if (field == "attrs") return rec.attr_raw;
-    if (field == "attributes") return rec.attr_raw;
+    if (field == "attrs") return std::string{rec.attr_raw};
+    if (field == "attributes") return std::string{rec.attr_raw};
 
     std::string attr_key;
     if (field.rfind("attr.", 0) == 0) {

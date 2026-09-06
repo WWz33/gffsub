@@ -56,6 +56,16 @@ static std::optional<std::optional<double>> parse_score_filter(std::string_view 
 }
 
 AnnotationIndex load_index(const std::string& path) {
+    if (path == "-") {
+        // stdin: single read, sniff from content, then parse. The index owns
+        // the data because there is no long-lived caller GffData.
+        GffData data;
+        InputFormat fmt = InputFormat::GFF3;
+        if (parse_stdin(data, fmt) != 0) {
+            throw std::runtime_error("cannot parse stdin");
+        }
+        return AnnotationIndex::from_owned(std::move(data));
+    }
     return AnnotationIndex::from_file(path);
 }
 
@@ -119,7 +129,6 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
     enum {
         OPT_ID_LIST,
         OPT_SOURCE,
-        OPT_SCORE,
         OPT_STRAND_FILTER,
         OPT_PHASE,
         OPT_GREP,
@@ -130,8 +139,6 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         OPT_INCLUDE_EXPR,
         OPT_EXCLUDE_EXPR,
         OPT_INVERT_MATCH,
-        OPT_IGNORE_CASE,
-        OPT_FORMAT,
         OPT_LONGEST_TYPE,
         OPT_VERSION
     };
@@ -150,7 +157,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"include-expr",  required_argument, nullptr, OPT_INCLUDE_EXPR},
         {"exclude-expr",  required_argument, nullptr, OPT_EXCLUDE_EXPR},
         {"invert-match",  no_argument,       nullptr, OPT_INVERT_MATCH},
-        {"ignore-case",   no_argument,       nullptr, OPT_IGNORE_CASE},
+        {"ignore-case",   no_argument,       nullptr, 'y'},
         {"summary",       no_argument,       nullptr, 's'},
         {"parents",       no_argument,       nullptr, 'p'},
         {"include-parents", no_argument,      nullptr, 'p'},
@@ -165,8 +172,10 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"strand-aware",  no_argument,       nullptr, 'a'},
         {"seqid",         required_argument, nullptr, 'S'},
         {"source",        required_argument, nullptr, OPT_SOURCE},
-        {"score",         required_argument, nullptr, OPT_SCORE},
+        {"score",         required_argument, nullptr, 'c'},
         {"strand",        required_argument, nullptr, OPT_STRAND_FILTER},
+        {"sort",          required_argument, nullptr, 'k'},
+        {"reverse",       no_argument,       nullptr, 'R'},
         {"phase",         required_argument, nullptr, OPT_PHASE},
         {"children",      no_argument,       nullptr, 'C'},
         {"include-children", no_argument,     nullptr, 'C'},
@@ -176,8 +185,8 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"longest",       no_argument,       nullptr, 'L'},
         {"longest-type",  required_argument, nullptr, OPT_LONGEST_TYPE},
         {"threads",       required_argument, nullptr, '@'},
-        {"format",        required_argument, nullptr, OPT_FORMAT},
-        {"output-format", required_argument, nullptr, OPT_FORMAT},
+        {"format",        required_argument, nullptr, 'f'},
+        {"output-format", required_argument, nullptr, 'f'},
         {"output",        required_argument, nullptr, 'o'},
         {"help",          no_argument,       nullptr, 'h'},
         {"version",       no_argument,       nullptr, OPT_VERSION},
@@ -186,7 +195,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:c:f:k:Ry", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'i': args.ids.emplace_back(optarg); break;
             case OPT_ID_LIST: args.id_list_file = optarg; break;
@@ -246,7 +255,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             case 'v':
                 args.invert_grep = true;
                 break;
-            case OPT_IGNORE_CASE:
+            case 'y':
                 args.ignore_case = true;
                 break;
             case 's':
@@ -261,7 +270,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             case 'a': args.strand_aware = true; break;
             case 'S': args.seqid_filter = optarg; break;
             case OPT_SOURCE: args.source_filter = optarg; break;
-            case OPT_SCORE: {
+            case 'c': {
                 args.score_filter = parse_score_filter(optarg);
                 if (!args.score_filter) {
                     std::cerr << "Error: --score expects a finite floating point number or .\n";
@@ -321,7 +330,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 args.num_threads = t;
                 break;
             }
-            case OPT_FORMAT: {
+            case 'f': {
                 const std::string fmt_str = optarg;
                 if (fmt_str == "gff3") args.format = OutputFormat::GFF3;
                 else if (fmt_str == "gtf" || fmt_str == "gtf2") args.format = OutputFormat::GTF2;
@@ -334,6 +343,8 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 }
                 break;
             }
+            case 'k': args.sort_keys = optarg; break;
+            case 'R': args.sort_reverse = true; break;
             case 'o': args.output_file = optarg; break;
             case 'h': usage(argv[0]); help_requested = true; return std::nullopt;
             case OPT_VERSION:

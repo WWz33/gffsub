@@ -125,7 +125,7 @@ void print_summary(std::ostream& out, const std::vector<GffRecord>& records) {
     // (seqid, type) -> stats
     std::map<std::pair<std::string, std::string>, Stats> agg;
     for (const auto& rec : records) {
-        agg[{rec.seqid, rec.type}].add(rec.start, rec.end);
+        agg[{std::string{rec.seqid}, std::string{rec.type}}].add(rec.start, rec.end);
     }
 
     std::unordered_set<std::string> seqids;
