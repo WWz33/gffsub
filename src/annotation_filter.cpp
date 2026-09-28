@@ -3,6 +3,7 @@
 #include "record.hpp"
 #include "string_utils.hpp"
 #include <fstream>
+#include <stdexcept>
 
 namespace gffsub {
 
@@ -19,7 +20,11 @@ static std::vector<Region> load_regions(const std::string& filename, bool is_bed
     std::vector<Region> regions;
     if (is_bed) {
         std::ifstream file(filename);
-        if (!file.is_open()) return regions;
+        // An unopenable file must not masquerade as "zero regions" (which
+        // would silently drop every record); surface it as an error.
+        if (!file.is_open()) {
+            throw std::runtime_error("cannot open BED file: " + filename);
+        }
 
         std::string line;
         while (std::getline(file, line)) {

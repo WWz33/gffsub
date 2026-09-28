@@ -2,9 +2,11 @@
 #include "parser.hpp"
 #include "record.hpp"
 #include <algorithm>
+#include <functional>
 #include <future>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace gffsub {
 
@@ -90,149 +92,197 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         }
     }
 
-    auto process_chromosome = [&](const std::string& chrom, const std::vector<int>& gene_indices) {
-        (void)chrom; // reserved for future debugging
-        for (int gene_idx : gene_indices) {
-            const auto& gene = data.records[gene_idx];
-            if (!gene.id) continue;
-
-            // Find isoforms for this gene using index
-            auto isoform_it = gene_to_isoforms.find(*gene.id);
-            if (isoform_it == gene_to_isoforms.end()) {
-                // gene with no isoform children: keep only if it has any
-                // non-isoform children (e.g. TF_binding_site). A gene with
-                // no children at all is dropped.
-                auto child_it = isoform_to_children.find(*gene.id);
-                if (child_it == isoform_to_children.end()) {
-                    data.records[gene_idx].kept = false;
-                }
-                continue;
-            }
-            if (isoform_it->second.size() <= 1) continue;
-
-            const auto& isoform_indices = isoform_it->second;
-
-            // Per-gene check: does ANY isoform have CDS?
-            bool gene_has_cds = false;
-            for (int iso_idx : isoform_indices) {
-                const auto& iso = data.records[iso_idx];
-                if (!iso.id) continue;
-                auto child_it = isoform_to_children.find(*iso.id);
-                if (child_it != isoform_to_children.end()) {
-                    for (int child_idx : child_it->second) {
-                        if (data.records[child_idx].feat_class == FeatureClass::CDS) {
-                            gene_has_cds = true;
-                            break;
-                        }
-                    }
-                }
-                if (gene_has_cds) break;
-            }
-
-            // Find longest isoform
-            int longest_idx = -1;
-            int64_t max_len = -1;
-
-            for (int iso_idx : isoform_indices) {
-                const auto& iso = data.records[iso_idx];
-                if (!iso.id) continue;
-
-                auto child_it = isoform_to_children.find(*iso.id);
-                if (child_it == isoform_to_children.end()) continue;
-
-                int64_t len = 0;
-                bool found = false;
-
-                if (gene_has_cds) {
-                    // Distinct CDS IDs under one transcript are alternative
-                    // protein variants (spec EDEN example: cds00003/cds00004);
-                    // score by the LONGEST variant, do not sum across variants.
-                    // Lines sharing an ID are one discontinuous CDS (summed).
-                    std::unordered_map<std::string, int64_t> variant_len;
-                    for (int child_idx : child_it->second) {
-                        const auto& child = data.records[child_idx];
-                        if (child.feat_class == FeatureClass::CDS) {
-                            const std::string key = child.id ? *child.id : std::string{};
-                            variant_len[key] += child.end - child.start + 1;
-                        }
-                    }
-                    if (variant_len.empty()) continue; // isoform without CDS is skipped
-                    for (const auto& [key, vlen] : variant_len) {
-                        (void)key;
-                        if (vlen > len) len = vlen;
-                    }
-                } else {
-                    for (int child_idx : child_it->second) {
-                        const auto& child = data.records[child_idx];
-                        if (child.feat_class == FeatureClass::Exon) {
-                            len += child.end - child.start + 1;
-                            found = true;
-                        }
-                    }
-                    // No exon children: cannot be "longest" by exon span,
-                    // mirroring gffread's covlen (sum of exon lengths).
-                    if (!found) continue;
-                }
-
-                if (len > max_len) {
-                    max_len = len;
-                    longest_idx = iso_idx;
-                }
-            }
-
-            // Mark longest as kept, others as not kept
-            if (longest_idx >= 0) {
-                for (int iso_idx : isoform_indices) {
-                    data.records[iso_idx].kept = (iso_idx == longest_idx);
-                }
-                // Drop children of all isoforms, then re-keep children of the
-                // longest. Two-pass so a child shared between the longest and a
-                // dropped isoform (multi-parent Parent=a,b) stays kept.
-                for (int iso_idx : isoform_indices) {
-                    const auto& iso = data.records[iso_idx];
-                    if (!iso.id) continue;
-                    auto child_it = isoform_to_children.find(*iso.id);
-                    if (child_it != isoform_to_children.end()) {
-                        for (int child_idx : child_it->second) {
-                            data.records[child_idx].kept = false;
-                        }
-                    }
-                }
-                const auto& longest = data.records[longest_idx];
-                if (longest.id) {
-                    auto child_it = isoform_to_children.find(*longest.id);
-                    if (child_it != isoform_to_children.end()) {
-                        for (int child_idx : child_it->second) {
-                            data.records[child_idx].kept = true;
-                        }
-                    }
-                }
-            }
-        }
+    // Two-phase design: phase 1 computes each gene's decision read-only
+    // (parallel-safe), phase 2 applies every write single-threaded. Genes on
+    // different chromosomes can share children via multi-parent transcripts
+    // (e.g. trans-splicing), so workers must never write record state.
+    struct GenePlan {
+        int gene_idx = -1;
+        bool drop_gene = false;
+        int longest_idx = -1;
+        std::vector<int> isoform_indices;
     };
 
+    auto plan_gene = [&](int gene_idx) -> std::optional<GenePlan> {
+        const auto& gene = data.records[gene_idx];
+        if (!gene.id) return std::nullopt;
+
+        auto isoform_it = gene_to_isoforms.find(*gene.id);
+        if (isoform_it == gene_to_isoforms.end()) {
+            // gene with no isoform children: keep only if it has any
+            // non-isoform children (e.g. TF_binding_site). A gene with
+            // no children at all is dropped.
+            auto child_it = isoform_to_children.find(*gene.id);
+            if (child_it == isoform_to_children.end()) {
+                GenePlan plan;
+                plan.gene_idx = gene_idx;
+                plan.drop_gene = true;
+                return plan;
+            }
+            return std::nullopt;
+        }
+        if (isoform_it->second.size() <= 1) return std::nullopt;
+
+        const auto& isoform_indices = isoform_it->second;
+
+        // Per-gene check: does ANY isoform have CDS?
+        bool gene_has_cds = false;
+        for (int iso_idx : isoform_indices) {
+            const auto& iso = data.records[iso_idx];
+            if (!iso.id) continue;
+            auto child_it = isoform_to_children.find(*iso.id);
+            if (child_it != isoform_to_children.end()) {
+                for (int child_idx : child_it->second) {
+                    if (data.records[child_idx].feat_class == FeatureClass::CDS) {
+                        gene_has_cds = true;
+                        break;
+                    }
+                }
+            }
+            if (gene_has_cds) break;
+        }
+
+        // Find longest isoform
+        int longest_idx = -1;
+        int64_t max_len = -1;
+
+        for (int iso_idx : isoform_indices) {
+            const auto& iso = data.records[iso_idx];
+            if (!iso.id) continue;
+
+            auto child_it = isoform_to_children.find(*iso.id);
+            if (child_it == isoform_to_children.end()) continue;
+
+            int64_t len = 0;
+            bool found = false;
+
+            if (gene_has_cds) {
+                // Distinct CDS IDs under one transcript are alternative
+                // protein variants (spec EDEN example: cds00003/cds00004);
+                // score by the LONGEST variant, do not sum across variants.
+                // Lines sharing an ID are one discontinuous CDS (summed).
+                std::unordered_map<std::string, int64_t> variant_len;
+                for (int child_idx : child_it->second) {
+                    const auto& child = data.records[child_idx];
+                    if (child.feat_class == FeatureClass::CDS) {
+                        const std::string key = child.id ? *child.id : std::string{};
+                        variant_len[key] += child.end - child.start + 1;
+                    }
+                }
+                if (variant_len.empty()) continue; // isoform without CDS is skipped
+                for (const auto& [key, vlen] : variant_len) {
+                    (void)key;
+                    if (vlen > len) len = vlen;
+                }
+            } else {
+                for (int child_idx : child_it->second) {
+                    const auto& child = data.records[child_idx];
+                    if (child.feat_class == FeatureClass::Exon) {
+                        len += child.end - child.start + 1;
+                        found = true;
+                    }
+                }
+                // No exon children: cannot be "longest" by exon span,
+                // mirroring gffread's covlen (sum of exon lengths).
+                if (!found) continue;
+            }
+
+            if (len > max_len) {
+                max_len = len;
+                longest_idx = iso_idx;
+            }
+        }
+
+        GenePlan plan;
+        plan.gene_idx = gene_idx;
+        plan.longest_idx = longest_idx;
+        plan.isoform_indices = isoform_indices;
+        return plan;
+    };
+
+    auto plan_chromosome = [&](const std::string& chrom,
+                               const std::vector<int>& gene_indices) {
+        std::vector<GenePlan> plans;
+        for (int gene_idx : gene_indices) {
+            if (auto plan = plan_gene(gene_idx)) {
+                plans.push_back(std::move(*plan));
+            }
+        }
+        return plans;
+    };
+
+    std::vector<GenePlan> all_plans;
     if (num_threads <= 1) {
         for (auto& [chrom, gene_indices] : chrom_to_gene_idx) {
-            process_chromosome(chrom, gene_indices);
+            auto plans = plan_chromosome(chrom, gene_indices);
+            all_plans.insert(all_plans.end(),
+                             std::make_move_iterator(plans.begin()),
+                             std::make_move_iterator(plans.end()));
         }
     } else {
         // Cap in-flight threads at num_threads; scaffold-heavy files can
         // have thousands of chromosomes, one future each would exhaust
         // thread limits. Batch: launch up to num_threads, then wait.
-        std::vector<std::future<void>> futures;
+        std::vector<std::future<std::vector<GenePlan>>> futures;
         for (auto& kv : chrom_to_gene_idx) {
             const std::string& chrom = kv.first;
             std::vector<int> gene_indices = kv.second;
             futures.push_back(std::async(std::launch::async, [&, chrom, gene_indices]() {
-                process_chromosome(chrom, gene_indices);
+                return plan_chromosome(chrom, gene_indices);
             }));
             if (futures.size() >= num_threads) {
-                for (auto& f : futures) f.get();
+                for (auto& f : futures) {
+                    auto plans = f.get();
+                    all_plans.insert(all_plans.end(),
+                                     std::make_move_iterator(plans.begin()),
+                                     std::make_move_iterator(plans.end()));
+                }
                 futures.clear();
             }
         }
         for (auto& f : futures) {
-            f.get();
+            auto plans = f.get();
+            all_plans.insert(all_plans.end(),
+                             std::make_move_iterator(plans.begin()),
+                             std::make_move_iterator(plans.end()));
+        }
+    }
+
+    // Phase 2: apply writes single-threaded. Global drop pass then global
+    // re-keep pass, so a child shared with any surviving longest isoform
+    // (across genes or chromosomes) stays kept regardless of plan order.
+    for (const auto& plan : all_plans) {
+        if (plan.drop_gene) {
+            data.records[plan.gene_idx].kept = false;
+        }
+    }
+    for (const auto& plan : all_plans) {
+        if (plan.longest_idx < 0) continue;
+        for (int iso_idx : plan.isoform_indices) {
+            const auto& iso = data.records[iso_idx];
+            if (!iso.id) continue;
+            auto child_it = isoform_to_children.find(*iso.id);
+            if (child_it != isoform_to_children.end()) {
+                for (int child_idx : child_it->second) {
+                    data.records[child_idx].kept = false;
+                }
+            }
+        }
+    }
+    for (const auto& plan : all_plans) {
+        if (plan.longest_idx < 0) continue;
+        // Mark longest as kept, others as not kept.
+        for (int iso_idx : plan.isoform_indices) {
+            data.records[iso_idx].kept = (iso_idx == plan.longest_idx);
+        }
+        const auto& longest = data.records[plan.longest_idx];
+        if (longest.id) {
+            auto child_it = isoform_to_children.find(*longest.id);
+            if (child_it != isoform_to_children.end()) {
+                for (int child_idx : child_it->second) {
+                    data.records[child_idx].kept = true;
+                }
+            }
         }
     }
 }

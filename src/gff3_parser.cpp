@@ -272,6 +272,16 @@ namespace {
 // not recognizable and the caller should keep scanning.
 std::optional<InputFormat> sniff_line(std::string_view line) {
     const auto cols = split_line(line, '\t');
+    const auto is_int = [](std::string_view s) {
+        if (s.empty()) return false;
+        size_t pos = 0;
+        try {
+            std::stoll(std::string{s}, &pos);
+        } catch (...) {
+            return false;
+        }
+        return pos == s.size();
+    };
     if (cols.size() >= 9) {
         const auto& a = cols[8];
         if (a.find('"') != std::string_view::npos) {
@@ -280,22 +290,17 @@ std::optional<InputFormat> sniff_line(std::string_view line) {
         if (a.find('=') != std::string_view::npos) {
             return InputFormat::GFF3;
         }
-        // Col9 present but neither GFF3 nor GTF shape; fall back to GFF3
-        // (lenient) rather than guessing BED from a 9-column line.
+        // Col9 present but neither GFF3 nor GTF shape. BED9/BED12 lines
+        // (itemRgb or a plain col9) also land here: columns 2-3 are integer
+        // coordinates (0-based start/end), while a GFF3 source column (col 2)
+        // is a label, so two leading integers indicate BED.
+        if (is_int(cols[1]) && is_int(cols[2])) {
+            return InputFormat::BED;
+        }
         return InputFormat::GFF3;
     }
     if (cols.size() >= 3 && cols.size() <= 12) {
         // Tentative BED: require integer start/end.
-        const auto is_int = [](std::string_view s) {
-            if (s.empty()) return false;
-            size_t pos = 0;
-            try {
-                std::stoll(std::string{s}, &pos);
-            } catch (...) {
-                return false;
-            }
-            return pos == s.size();
-        };
         if (is_int(cols[1]) && is_int(cols[2])) {
             return InputFormat::BED;
         }

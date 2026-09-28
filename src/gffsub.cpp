@@ -179,7 +179,7 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
             return std::string{argv[i]};
         };
 
-        if (arg == "--id") {
+        if (arg == "--id" || arg == "-i") {
             auto value = require_value("--id");
             if (!value) return 1;
             if (!params.id.empty()) {
@@ -187,7 +187,7 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
                 return 1;
             }
             params.id = *value;
-        } else if (arg == "--up" || arg == "--upstream") {
+        } else if (arg == "--up" || arg == "--upstream" || arg == "-u") {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
             try {
@@ -202,7 +202,7 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
                 std::cerr << "Error: " << arg << " must be non-negative\n";
                 return 1;
             }
-        } else if (arg == "--down" || arg == "--downstream") {
+        } else if (arg == "--down" || arg == "--downstream" || arg == "-D") {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
             try {
@@ -217,7 +217,7 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
                 std::cerr << "Error: " << arg << " must be non-negative\n";
                 return 1;
             }
-        } else if (arg == "--strand-aware") {
+        } else if (arg == "--strand-aware" || arg == "-a") {
             params.strand_aware = true;
         } else if (arg == "-h" || arg == "--help") {
             window_usage(prog);
@@ -420,7 +420,12 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    subset(data, build_subset_params(a));
+    try {
+        subset(data, build_subset_params(a));
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+        return 1;
+    }
 
     // Sort after filtering: only order changes, membership does not.
     if (a.sort_keys.empty() && a.sort_reverse) {

@@ -107,6 +107,14 @@ AnnotationIndex& AnnotationIndex::operator=(AnnotationIndex&& other) noexcept {
 }
 
 void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
+    // Flat GTF fallback: GTF2.2 has no gene feature type, grouping is done
+    // purely through the gene_id attribute. When no gene-classified record
+    // exists, map each gene_id to every record carrying it so --name returns
+    // the gene's lines (exon/CDS records carry no ID of their own, so there
+    // is nothing to anchor hierarchy expansion on). window/gene_model on a
+    // flat file anchor on the first line's span, not a synthesized gene span.
+    bool saw_gene = false;
+
     for (int i = 0; i < static_cast<int>(records.size()); ++i) {
         const auto& rec = records[i];
         if (rec.id) {
@@ -116,33 +124,47 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
             id_to_records_[*rec.id].push_back(i);
         }
 
-        if (rec.feat_class != FeatureClass::Gene) {
-            continue;
-        }
+        if (rec.feat_class == FeatureClass::Gene) {
+            saw_gene = true;
 
-        auto add_gene_key = [&](const std::string& key) {
-            if (key.empty()) return;
-            auto& vec = gene_lookup_[key];
-            if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                vec.push_back(i);
+            auto add_gene_key = [&](const std::string& key) {
+                if (key.empty()) return;
+                auto& vec = gene_lookup_[key];
+                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                    vec.push_back(i);
+                }
+            };
+
+            if (rec.id) {
+                add_gene_key(*rec.id);
             }
-        };
-
-        if (rec.id) {
-            add_gene_key(*rec.id);
-        }
-        if (rec.gene_id) {
-            add_gene_key(*rec.gene_id);
-        }
-
-        const auto attrs = parse_attributes(rec.attr_raw);
-        for (const char* key : {"Name", "gene_id", "locus_tag", "Alias", "Dbxref"}) {
-            const auto it = attrs.find(key);
-            if (it == attrs.end()) {
-                continue;
+            if (rec.gene_id) {
+                add_gene_key(*rec.gene_id);
             }
-            for (const auto& value : it->second) {
-                add_gene_key(value);
+
+            const auto attrs = parse_attributes(rec.attr_raw);
+            for (const char* key : {"Name", "gene_id", "locus_tag", "Alias", "Dbxref"}) {
+                const auto it = attrs.find(key);
+                if (it == attrs.end()) {
+                    continue;
+                }
+                for (const auto& value : it->second) {
+                    add_gene_key(value);
+                }
+            }
+        }
+    }
+
+    if (!saw_gene) {
+        // Flat file: group every record by its gene_id attribute. Only files
+        // without gene records pay this extra pass.
+        for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+            const auto& rec = records[i];
+            if (rec.gene_id && !rec.gene_id->empty()) {
+                auto& vec = gene_lookup_[*rec.gene_id];
+                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                    vec.push_back(i);
+                }
             }
         }
     }
