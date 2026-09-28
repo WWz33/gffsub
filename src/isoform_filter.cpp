@@ -249,8 +249,10 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     }
 
     // Phase 2: apply writes single-threaded. Global drop pass then global
-    // re-keep pass, so a child shared with any surviving longest isoform
-    // (across genes or chromosomes) stays kept regardless of plan order.
+    // re-keep pass. Only the re-keep pass writes true, so a record claimed by
+    // any gene's longest isoform stays kept regardless of plan order; this
+    // covers both multi-parent children and a multi-parent isoform that is
+    // one gene's winner and another gene's loser.
     for (const auto& plan : all_plans) {
         if (plan.drop_gene) {
             data.records[plan.gene_idx].kept = false;
@@ -259,6 +261,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     for (const auto& plan : all_plans) {
         if (plan.longest_idx < 0) continue;
         for (int iso_idx : plan.isoform_indices) {
+            data.records[iso_idx].kept = false;
             const auto& iso = data.records[iso_idx];
             if (!iso.id) continue;
             auto child_it = isoform_to_children.find(*iso.id);
@@ -271,10 +274,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     }
     for (const auto& plan : all_plans) {
         if (plan.longest_idx < 0) continue;
-        // Mark longest as kept, others as not kept.
-        for (int iso_idx : plan.isoform_indices) {
-            data.records[iso_idx].kept = (iso_idx == plan.longest_idx);
-        }
+        data.records[plan.longest_idx].kept = true;
         const auto& longest = data.records[plan.longest_idx];
         if (longest.id) {
             auto child_it = isoform_to_children.find(*longest.id);
