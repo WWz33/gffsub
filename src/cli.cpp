@@ -431,7 +431,13 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 else args.type_filter += "," + std::string{optarg};
                 break;
             case 'L': args.do_longest = true; break;
-            case OPT_LONGEST_TYPE: args.longest_type = optarg; break;
+            case OPT_LONGEST_TYPE:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --longest-type requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.longest_type = optarg;
+                break;
             case '@': {
                 args.threads_set = true;
                 // stoul accepts a leading '-' and wraps, so reject it explicitly.
@@ -516,9 +522,8 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         }
         std::string line;
         while (std::getline(in, line)) {
-            // Strip CR from CRLF files before trimming: trim_copy only
-            // handles spaces/tabs, so a pattern like "GeneA\r" would never
-            // match. Same handling as load_id_list_file.
+            // Strip CR from files read on Windows or transported with CRLF
+            // endings. Same handling as load_id_list_file.
             if (!line.empty() && line.back() == '\r') line.pop_back();
             const auto pattern = trim_copy(line);
             if (pattern.empty()) continue;

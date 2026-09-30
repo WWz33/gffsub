@@ -116,8 +116,6 @@ if(BUILD_TESTING)
         src
     )
 
-    target_link_libraries(feature_types_smoke PRIVATE ZLIB::ZLIB)
-
     target_compile_options(feature_types_smoke PRIVATE
         -Wall -O2
     )

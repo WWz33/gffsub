@@ -3,14 +3,13 @@
 #include "gtf_parser.hpp"
 #include "parser.hpp"
 #include "record.hpp"
+#include "string_utils.hpp"
 #include <unordered_map>
 #include <unordered_set>
 
 namespace gffsub {
 
 namespace {
-
-bool is_space(char c) { return c == ' ' || c == '\t'; }
 
 // Keep only the listed tags (plus ID/Parent) in a GFF3 column-9 string.
 // Segments are re-emitted verbatim so existing URL encoding is preserved.
@@ -29,11 +28,10 @@ std::string project_col9(std::string_view col9, const std::vector<std::string>& 
         std::string_view pair = col9.substr(pos, end - pos);
         const auto eq = pair.find('=');
         if (eq != std::string_view::npos && eq > 0) {
-            size_t kstart = 0;
-            while (kstart < eq && is_space(pair[kstart])) ++kstart;
-            size_t kend = eq;
-            while (kend > kstart && is_space(pair[kend - 1])) --kend;
-            if (keep.count(std::string{pair.substr(kstart, kend - kstart)}) > 0) {
+            // Same trim as attributes.cpp so a key matches whichever parser
+            // produced it (space/tab/CR around the key).
+            const std::string key{trim_view(pair.substr(0, eq))};
+            if (keep.count(key) > 0) {
                 if (!out.empty()) out += ';';
                 out += pair;
             }
