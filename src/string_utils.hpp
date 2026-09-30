@@ -11,11 +11,13 @@ namespace gffsub {
 // Lowercase a string view, returning a new std::string.
 std::string to_lower(std::string_view sv);
 
-// Trim leading and trailing spaces/tabs. Returns a view into the input;
-// the input must outlive the returned view.
+// Trim leading and trailing spaces, tabs, and CR. Returns a view into the
+// input; the input must outlive the returned view. Raw CR in a GFF3/GTF
+// field is never legal (the specs require %0D / \r escaping), so trimming
+// it only removes line-ending residue from CRLF input.
 std::string_view trim_view(std::string_view s);
 
-// Trim leading and trailing spaces/tabs, returning a new std::string.
+// Trim leading and trailing spaces, tabs, and CR, returning a new string.
 std::string trim_copy(std::string_view s);
 
 // Split a string view on a single-character delimiter. Returns views into

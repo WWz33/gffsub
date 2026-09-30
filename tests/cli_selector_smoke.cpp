@@ -42,6 +42,15 @@ static void cleanup_outputs() {
     std::remove("selector_overlap.bed");
     std::remove("selector_strand2.bed");
     std::remove("selector_window_patterns.txt");
+    std::remove("selector_odd.gff3");
+    std::remove("selector_odd.gff3.gz");
+    std::remove("selector_odd_fifo");
+    std::remove("odd_plain.gff3");
+    std::remove("odd_gz.gff3");
+    std::remove("odd_stdin.gff3");
+    std::remove("odd_fifo.gff3");
+    std::remove("pad_where.gff3");
+    std::remove("pad_attrs.gff3");
     std::remove("selector_bed_overlap.gff3");
     std::remove("selector_bed_exclude.gff3");
     std::remove("selector_bed_same.gff3");
@@ -1139,6 +1148,36 @@ int main(int argc, char* argv[]) {
             compare_files("gz_ref.gff3", "gz_fifo.gff3") != 0) {
             return 1;
         }
+        // Comment line with tabs (a pre-fix mis-sniff trigger), a padded
+        // key after '; ', and a final line ending in CR without LF: all
+        // routes must agree and keep both records.
+        {
+            std::ofstream odd{"selector_odd.gff3"};
+            odd << "#comment\twith\ttab\n"
+                << "##gff-version 3\n"
+                << "chr1\t.\tgene\t1\t9\t.\t+\t.\tID=g1; Name=n1\n"
+                << "chr1\t.\texon\t2\t3\t.\t+\t.\tID=e1;Parent=g1\r";
+        }
+        if (run_command("gzip -c selector_odd.gff3 > selector_odd.gff3.gz") != 0 ||
+            run_command(exe + " selector_odd.gff3 > odd_plain.gff3") != 0 ||
+            run_command(exe + " selector_odd.gff3.gz > odd_gz.gff3") != 0 ||
+            run_command("cat selector_odd.gff3.gz | " + exe + " - > odd_stdin.gff3") != 0 ||
+            run_command("(cat selector_odd.gff3.gz > selector_odd_fifo &) ; " + exe +
+                        " selector_odd_fifo > odd_fifo.gff3") != 0 ||
+            compare_files("odd_plain.gff3", "odd_gz.gff3") != 0 ||
+            compare_files("odd_plain.gff3", "odd_stdin.gff3") != 0 ||
+            compare_files("odd_plain.gff3", "odd_fifo.gff3") != 0 ||
+            require_contains("odd_gz.gff3", "ID=e1") != 0) {
+            return 1;
+        }
+        // `; Key=value` spacing: the attribute indexer and --out-attrs must
+        // agree on the key.
+        if (run_command(exe + " selector_odd.gff3 --where Name=n1 > pad_where.gff3") != 0 ||
+            run_command(exe + " selector_odd.gff3 --out-attrs Name > pad_attrs.gff3") != 0 ||
+            require_contains("pad_where.gff3", "ID=g1") != 0 ||
+            require_contains("pad_attrs.gff3", "Name=n1") != 0) {
+            return 1;
+        }
         // Truncated gzip on stdin must fail, not silently emit nothing.
         if (expect_command_failure("gzip -c " + gff + " | head -c 40 | " + exe +
                                    " - > gz_trunc.out 2> gz_trunc.err") != 0 ||
@@ -1174,6 +1213,8 @@ int main(int argc, char* argv[]) {
         require_exit_one_with_error(exe + " " + gff + " --exclude-region '' > selector_bad.out 2> selector_bad.err",
                                     "selector_bad.err", "non-empty") != 0 ||
         require_exit_one_with_error(exe + " " + gff + " --ids '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -L --longest-type '' > selector_bad.out 2> selector_bad.err",
                                     "selector_bad.err", "non-empty") != 0) {
         return 1;
     }

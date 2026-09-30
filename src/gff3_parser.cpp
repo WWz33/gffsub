@@ -479,22 +479,28 @@ InputFormat sniff_format(const std::string& path) {
             std::string line;
             char c = 0;
             while (gzread(gz, &c, 1) == 1) {
-                if (c == '\n') {
-                    if (!line.empty() && line.back() == '\r') line.pop_back();
-                    if (!line.empty() && line[0] != '#') {
+                if (c != '\n') {
+                    line.push_back(c);
+                    continue;
+                }
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                if (!line.empty()) {
+                    if (line.rfind("##FASTA", 0) == 0) {
+                        line.clear();
+                        break;
+                    }
+                    if (line[0] != '#') {
                         if (const auto fmt = sniff_line(line)) {
                             gzclose(gz);
                             return *fmt;
                         }
                     }
-                    line.clear();
-                } else {
-                    line.push_back(c);
                 }
+                line.clear();
             }
             // Last line without a trailing newline.
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            if (!line.empty() && line[0] != '#') {
+            if (!line.empty() && line[0] != '#' && line.rfind("##FASTA", 0) != 0) {
                 if (const auto fmt = sniff_line(line)) {
                     gzclose(gz);
                     return *fmt;
@@ -518,8 +524,9 @@ InputFormat sniff_format(const std::string& path) {
     std::string line;
     while (std::getline(f, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.empty() || line[0] == '#') continue;
+        if (line.empty()) continue;
         if (line.rfind("##FASTA", 0) == 0) break;
+        if (line[0] == '#') continue;
         if (const auto fmt = sniff_line(line)) return *fmt;
     }
     return InputFormat::GFF3;
@@ -539,8 +546,9 @@ InputFormat infer_format_from_content(std::string_view content) {
         std::string_view line = content.substr(pos, eol - pos);
         pos = eol + 1;
         if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
-        if (line.empty() || line[0] == '#') continue;
+        if (line.empty()) continue;
         if (line.rfind("##FASTA", 0) == 0) break;
+        if (line[0] == '#') continue;
         if (const auto fmt = sniff_line(line)) return *fmt;
     }
     return InputFormat::GFF3;

@@ -36,7 +36,14 @@ All notable changes to gffsub are documented in this file. The format follows
 - window subcommand accepts the documented `-i/-u/-D/-a` short forms
 - `--ids`/`--id-list` are repeatable and accumulate
 - Empty values for `--seqid`, `--source`, `--type`, `--name`, `--ids`,
-  `--region`, `--bed` are rejected
+  `--region`, `--bed`, `--longest-type`, `--up`, `--down`, `--sort`,
+  `--output`, `--grep-file`, `--grep-field`, `--nearest` are rejected
+- Truncated gzip input is rejected on every route (a cut member used to
+  parse as a partial file on the regular-file path)
+- gzip format sniffing skips comment and blank lines and strips a trailing
+  CR, matching the plain-file path
+- `--out-attrs` matches keys after the same trim the attribute indexer
+  applies
 - `--threads` help text and README state the actual default (6)
 
 ## [0.1.0] - 2026-08-16
