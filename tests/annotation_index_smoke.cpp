@@ -258,6 +258,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    std::remove("annotation_index_smoke.gff3");
+
     std::cout << "annotation_index_smoke OK\n";
     return 0;
 }

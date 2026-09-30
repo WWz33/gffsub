@@ -38,3 +38,4 @@ CLAUDE.md
 .zcode/
 
 .zcodeignore
+annotation_index_smoke.gff3
