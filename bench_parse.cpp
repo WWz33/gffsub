@@ -2,6 +2,7 @@
 // (string_view into one big buffer) on the same file. No changes to src/.
 // Usage: ./bench_parse <gff3> [iterations]
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>

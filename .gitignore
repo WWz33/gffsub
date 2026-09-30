@@ -1,6 +1,7 @@
 # Build artifacts
 gffsub
 *_smoke
+bench_parse
 *.o
 *.a
 *.so

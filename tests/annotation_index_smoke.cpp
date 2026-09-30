@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 
 static bool write_test_annotation(const std::string& path) {
@@ -204,6 +205,38 @@ static int check_soybean_annotation(const std::string& path) {
     return 0;
 }
 
+// An AnnotationIndex copy must stay usable after the source is destroyed:
+// copy_storage_from re-bases every record view onto the copy's own buffer.
+static int check_index_copy_survives_source() {
+    const std::string path{"annotation_index_smoke.gff3"};
+    if (!write_test_annotation(path)) {
+        std::cerr << "cannot write copy test annotation\n";
+        return 1;
+    }
+
+    // Heap-indirect so the copy constructor cannot be elided (NRVO would
+    // otherwise alias the source and defeat the test).
+    std::unique_ptr<gffsub::AnnotationIndex> copied;
+    {
+        const auto original = gffsub::AnnotationIndex::from_gff3(path);
+        copied = std::make_unique<gffsub::AnnotationIndex>(original);
+    }
+    // The original's storage (mapping or buffer) is released here. Any read
+    // that still points into it would be use-after-free.
+    const auto by_id = copied->find_by_id("gene1");
+    if (!by_id || by_id->type != "gene" || by_id->seqid != "chr1" ||
+        by_id->attr_raw.find("Name=GeneOne") == std::string_view::npos) {
+        std::cerr << "copied index unusable after source destroyed\n";
+        return 1;
+    }
+    const auto children = copied->children_of("tx1");
+    if (children.empty() || children.front().seqid != "chr1") {
+        std::cerr << "copied index children_of failed\n";
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     if (argc > 2) {
         std::cerr << "usage: annotation_index_smoke [annotation.gff3]\n";
@@ -218,6 +251,10 @@ int main(int argc, char* argv[]) {
         const int self_contained_status = check_self_contained_annotation();
         if (self_contained_status != 0) {
             return self_contained_status;
+        }
+        const int copy_status = check_index_copy_survives_source();
+        if (copy_status != 0) {
+            return copy_status;
         }
     }
 

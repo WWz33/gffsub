@@ -63,6 +63,9 @@ static void cleanup_outputs() {
     std::remove("win_plain.gff3");
     std::remove("win_strand.gff3");
     std::remove("win_mrna.gff3");
+    std::remove("selector_window_plus.gff3");
+    std::remove("win_plus_plain.gff3");
+    std::remove("win_plus_a.gff3");
     std::remove("selector_gz_probe.gz");
     std::remove("selector_gz_fifo");
     std::remove("gz_ref.gff3");
@@ -1093,11 +1096,32 @@ int main(int argc, char* argv[]) {
         require_not_contains("win_mrna.gff3", "ID=wleft") != 0) {
         return 1;
     }
+    // Plus strand: -a must NOT swap the extensions (only minus-strand genes
+    // extend toward larger coordinates), so -a and plain agree.
+    {
+        std::ofstream wf{"selector_window_plus.gff3"};
+        wf << "##gff-version 3\n"
+           << "chr1\t.\tgene\t8000\t9000\t.\t+\t.\tID=pg\n"
+           << "chr1\t.\texon\t7930\t7980\t.\t+\t.\tID=pleft;Parent=pg\n"
+           << "chr1\t.\texon\t9050\t9080\t.\t+\t.\tID=pright;Parent=pg\n";
+    }
+    if (run_command(exe + " window selector_window_plus.gff3 -i pg -u 100 -D 10 > win_plus_plain.gff3") != 0 ||
+        run_command(exe + " window selector_window_plus.gff3 -i pg -u 100 -D 10 -a > win_plus_a.gff3") != 0 ||
+        compare_files("win_plus_plain.gff3", "win_plus_a.gff3") != 0 ||
+        require_contains("win_plus_a.gff3", "ID=pleft") != 0 ||
+        require_not_contains("win_plus_a.gff3", "ID=pright") != 0) {
+        return 1;
+    }
 
     // --- gzip: file, stdin, and FIFO all agree ---
 
-    if (std::system("command -v gzip > /dev/null 2>&1") == 0 &&
-        std::system("command -v mkfifo > /dev/null 2>&1") == 0) {
+    const bool have_gz_tools =
+        std::system("command -v gzip > /dev/null 2>&1") == 0 &&
+        std::system("command -v mkfifo > /dev/null 2>&1") == 0;
+    if (!have_gz_tools) {
+        std::cerr << "skipping gzip tests: gzip or mkfifo not available\n";
+    }
+    if (have_gz_tools) {
         if (run_command(exe + " " + gff + " > gz_ref.gff3") != 0 ||
             run_command("gzip -c " + gff + " > selector_gz_probe.gz") != 0 ||
             run_command(exe + " selector_gz_probe.gz > gz_file.gff3") != 0 ||

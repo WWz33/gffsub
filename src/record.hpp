@@ -84,6 +84,7 @@ public:
     // dies. Views into static storage (e.g. the literal source of BED
     // records) are outside the copied range and are left untouched.
     void copy_storage_from(const GffData& other) {
+        if (this == &other) return;
         release_mapping();
         directives = other.directives;
 

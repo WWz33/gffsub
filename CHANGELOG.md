@@ -12,7 +12,8 @@ All notable changes to gffsub are documented in this file. The format follows
 - Orphan removal (`--drop-orphans`): drops records all of whose Parent
   references leave the kept set, to a fixpoint
 - Column-9 projection (`--out-attrs LIST`); ID and Parent are always kept
-- Transparent gzip input for files, stdin, and format sniffing
+- Transparent gzip input for files, stdin, FIFOs/devices, and format
+  sniffing; concatenated gzip members are read in full
 - mmap-backed parsing for regular files
 - Per-seqid interval index (sorted starts + prefix max end) for BED overlap
 - Flat GTF `--name` lookup falls back to the gene_id attribute when the file

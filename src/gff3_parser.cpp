@@ -6,6 +6,7 @@
 #include "gtf_parser.hpp"
 #include "string_utils.hpp"
 #include <cctype>
+#include <algorithm>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
@@ -27,7 +28,10 @@ bool is_gzip_magic(const unsigned char* magic) {
     return magic[0] == 0x1f && magic[1] == 0x8b;
 }
 
-// Inflate a whole gzip file; false on open/decode error.
+// Inflate a whole gzip file; false on open/decode error. Handles gzip
+// members concatenated by `cat a.gz b.gz` (gzread does this natively) and
+// detects truncation: a cut-off member latches an error that gzread reports
+// as end-of-file, so the error code is checked after the loop.
 bool inflate_file(const std::string& path, std::string& out) {
     gzFile gz = gzopen(path.c_str(), "rb");
     if (gz == nullptr) return false;
@@ -37,32 +41,57 @@ bool inflate_file(const std::string& path, std::string& out) {
     while ((n = gzread(gz, buf, sizeof buf)) > 0) {
         result.append(buf, static_cast<size_t>(n));
     }
-    const bool ok = (n >= 0);
+    int errnum = 0;
+    (void)gzerror(gz, &errnum);
     gzclose(gz);
-    if (!ok) return false;
+    if (n < 0 || errnum != Z_OK) return false;
     out = std::move(result);
     return true;
 }
 
-// Inflate a gzip stream already held in memory (stdin path).
+// Inflate a gzip stream already held in memory (stdin and FIFO paths).
+// Feeds the input in chunks (avail_in is a 32-bit count, so a >4GiB stream
+// would otherwise be truncated) and continues across concatenated gzip
+// members. Truncated input fails: running out of input before Z_STREAM_END
+// surfaces as Z_BUF_ERROR with no pending input.
 bool inflate_memory(std::string_view in, std::string& out) {
     z_stream strm{};
     if (inflateInit2(&strm, 15 + 16) != Z_OK) return false;  // 16 = gzip wrapper
-    strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(in.data()));
-    strm.avail_in = static_cast<uInt>(in.size());
     std::string result;
     char buf[1u << 20];
-    int ret = Z_OK;
-    do {
+    size_t consumed = 0;
+    for (;;) {
+        if (strm.avail_in == 0) {
+            if (consumed >= in.size()) {
+                // Out of input before Z_STREAM_END: the member is truncated.
+                inflateEnd(&strm);
+                return false;
+            }
+            const size_t chunk = std::min<size_t>(in.size() - consumed, 1u << 30);
+            strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(in.data() + consumed));
+            strm.avail_in = static_cast<uInt>(chunk);
+            consumed += chunk;
+        }
         strm.next_out = reinterpret_cast<Bytef*>(buf);
         strm.avail_out = sizeof buf;
-        ret = inflate(&strm, Z_NO_FLUSH);
-        if (ret != Z_OK && ret != Z_STREAM_END) {
+        const int ret = inflate(&strm, Z_NO_FLUSH);
+        if (ret == Z_OK || ret == Z_STREAM_END) {
+            result.append(buf, sizeof(buf) - strm.avail_out);
+        }
+        if (ret == Z_STREAM_END) {
+            if (strm.avail_in == 0 && consumed >= in.size()) break;
+            // Concatenated members: rewind for the next gzip header.
+            if (inflateReset2(&strm, 15 + 16) != Z_OK) {
+                inflateEnd(&strm);
+                return false;
+            }
+            continue;
+        }
+        if (ret != Z_OK) {
             inflateEnd(&strm);
             return false;
         }
-        result.append(buf, sizeof(buf) - strm.avail_out);
-    } while (ret != Z_STREAM_END);
+    }
     inflateEnd(&strm);
     out = std::move(result);
     return true;

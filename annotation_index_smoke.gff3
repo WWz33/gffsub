@@ -1,0 +1,7 @@
+##gff-version 3
+chr1	.	gene	1	100	.	+	.	ID=gene1;Name=GeneOne;gene_id=G1;locus_tag=Locus1;Alias=Alpha,Beta;Dbxref=GeneID:12345
+chr1	.	mRNA	1	100	.	+	.	ID=tx1;Parent=gene1
+chr1	.	mRNA	1	100	.	+	.	ID=tx2;Parent=gene1
+chr1	.	exon	10	20	.	+	.	ID=exon_shared;Parent=tx1,tx2
+chr1	.	CDS	30	50	.	+	0	ID=cds1;Parent=tx1
+chr1	.	gene	200	300	.	-	.	ID=gene2;Name=GeneTwo
