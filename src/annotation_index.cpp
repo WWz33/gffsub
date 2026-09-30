@@ -47,12 +47,12 @@ AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
 }
 
 AnnotationIndex::AnnotationIndex(const AnnotationIndex& other)
-    : data_(other.data_),
-      id_to_record_(other.id_to_record_),
+    : id_to_record_(other.id_to_record_),
       id_to_records_(other.id_to_records_),
       gene_lookup_(other.gene_lookup_),
       parents_by_child_id_(other.parents_by_child_id_),
       children_by_parent_id_(other.children_by_parent_id_) {
+    data_.copy_storage_from(other.data_);
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
     } else {
@@ -76,7 +76,7 @@ AnnotationIndex::AnnotationIndex(AnnotationIndex&& other) noexcept
 
 AnnotationIndex& AnnotationIndex::operator=(const AnnotationIndex& other) {
     if (this == &other) return *this;
-    data_ = other.data_;
+    data_.copy_storage_from(other.data_);
     id_to_record_ = other.id_to_record_;
     id_to_records_ = other.id_to_records_;
     gene_lookup_ = other.gene_lookup_;

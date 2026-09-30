@@ -1,5 +1,6 @@
 CXX ?= g++
 CXXFLAGS = -O2 -Wall -std=c++17 -pthread
+LDLIBS = -lz
 AR ?= ar
 PREFIX ?= /usr/local
 
@@ -66,13 +67,13 @@ $(LIB): $(LIB_OBJS)
 	$(AR) rcs $@ $(LIB_OBJS)
 
 $(TARGET): $(CLI_OBJS) $(LIB)
-	$(CXX) $(CXXFLAGS) -o $@ $(CLI_OBJS) $(LIB)
+	$(CXX) $(CXXFLAGS) -o $@ $(CLI_OBJS) $(LIB) $(LDLIBS)
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(LDLIBS)
 
 $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp

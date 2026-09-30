@@ -44,7 +44,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
 
     const std::string input_file = argv[1];
     QueryParams params;
-    std::string id_list_file;
+    std::vector<std::string> id_list_files;
     bool summary = false;
 
     for (int i = 2; i < argc; ++i) {
@@ -69,7 +69,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
         } else if (arg == "--ids" || arg == "--id-list") {
             auto value = require_value(arg.c_str());
             if (!value) return 1;
-            id_list_file = *value;
+            id_list_files.push_back(*value);
         } else if (arg == "-r" || arg == "--region") {
             auto value = require_value("-r");
             if (!value) return 1;
@@ -120,23 +120,23 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     }
 
     if ((params.include_children || params.include_parents || params.include_model) &&
-        params.ids.empty() && id_list_file.empty() && params.name.empty() &&
+        params.ids.empty() && id_list_files.empty() && params.name.empty() &&
         params.attr_filters.empty() && !params.nearest_region) {
         std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest\n";
         return 1;
     }
 
-    if (params.ids.empty() && id_list_file.empty() && params.name.empty() &&
+    if (params.ids.empty() && id_list_files.empty() && params.name.empty() &&
         params.attr_filters.empty() && !params.nearest_region && !params.region) {
         std::cerr << "Error: query requires a selector: --id, --ids, --name, --where, --region, or --nearest\n";
         query_usage(prog);
         return 1;
     }
 
-    if (!id_list_file.empty()) {
-        auto ids = load_id_list_file(id_list_file);
+    for (const auto& path : id_list_files) {
+        auto ids = load_id_list_file(path);
         if (!ids) {
-            std::cerr << "Error: cannot open " << id_list_file << '\n';
+            std::cerr << "Error: cannot open " << path << '\n';
             return 1;
         }
         params.ids.insert(params.ids.end(), std::make_move_iterator(ids->begin()), std::make_move_iterator(ids->end()));
@@ -310,7 +310,12 @@ SubsetParams build_subset_params(const CliArgs& a) {
     if (!a.region_str.empty()) {
         s.region = parse_region(a.region_str);
     }
+    if (!a.exclude_region_str.empty()) {
+        s.exclude_region = parse_region(a.exclude_region_str);
+    }
     s.bed_file = a.bed_file;
+    s.bed_exclude = a.bed_exclude;
+    s.bed_strand_mode = a.bed_strand_mode;
     s.seqid_filter = a.seqid_filter;
     s.source_filter = a.source_filter;
     s.score_filter = a.score_filter;
@@ -320,6 +325,7 @@ SubsetParams build_subset_params(const CliArgs& a) {
     s.longest_type = a.longest_type;
     s.longest = a.do_longest;
     s.threads = a.num_threads;
+    s.drop_orphans = a.drop_orphans;
     s.grep_filters = a.grep_filters;
     s.include_exprs = a.include_expr_filters;
     s.exclude_exprs = a.exclude_expr_filters;
@@ -345,33 +351,38 @@ int main(int argc, char* argv[]) {
     if (!args) return help_requested ? 0 : 1;
     const auto& a = *args;
 
-    // Window shortcut: --up/--down/--strand-aware with exactly one --id
+    // Window shortcut: --up/--down/--strand-aware with exactly one --id.
+    // The guard below is a blacklist over CliArgs: any new field MUST be
+    // added here or window will silently accept (and ignore) its flag.
     if (!a.upstream_arg.empty() || !a.downstream_arg.empty() || a.strand_aware) {
         if (a.ids.size() != 1) {
             std::cerr << "Error: window shortcut requires exactly one --id\n";
             return 1;
         }
-        if (!a.id_list_file.empty() || !a.name.empty() || !a.attr_filters.empty() || !a.nearest_region_str.empty() ||
+        if (!a.id_list_files.empty() || !a.name.empty() || !a.attr_filters.empty() || !a.nearest_region_str.empty() ||
             a.include_children || a.include_parents || a.include_model ||
             a.summary || !a.region_str.empty() || !a.bed_file.empty() ||
             !a.seqid_filter.empty() || !a.source_filter.empty() || a.score_filter || a.strand_filter ||
             a.phase_filter || !a.type_filter.empty() || a.do_longest || !a.longest_type.empty() ||
             !a.grep_filters.empty() || !a.grep_file.empty() || !a.grep_field.empty() || a.grep_file_regex ||
             !a.include_expr_filters.empty() || !a.exclude_expr_filters.empty() || a.invert_grep || a.ignore_case ||
-            a.format != OutputFormat::GFF3 || !a.output_file.empty() || !a.sort_keys.empty() || a.sort_reverse) {
+            a.format != OutputFormat::GFF3 || !a.output_file.empty() || !a.sort_keys.empty() || a.sort_reverse ||
+            a.threads_set || !a.exclude_region_str.empty() || a.bed_exclude || a.bed_strand_mode != 0 ||
+            a.drop_orphans || !a.out_attrs.empty()) {
             std::cerr << "Error: window shortcut only supports --id, --up/--upstream, --down/--downstream, and --strand-aware\n";
             return 1;
         }
         return run_window_from_args(a);
     }
 
-    const bool has_query_style_selector = !a.ids.empty() || !a.id_list_file.empty() ||
+    const bool has_query_style_selector = !a.ids.empty() || !a.id_list_files.empty() ||
         !a.name.empty() || !a.attr_filters.empty() || !a.nearest_region_str.empty();
 
     // Pure query-style selector (no subset filters) → dispatch to query API
     const bool can_dispatch_to_query = !a.summary && no_subset_filters(a) &&
         a.format == OutputFormat::GFF3 && a.output_file.empty() && a.region_str.empty() &&
-        a.sort_keys.empty() && !a.sort_reverse;
+        a.sort_keys.empty() && !a.sort_reverse && a.exclude_region_str.empty() &&
+        !a.drop_orphans && a.out_attrs.empty() && a.bed_strand_mode == 0 && !a.bed_exclude;
 
     if (has_query_style_selector && can_dispatch_to_query) {
         auto qparams = build_query_params(a);
@@ -380,7 +391,7 @@ int main(int argc, char* argv[]) {
         const auto index = try_load_index(a.input_file);
         if (!index) return 1;
         const auto result = query(*index, *qparams);
-        print_gff3(std::cout, result.records);
+        print_gff3(std::cout, result.records, a.out_attrs);
         return 0;
     }
 
@@ -466,9 +477,9 @@ int main(int argc, char* argv[]) {
         print_summary(*out, kept_records);
     } else {
         switch (a.format) {
-            case OutputFormat::GFF3: print_gff3(*out, data); break;
-            case OutputFormat::GTF2: print_gtf(*out, data, a.format); break;
-            case OutputFormat::GTF3: print_gtf3(*out, data); break;
+            case OutputFormat::GFF3: print_gff3(*out, data, a.out_attrs); break;
+            case OutputFormat::GTF2: print_gtf(*out, data, a.format, a.out_attrs); break;
+            case OutputFormat::GTF3: print_gtf3(*out, data, a.out_attrs); break;
             case OutputFormat::BED:  print_bed(*out, data); break;
         }
     }

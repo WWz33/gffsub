@@ -3,21 +3,96 @@
 #include "gtf_parser.hpp"
 #include "parser.hpp"
 #include "record.hpp"
-#include <iostream>
-#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace gffsub {
 
-void print_gff3(std::ostream& out, const GffData& data) {
-    // Emit captured ## directives; if none, fall back to a default header.
-    if (!data.directives.empty()) {
-        for (const auto& d : data.directives) {
-            out << d << '\n';
+namespace {
+
+bool is_space(char c) { return c == ' ' || c == '\t'; }
+
+// Keep only the listed tags (plus ID/Parent) in a GFF3 column-9 string.
+// Segments are re-emitted verbatim so existing URL encoding is preserved.
+std::string project_col9(std::string_view col9, const std::vector<std::string>& keep_tags) {
+    if (keep_tags.empty() || col9.empty() || col9 == ".") {
+        return std::string{col9};
+    }
+    std::unordered_set<std::string> keep{keep_tags.begin(), keep_tags.end()};
+    keep.insert("ID");
+    keep.insert("Parent");
+    std::string out;
+    size_t pos = 0;
+    while (pos <= col9.size()) {
+        size_t end = col9.find(';', pos);
+        if (end == std::string_view::npos) end = col9.size();
+        std::string_view pair = col9.substr(pos, end - pos);
+        const auto eq = pair.find('=');
+        if (eq != std::string_view::npos && eq > 0) {
+            size_t kstart = 0;
+            while (kstart < eq && is_space(pair[kstart])) ++kstart;
+            size_t kend = eq;
+            while (kend > kstart && is_space(pair[kend - 1])) --kend;
+            if (keep.count(std::string{pair.substr(kstart, kend - kstart)}) > 0) {
+                if (!out.empty()) out += ';';
+                out += pair;
+            }
         }
-    } else {
-        out << "##gff-version 3\n";
+        if (end == col9.size()) break;
+        pos = end + 1;
+    }
+    if (out.empty()) out = ".";
+    return out;
+}
+
+// A sub-subset must not declare landmarks it no longer contains: drop
+// ##sequence-region directives whose seqid is absent from the kept records.
+bool directive_survives(const std::string& d,
+                        const std::unordered_set<std::string>& kept_seqids) {
+    constexpr std::string_view kPrefix = "##sequence-region";
+    if (d.rfind(kPrefix, 0) != 0) return true;
+    // Require the directive name to end here (whitespace or EOL) so an
+    // application-specific ##sequence-regionfoo is not misread.
+    if (d.size() > kPrefix.size() &&
+        d[kPrefix.size()] != ' ' && d[kPrefix.size()] != '\t') {
+        return true;
+    }
+    size_t p = d.find_first_not_of(" \t", kPrefix.size());
+    if (p == std::string::npos) return true;
+    size_t q = d.find_first_of(" \t", p);
+    const std::string seqid = d.substr(p, q == std::string::npos ? q : q - p);
+    return kept_seqids.count(seqid) > 0;
+}
+
+std::unordered_set<std::string> collect_kept_seqids(const GffData& data) {
+    std::unordered_set<std::string> seqids;
+    for (const auto& rec : data) {
+        if (rec.kept) seqids.insert(std::string{rec.seqid});
+    }
+    return seqids;
+}
+
+}  // namespace
+
+void print_gff3(std::ostream& out, const GffData& data,
+                const std::vector<std::string>& out_attrs) {
+    // ##gff-version must be the topmost line (GFF3 spec). Take it from the
+    // input when present, otherwise synthesize; ##gtf-version is a GTF
+    // directive and must not leak into GFF3 output.
+    std::string_view version_line = "##gff-version 3";
+    for (const auto& d : data.directives) {
+        if (d.rfind("##gff-version", 0) == 0) {
+            version_line = d;
+            break;
+        }
+    }
+    out << version_line << '\n';
+    const auto kept_seqids = collect_kept_seqids(data);
+    for (const auto& d : data.directives) {
+        if (d.rfind("##gff-version", 0) == 0) continue;
+        if (d.rfind("##gtf-version", 0) == 0) continue;
+        if (!directive_survives(d, kept_seqids)) continue;
+        out << d << '\n';
     }
     for (const auto& rec : data) {
         if (!rec.kept) continue;
@@ -37,6 +112,11 @@ void print_gff3(std::ostream& out, const GffData& data) {
             col9 = rec.attr_raw;
         }
         if (col9.empty()) col9 = ".";
+        std::string col9_projected;
+        if (!out_attrs.empty()) {
+            col9_projected = project_col9(col9, out_attrs);
+            col9 = col9_projected;
+        }
         out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << col9 << '\n';
@@ -44,7 +124,8 @@ void print_gff3(std::ostream& out, const GffData& data) {
 }
 
 static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val,
-                                   bool is_gene, const GffRecord& rec) {
+                                   bool is_gene, const GffRecord& rec,
+                                   const std::vector<std::string>& out_attrs) {
     // GTF2.2: gene_id required on every line, transcript_id on non-gene
     // features; other attributes may follow (spec: "Any other attributes or
     // comments must appear after these two"). Preserve them like AGAT does
@@ -76,9 +157,16 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
     // GTF-source col9 is `key "value";`, which parse_attributes (tag=value)
     // cannot read — it would drop or corrupt every attribute. Use the GTF
     // pair parser for GTF-source records.
+    std::unordered_set<std::string> keep;
+    if (!out_attrs.empty()) keep.insert(out_attrs.begin(), out_attrs.end());
+    const auto wanted = [&](std::string_view key) {
+        if (key == "gene_id" || key == "transcript_id") return false;
+        if (keep.empty()) return true;
+        return keep.count(std::string{key}) > 0;
+    };
     if (rec.src_fmt == InputFormat::GTF) {
         for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-            if (key == "gene_id" || key == "transcript_id") continue;
+            if (!wanted(key)) continue;
             result += ' ';
             result += key;
             result += " \"";
@@ -87,7 +175,7 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
         }
     } else {
         for (const auto& [key, values] : parse_attributes(rec.attr_raw)) {
-            if (key == "gene_id" || key == "transcript_id" || key == "Parent" || key == "ID") continue;
+            if (!wanted(key) || key == "Parent" || key == "ID") continue;
             for (const auto& v : values) {
                 result += ' ';
                 result += key;
@@ -100,7 +188,8 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
     return result;
 }
 
-void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
+void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
+               const std::vector<std::string>& out_attrs) {
     // GTF header per AGAT spec
     if (fmt == OutputFormat::GTF3) {
         out << "##gtf-version 2.2.1\n";
@@ -110,9 +199,11 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
     // Preserve ## directives from input (##sequence-region, ##species, etc.)
     // but skip ##gff-version / ##gtf-version — the header line above already
     // declares the output format version.
+    const auto kept_seqids = collect_kept_seqids(data);
     for (const auto& d : data.directives) {
         if (d.rfind("##gff-version", 0) == 0) continue;
         if (d.rfind("##gtf-version", 0) == 0) continue;
+        if (!directive_survives(d, kept_seqids)) continue;
         out << d << '\n';
     }
 
@@ -187,7 +278,9 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
         // GTF2.2 requires gene_id on every feature line. When it cannot be
         // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
         // convention rather than dropping the feature silently.
-        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val, rec.feat_class == FeatureClass::Gene, rec);
+        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
+                                            rec.feat_class == FeatureClass::Gene, rec,
+                                            out_attrs);
 
         out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
@@ -195,8 +288,9 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt) {
     }
 }
 
-void print_gtf3(std::ostream& out, const GffData& data) {
-    print_gtf(out, data, OutputFormat::GTF3);
+void print_gtf3(std::ostream& out, const GffData& data,
+                const std::vector<std::string>& out_attrs) {
+    print_gtf(out, data, OutputFormat::GTF3, out_attrs);
 }
 
 void print_bed(std::ostream& out, const GffData& data) {

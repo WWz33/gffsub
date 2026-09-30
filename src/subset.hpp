@@ -16,7 +16,10 @@ namespace gffsub {
 
 struct SubsetParams {
     std::optional<Region> region;
+    std::optional<Region> exclude_region;
     std::string bed_file;
+    bool bed_exclude = false;        // ^-prefixed -b value
+    char bed_strand_mode = 0;        // 0 = ignore, 's' = same, 'o' = opposite
     std::string seqid_filter;       // ^-prefixed for exclude
     std::string source_filter;
     std::optional<std::optional<double>> score_filter;
@@ -28,14 +31,16 @@ struct SubsetParams {
     std::string longest_type;
     bool longest = false;
     size_t threads = 1;
+    bool drop_orphans = false;
     std::vector<GrepFilter> grep_filters;
     std::vector<ExprNode> include_exprs;
     std::vector<ExprNode> exclude_exprs;
     bool invert_grep = false;
 };
 
-// Apply region, bed, seqid, source, score, strand, phase, grep, expr, and
-// type filters in sequence. Modifies data in place.
+// Apply region, exclude-region, bed, seqid, source, score, strand, phase,
+// grep, expr, and type filters in sequence, then --drop-orphans. Modifies
+// data in place.
 void subset(GffData& data, const SubsetParams& params);
 
 // Stable-sort records by comma-separated keys: seqid, natural-seqid, start,

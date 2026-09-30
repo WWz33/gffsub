@@ -14,6 +14,8 @@ struct Region {
     std::string seqid;
     int64_t start = 0;
     int64_t end = 0;
+    // '+'/'-'/'?' from a BED strand column; 0 when the source has no strand.
+    char strand = 0;
 };
 
 struct BedRegion {

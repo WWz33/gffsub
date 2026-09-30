@@ -1,5 +1,6 @@
 #include "subset.hpp"
 
+#include "parser.hpp"
 #include "string_utils.hpp"
 
 #include <algorithm>
@@ -10,13 +11,61 @@
 
 namespace gffsub {
 
+namespace {
+
+// Remove records all of whose Parent references point outside the kept set.
+// Runs to a fixpoint because dropping a transcript orphans its exons in
+// turn. Records without parents are never orphans.
+void drop_orphans(GffData& data) {
+    std::vector<std::vector<std::string>> parents(data.records.size());
+    for (size_t i = 0; i < data.records.size(); ++i) {
+        const auto& rec = data.records[i];
+        if (!rec.kept) continue;
+        const auto attrs = parse_attributes(rec.attr_raw);
+        const auto it = attrs.find("Parent");
+        if (it != attrs.end()) {
+            parents[i] = it->second;
+        }
+        if (rec.parent_id &&
+            std::find(parents[i].begin(), parents[i].end(), *rec.parent_id) == parents[i].end()) {
+            parents[i].push_back(*rec.parent_id);
+        }
+    }
+
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        std::unordered_set<std::string> kept_ids;
+        for (const auto& rec : data.records) {
+            if (rec.kept && rec.id) kept_ids.insert(std::string{*rec.id});
+        }
+        for (size_t i = 0; i < data.records.size(); ++i) {
+            if (!data.records[i].kept || parents[i].empty()) continue;
+            const bool has_kept_parent =
+                std::any_of(parents[i].begin(), parents[i].end(),
+                            [&](const std::string& p) { return kept_ids.count(p) > 0; });
+            if (!has_kept_parent) {
+                data.records[i].kept = false;
+                changed = true;
+            }
+        }
+    }
+}
+
+}  // namespace
+
 void subset(GffData& data, const SubsetParams& params) {
     if (params.region) {
         filter_by_region(data, *params.region);
     }
 
+    if (params.exclude_region) {
+        filter_by_region_exclude(data, *params.exclude_region);
+    }
+
     if (!params.bed_file.empty()) {
-        filter_by_regions_from_file(data, params.bed_file);
+        filter_by_regions_from_file(data, params.bed_file, params.bed_exclude,
+                                    params.bed_strand_mode);
     }
 
     if (!params.seqid_filter.empty()) {
@@ -62,6 +111,9 @@ void subset(GffData& data, const SubsetParams& params) {
         bool type_exclude = false;
         auto types = parse_list(params.type, type_exclude);
         filter_by_type(data, types, type_exclude);
+    }
+    if (params.drop_orphans) {
+        drop_orphans(data);
     }
 }
 

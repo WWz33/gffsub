@@ -15,7 +15,13 @@ git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
 ```
 
-生成 `./gffsub`。需 C++17 编译器（g++ 9+、clang 10+），无外部依赖。
+生成 `./gffsub`。需 C++17 编译器（g++ 9+、clang 10+）与 zlib（`-lz`；macOS 自带，Debian/Ubuntu 安装 `zlib1g-dev`）。
+
+## 输入
+
+- GFF3、GTF 或 BED，按内容识别（不依赖扩展名）
+- 纯文本或 gzip 压缩文件均可直接读取（`ann.gtf.gz`）
+- `-` 读取 stdin，纯文本或 gzip 均可
 
 ## 示例数据
 

@@ -2,11 +2,9 @@
 #include "parser.hpp"
 #include "record.hpp"
 #include <algorithm>
-#include <functional>
 #include <future>
 #include <map>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace gffsub {
 
@@ -200,8 +198,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         return plan;
     };
 
-    auto plan_chromosome = [&](const std::string& chrom,
-                               const std::vector<int>& gene_indices) {
+    auto plan_chromosome = [&](const std::vector<int>& gene_indices) {
         std::vector<GenePlan> plans;
         for (int gene_idx : gene_indices) {
             if (auto plan = plan_gene(gene_idx)) {
@@ -214,7 +211,8 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     std::vector<GenePlan> all_plans;
     if (num_threads <= 1) {
         for (auto& [chrom, gene_indices] : chrom_to_gene_idx) {
-            auto plans = plan_chromosome(chrom, gene_indices);
+            (void)chrom;
+            auto plans = plan_chromosome(gene_indices);
             all_plans.insert(all_plans.end(),
                              std::make_move_iterator(plans.begin()),
                              std::make_move_iterator(plans.end()));
@@ -225,10 +223,9 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         // thread limits. Batch: launch up to num_threads, then wait.
         std::vector<std::future<std::vector<GenePlan>>> futures;
         for (auto& kv : chrom_to_gene_idx) {
-            const std::string& chrom = kv.first;
             std::vector<int> gene_indices = kv.second;
-            futures.push_back(std::async(std::launch::async, [&, chrom, gene_indices]() {
-                return plan_chromosome(chrom, gene_indices);
+            futures.push_back(std::async(std::launch::async, [&, gene_indices]() {
+                return plan_chromosome(gene_indices);
             }));
             if (futures.size() >= num_threads) {
                 for (auto& f : futures) {

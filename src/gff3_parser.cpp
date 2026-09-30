@@ -5,11 +5,70 @@
 #include "region.hpp"
 #include "gtf_parser.hpp"
 #include "string_utils.hpp"
+#include <cctype>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <zlib.h>
 
 namespace gffsub {
+
+namespace {
+
+// Defined below next to the other stream helpers.
+std::string read_stream_chunked(std::istream& in);
+
+// gzip magic bytes (RFC 1952).
+bool is_gzip_magic(const unsigned char* magic) {
+    return magic[0] == 0x1f && magic[1] == 0x8b;
+}
+
+// Inflate a whole gzip file; false on open/decode error.
+bool inflate_file(const std::string& path, std::string& out) {
+    gzFile gz = gzopen(path.c_str(), "rb");
+    if (gz == nullptr) return false;
+    std::string result;
+    char buf[1u << 20];
+    int n = 0;
+    while ((n = gzread(gz, buf, sizeof buf)) > 0) {
+        result.append(buf, static_cast<size_t>(n));
+    }
+    const bool ok = (n >= 0);
+    gzclose(gz);
+    if (!ok) return false;
+    out = std::move(result);
+    return true;
+}
+
+// Inflate a gzip stream already held in memory (stdin path).
+bool inflate_memory(std::string_view in, std::string& out) {
+    z_stream strm{};
+    if (inflateInit2(&strm, 15 + 16) != Z_OK) return false;  // 16 = gzip wrapper
+    strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(in.data()));
+    strm.avail_in = static_cast<uInt>(in.size());
+    std::string result;
+    char buf[1u << 20];
+    int ret = Z_OK;
+    do {
+        strm.next_out = reinterpret_cast<Bytef*>(buf);
+        strm.avail_out = sizeof buf;
+        ret = inflate(&strm, Z_NO_FLUSH);
+        if (ret != Z_OK && ret != Z_STREAM_END) {
+            inflateEnd(&strm);
+            return false;
+        }
+        result.append(buf, sizeof(buf) - strm.avail_out);
+    } while (ret != Z_STREAM_END);
+    inflateEnd(&strm);
+    out = std::move(result);
+    return true;
+}
+
+}  // namespace
 
 static std::optional<std::string> extract_attr_value(std::string_view attrs, std::string_view key) {
     size_t pos = 0;
@@ -58,36 +117,71 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
     // Read the whole input into data.buffer; record fields are string_views
     // into it. stdin ("-") goes through parse_stdin instead: the format must
     // be sniffed from the buffer after the single read.
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) return -1;
+    //
+    // gzip input (magic 1f 8b) is inflated transparently; mmap-able regular
+    // files are mapped read-only to skip the read + zero-fill copy.
     {
-        file.seekg(0, std::ios::end);
-        const auto end = file.tellg();
-        if (file && end > 0) {
-            data.buffer.resize(static_cast<size_t>(end));
-            file.seekg(0);
-            file.read(data.buffer.data(), end);
-            data.buffer.resize(static_cast<size_t>(file.gcount()));
+        // Probe for gzip only on regular files: reading a FIFO/pipe here
+        // would consume bytes the later streaming read cannot recover.
+        struct stat pst{};
+        const bool regular = (::stat(filename.c_str(), &pst) == 0) && S_ISREG(pst.st_mode);
+        std::ifstream probe(filename, std::ios::binary);
+        if (!probe.is_open()) return -1;
+        unsigned char magic[2] = {0, 0};
+        bool gzip_input = false;
+        if (regular) {
+            probe.read(reinterpret_cast<char*>(magic), 2);
+            gzip_input = probe.gcount() == 2 && is_gzip_magic(magic);
+            probe.close();
+        }
+
+        if (gzip_input) {
+            if (!inflate_file(filename, data.buffer)) return -1;
+        } else if (regular) {
+            int fd = ::open(filename.c_str(), O_RDONLY);
+            if (fd < 0) return -1;
+            struct stat st{};
+            if (::fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0) {
+                void* map = ::mmap(nullptr, static_cast<size_t>(st.st_size),
+                                   PROT_READ, MAP_PRIVATE, fd, 0);
+                if (map != MAP_FAILED) {
+                    data.set_mapping(map, static_cast<size_t>(st.st_size));
+                }
+            }
+            ::close(fd);
+            if (data.content().empty()) {
+                // Failed mapping: read normally.
+                std::ifstream file(filename, std::ios::binary);
+                if (!file.is_open()) return -1;
+                data.buffer = read_stream_chunked(file);
+            }
         } else {
-            // Non-seekable input (FIFO/pipe): fall back to a streaming read.
-            file.clear();
-            file.seekg(0);
-            file.clear();
-            std::string chunk{std::istreambuf_iterator<char>(file),
-                              std::istreambuf_iterator<char>()};
-            data.buffer = std::move(chunk);
+            // FIFO/device: a second open() would block waiting for a new
+            // writer, so read the already-open stream once and sniff the
+            // format from the loaded content.
+            data.buffer = read_stream_chunked(probe);
+            probe.close();
+            format = infer_format_from_content(data.content());
         }
     }
     // Reserve records capacity: average GFF3 line ~130 bytes. Cap to avoid
     // bad_alloc on comment-heavy files.
-    size_t hint = data.buffer.size() / 130;
+    size_t hint = data.content().size() / 130;
     if (hint > 1u << 20) hint = 1u << 20;
     data.reserve(hint);
     return parse_content(data, format);
 }
 
+void GffData::release_mapping() {
+    if (mapped_data_ != nullptr) {
+        ::munmap(mapped_data_, mapped_size_);
+        mapped_data_ = nullptr;
+        mapped_size_ = 0;
+    }
+}
+
 int parse_content(GffData& data, InputFormat format) {
-    const std::string_view content{data.buffer};
+    const std::string_view content{data.content()};
     bool in_fasta = false;
     size_t pos = 0;
 
@@ -220,9 +314,13 @@ int parse_content(GffData& data, InputFormat format) {
                     pos = 0;
                     rec.end = std::stoll(std::string{cols[2]}, &pos);
                     if (pos != cols[2].size()) throw std::invalid_argument{"end"};
-                    if (bed_start < 0 || rec.end <= bed_start) {
+                    if (bed_start < 0 || rec.end < bed_start) {
                         throw std::invalid_argument{"coordinates"};
                     }
+                    // Zero-length BED interval [s,s) is an insertion site;
+                    // map it to the one-base 1-based position s+1 so that
+                    // end == start (GFF3 zero-length convention).
+                    if (rec.end == bed_start) rec.end = bed_start + 1;
                     rec.start = bed_start + 1;  // BED 0-based half-open -> 1-based inclusive
                 }
                 rec.source = "gffsub";  // string literal: static storage, no allocation
@@ -290,6 +388,22 @@ std::optional<InputFormat> sniff_line(std::string_view line) {
         if (a.find('=') != std::string_view::npos) {
             return InputFormat::GFF3;
         }
+        // Unquoted GTF attributes: `key value; ...` (no quotes, no '=').
+        // Shape check keeps BED9 (itemRgb, no semicolon/space) out of this.
+        if (a.find(';') != std::string_view::npos) {
+            const auto sp = a.find_first_of(" \t");
+            if (sp != std::string_view::npos && sp > 0) {
+                bool ident = true;
+                for (size_t i = 0; i < sp; ++i) {
+                    const unsigned char c = static_cast<unsigned char>(a[i]);
+                    if (!(std::isalnum(c) || c == '_')) {
+                        ident = false;
+                        break;
+                    }
+                }
+                if (ident) return InputFormat::GTF;
+            }
+        }
         // Col9 present but neither GFF3 nor GTF shape. BED9/BED12 lines
         // (itemRgb or a plain col9) also land here: columns 2-3 are integer
         // coordinates (0-based start/end), while a GFF3 source column (col 2)
@@ -309,8 +423,48 @@ std::optional<InputFormat> sniff_line(std::string_view line) {
 }
 
 InputFormat sniff_format(const std::string& path) {
-    std::ifstream f(path);
+    // Only regular files are sniffed in a separate open. Opening a FIFO here
+    // would connect to the writer and closing it again would kill the writer
+    // (EPIPE) before parse_file can read; non-regular inputs are sniffed from
+    // the loaded content inside parse_file instead.
+    struct stat pst{};
+    if (::stat(path.c_str(), &pst) != 0 || !S_ISREG(pst.st_mode)) {
+        return InputFormat::GFF3;
+    }
+    std::ifstream f(path, std::ios::binary);
     if (!f.is_open()) return InputFormat::GFF3;
+    {
+        unsigned char magic[2] = {0, 0};
+        f.read(reinterpret_cast<char*>(magic), 2);
+        if (f.gcount() == 2 && is_gzip_magic(magic)) {
+            f.close();
+            gzFile gz = gzopen(path.c_str(), "rb");
+            if (gz == nullptr) return InputFormat::GFF3;
+            // Read incrementally until one feature line is seen, so a gzipped
+            // file with a long header of comments/directives still sniffs
+            // from real content (the plain-file path has no byte cap).
+            std::string head;
+            std::string line;
+            char c = 0;
+            bool decided = false;
+            while (!decided && gzread(gz, &c, 1) == 1) {
+                if (c == '\n') {
+                    if (!line.empty() && line.back() == '\r') line.pop_back();
+                    if (const auto fmt = sniff_line(line)) {
+                        gzclose(gz);
+                        return *fmt;
+                    }
+                    line.clear();
+                } else {
+                    line.push_back(c);
+                }
+            }
+            gzclose(gz);
+            return InputFormat::GFF3;
+        }
+        f.clear();
+        f.seekg(0);
+    }
     // On non-seekable input (FIFO/pipe) reading here would consume bytes the
     // later parse_file() re-open cannot recover; fall back to GFF3, the
     // project's primary format.
@@ -371,8 +525,22 @@ std::string read_stream_chunked(std::istream& in) {
 
 int parse_stdin(GffData& data, InputFormat& format_out) {
     data.buffer = read_stream_chunked(std::cin);
-    format_out = infer_format_from_content(data.buffer);
-    size_t hint = data.buffer.size() / 130;
+    // Transparent gzip: `zcat file.gff3.gz | gffsub -` gets the same result
+    // as passing the .gz path directly.
+    if (data.buffer.size() >= 2) {
+        const unsigned char magic[2] = {
+            static_cast<unsigned char>(data.buffer[0]),
+            static_cast<unsigned char>(data.buffer[1]),
+        };
+        if (is_gzip_magic(magic)) {
+            std::string inflated;
+            if (!inflate_memory(data.buffer, inflated)) return -1;
+            data.buffer = std::move(inflated);
+        }
+    }
+    const std::string_view content{data.content()};
+    format_out = infer_format_from_content(content);
+    size_t hint = content.size() / 130;
     if (hint > 1u << 20) hint = 1u << 20;
     data.reserve(hint);
     return parse_content(data, format_out);

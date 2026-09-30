@@ -65,3 +65,13 @@ Returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
 | `-C` / `-C` | downward | selector hit + all descendants |
 | `-p` | upward | selector hit + all ancestors to gene |
 | `-m` | both | full gene model |
+
+## --drop-orphans
+
+Remove records all of whose Parent references point outside the kept set. Applied after every other filter and repeated until a fixpoint, so dropping a transcript also drops its exons. Records without parents are never dropped.
+
+```bash
+./gffsub demo.gff3 -t exon --drop-orphans
+```
+
+With this flag the output contains no dangling `Parent=` references.

@@ -89,10 +89,10 @@ std::optional<std::vector<std::string>> load_id_list_file(const std::string& pat
 std::optional<QueryParams> build_query_params(const CliArgs& a) {
     QueryParams q;
     q.ids = a.ids;
-    if (!a.id_list_file.empty()) {
-        auto ids = load_id_list_file(a.id_list_file);
+    for (const auto& path : a.id_list_files) {
+        auto ids = load_id_list_file(path);
         if (!ids) {
-            std::cerr << "Error: cannot open " << a.id_list_file << '\n';
+            std::cerr << "Error: cannot open " << path << '\n';
             return std::nullopt;
         }
         q.ids.insert(q.ids.end(), std::make_move_iterator(ids->begin()), std::make_move_iterator(ids->end()));
@@ -140,6 +140,11 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         OPT_EXCLUDE_EXPR,
         OPT_INVERT_MATCH,
         OPT_LONGEST_TYPE,
+        OPT_EXCLUDE_REGION,
+        OPT_DROP_ORPHANS,
+        OPT_OUT_ATTRS,
+        OPT_SAME_STRAND,
+        OPT_OPPOSITE_STRAND,
         OPT_VERSION
     };
     static struct option long_options[] = {
@@ -180,7 +185,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         {"children",      no_argument,       nullptr, 'C'},
         {"include-children", no_argument,     nullptr, 'C'},
         {"region",        required_argument, nullptr, 'r'},
+        {"exclude-region", required_argument, nullptr, OPT_EXCLUDE_REGION},
         {"bed",           required_argument, nullptr, 'b'},
+        {"same-strand",   no_argument,       nullptr, OPT_SAME_STRAND},
+        {"opposite-strand", no_argument,     nullptr, OPT_OPPOSITE_STRAND},
+        {"drop-orphans",  no_argument,       nullptr, OPT_DROP_ORPHANS},
+        {"out-attrs",     required_argument, nullptr, OPT_OUT_ATTRS},
         {"type",          required_argument, nullptr, 't'},
         {"longest",       no_argument,       nullptr, 'L'},
         {"longest-type",  required_argument, nullptr, OPT_LONGEST_TYPE},
@@ -197,9 +207,27 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
     int option_index = 0;
     while ((opt = getopt_long(argc, argv, "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:c:f:k:Ry", long_options, &option_index)) != -1) {
         switch (opt) {
-            case 'i': args.ids.emplace_back(optarg); break;
-            case OPT_ID_LIST: args.id_list_file = optarg; break;
-            case 'n': args.name = optarg; break;
+            case 'i':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --id requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.ids.emplace_back(optarg);
+                break;
+            case OPT_ID_LIST:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --ids requires a non-empty file path\n";
+                    return std::nullopt;
+                }
+                args.id_list_files.emplace_back(optarg);
+                break;
+            case 'n':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --name requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.name = optarg;
+                break;
             case 'w': {
                 const std::string value{optarg};
                 const auto equal_pos = value.find('=');
@@ -225,9 +253,17 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 break;
             }
             case OPT_GREP_FILE:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --grep-file requires a non-empty value\n";
+                    return std::nullopt;
+                }
                 args.grep_file = optarg;
                 break;
             case OPT_GREP_FIELD:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --grep-field requires a non-empty value\n";
+                    return std::nullopt;
+                }
                 args.grep_field = optarg;
                 break;
             case OPT_GREP_FILE_REGEX:
@@ -263,13 +299,31 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 break;
             case 'p': args.include_parents = true; break;
             case 'm': args.include_model = true; break;
-            case 'N': args.nearest_region_str = optarg; break;
+            case 'N':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --nearest requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.nearest_region_str = optarg;
+                break;
             case 'C': args.include_children = true; break;
             case 'u': args.upstream_arg = optarg; break;
             case 'D': args.downstream_arg = optarg; break;
             case 'a': args.strand_aware = true; break;
-            case 'S': args.seqid_filter = optarg; break;
-            case OPT_SOURCE: args.source_filter = optarg; break;
+            case 'S':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --seqid requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.seqid_filter = optarg;
+                break;
+            case OPT_SOURCE:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --source requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.source_filter = optarg;
+                break;
             case 'c': {
                 args.score_filter = parse_score_filter(optarg);
                 if (!args.score_filter) {
@@ -295,14 +349,82 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 break;
             }
             case 'r':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --region requires a non-empty value\n";
+                    return std::nullopt;
+                }
                 args.region_str = optarg;
                 if (!parse_region(optarg)) {
                     std::cerr << "Error: invalid region format " << optarg << '\n';
                     return std::nullopt;
                 }
                 break;
-            case 'b': args.bed_file = optarg; break;
+            case OPT_EXCLUDE_REGION:
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --exclude-region requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.exclude_region_str = optarg;
+                if (!parse_region(optarg)) {
+                    std::cerr << "Error: invalid region format " << optarg << '\n';
+                    return std::nullopt;
+                }
+                break;
+            case 'b': {
+                const std::string value{optarg};
+                if (value.empty()) {
+                    std::cerr << "Error: --bed requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                // `^FILE` inverts the filter: keep records NOT overlapping.
+                if (value[0] == '^') {
+                    args.bed_exclude = true;
+                    args.bed_file = value.substr(1);
+                } else {
+                    args.bed_exclude = false;
+                    args.bed_file = value;
+                }
+                if (args.bed_file.empty()) {
+                    std::cerr << "Error: --bed requires a file path after ^\n";
+                    return std::nullopt;
+                }
+                break;
+            }
+            case OPT_SAME_STRAND:
+                if (args.bed_strand_mode == 'o') {
+                    std::cerr << "Error: --same-strand and --opposite-strand are mutually exclusive\n";
+                    return std::nullopt;
+                }
+                args.bed_strand_mode = 's';
+                break;
+            case OPT_OPPOSITE_STRAND:
+                if (args.bed_strand_mode == 's') {
+                    std::cerr << "Error: --same-strand and --opposite-strand are mutually exclusive\n";
+                    return std::nullopt;
+                }
+                args.bed_strand_mode = 'o';
+                break;
+            case OPT_DROP_ORPHANS:
+                args.drop_orphans = true;
+                break;
+            case OPT_OUT_ATTRS: {
+                std::istringstream in{std::string{optarg}};
+                std::string item;
+                while (std::getline(in, item, ',')) {
+                    const auto name = trim_copy(item);
+                    if (!name.empty()) args.out_attrs.push_back(name);
+                }
+                if (args.out_attrs.empty()) {
+                    std::cerr << "Error: --out-attrs requires a non-empty comma-separated list\n";
+                    return std::nullopt;
+                }
+                break;
+            }
             case 't':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --type requires a non-empty value\n";
+                    return std::nullopt;
+                }
                 // repeatable: later -t append with comma
                 if (args.type_filter.empty()) args.type_filter = optarg;
                 else args.type_filter += "," + std::string{optarg};
@@ -343,9 +465,21 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 }
                 break;
             }
-            case 'k': args.sort_keys = optarg; break;
+            case 'k':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --sort requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.sort_keys = optarg;
+                break;
             case 'R': args.sort_reverse = true; break;
-            case 'o': args.output_file = optarg; break;
+            case 'o':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --output requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.output_file = optarg;
+                break;
             case 'h': usage(argv[0]); help_requested = true; return std::nullopt;
             case OPT_VERSION:
                 std::cout << "gffsub " << kVersion << '\n';
@@ -406,7 +540,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         }
     }
 
-    const bool has_query_style_selector = !args.ids.empty() || !args.id_list_file.empty() ||
+    if (args.bed_strand_mode != 0 && args.bed_file.empty()) {
+        std::cerr << "Error: --same-strand/--opposite-strand require -b/--bed\n";
+        return std::nullopt;
+    }
+
+    const bool has_query_style_selector = !args.ids.empty() || !args.id_list_files.empty() ||
         !args.name.empty() || !args.attr_filters.empty() || !args.nearest_region_str.empty();
     if ((args.include_children || args.include_parents || args.include_model) && !has_query_style_selector) {
         std::cerr << "Error: --children/--parents/--model require --id, --ids, --name, --where, or --nearest\n";

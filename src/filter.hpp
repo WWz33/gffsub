@@ -13,7 +13,11 @@
 namespace gffsub {
 
 void filter_by_region(GffData& data, const Region& region);
-void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
+void filter_by_region_exclude(GffData& data, const Region& region);
+// exclude=true keeps records NOT overlapping any region. strand_mode is 0
+// (ignore), 's' (same strand as the BED row), or 'o' (opposite strand).
+void filter_by_regions_from_file(GffData& data, const std::string& bed_file,
+                                 bool exclude = false, char strand_mode = 0);
 void filter_by_type(GffData& data, const std::unordered_set<std::string>& types, bool exclude);
 void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude);
 void filter_by_source(GffData& data, const std::unordered_set<std::string>& sources, bool exclude);

@@ -7,77 +7,28 @@
 namespace gffsub {
 
 std::optional<std::string> extract_quoted_value(std::string_view attrs, std::string_view key) {
-    // GTF attributes are "; "-delimited: key "value";
-    // Match the key as a whole token, not as a substring of a longer name.
-    size_t pos = 0;
-    while (pos < attrs.size()) {
-        // Find the next occurrence of the key.
-        size_t hit = attrs.find(key, pos);
-        if (hit == std::string::npos) {
-            return std::nullopt;
+    // Whole-token match over the parsed pairs: avoids matching a key that
+    // only appears as a substring of a longer one (`ref_gene_id`) or inside
+    // another attribute's value, and accepts bare (unquoted) values.
+    for (const auto& [k, v] : parse_gtf_attributes(attrs)) {
+        if (k == key) {
+            return v;
         }
-        // Left boundary: must be at start, or preceded by ';' (optionally spaces).
-        bool left_ok = (hit == 0);
-        if (!left_ok) {
-            size_t p = hit;
-            while (p > 0 && (attrs[p - 1] == ' ' || attrs[p - 1] == '\t')) {
-                --p;
-            }
-            left_ok = (p > 0 && attrs[p - 1] == ';');
-        }
-        if (!left_ok) {
-            pos = hit + 1;
-            continue;
-        }
-        // Right boundary: after the key, skip spaces, expect '"'.
-        size_t q = hit + key.size();
-        while (q < attrs.size() && (attrs[q] == ' ' || attrs[q] == '\t')) {
-            ++q;
-        }
-        if (q >= attrs.size() || attrs[q] != '"') {
-            pos = hit + 1;
-            continue;
-        }
-        size_t q1 = q;
-        // Find closing quote, handling escaped quotes (\" -> literal quote in value)
-        size_t q2 = q1 + 1;
-        while (q2 < attrs.size()) {
-            if (attrs[q2] == '\\' && q2 + 1 < attrs.size()) {
-                q2 += 2;  // skip escaped char
-                continue;
-            }
-            if (attrs[q2] == '"') break;
-            ++q2;
-        }
-        if (q2 >= attrs.size()) {
-            return std::nullopt;
-        }
-        // Unescape: remove backslash before quotes and backslashes
-        std::string value{attrs.substr(q1 + 1, q2 - q1 - 1)};
-        std::string unescaped;
-        unescaped.reserve(value.size());
-        for (size_t j = 0; j < value.size(); ++j) {
-            if (value[j] == '\\' && j + 1 < value.size() && value[j + 1] == '"') {
-                unescaped.push_back('"');
-                ++j;
-            } else if (value[j] == '\\' && j + 1 < value.size() && value[j + 1] == '\\') {
-                unescaped.push_back('\\');
-                ++j;
-            } else {
-                unescaped.push_back(value[j]);
-            }
-        }
-        return unescaped;
     }
     return std::nullopt;
 }
 
 void apply_gtf_attributes(GffRecord& rec) {
-    if (!rec.gene_id) {
-        rec.gene_id = extract_quoted_value(rec.attr_raw, "gene_id");
-    }
-    if (!rec.transcript_id) {
-        rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
+    // One pass over column 9; both keys come from the same parse.
+    if (!rec.gene_id || !rec.transcript_id) {
+        for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
+            if (!rec.gene_id && key == "gene_id") {
+                rec.gene_id = value;
+            } else if (!rec.transcript_id && key == "transcript_id") {
+                rec.transcript_id = value;
+            }
+            if (rec.gene_id && rec.transcript_id) break;
+        }
     }
 }
 
@@ -100,46 +51,71 @@ std::string gtf_unescape(const std::string& s) {
     return out;
 }
 
+std::string_view trim_ws(std::string_view s) {
+    const auto first = s.find_first_not_of(" \t");
+    if (first == std::string_view::npos) return {};
+    const auto last = s.find_last_not_of(" \t");
+    return s.substr(first, last - first + 1);
+}
+
+// Emit one `;`-separated fragment as a key/value pair. Quoted values keep
+// `;` verbatim (handled by the caller's quote tracking); bare values
+// (non-standard GTF emitted by some tools) are accepted as-is.
+void emit_gtf_fragment(std::string_view frag,
+                       std::vector<std::pair<std::string, std::string>>& out) {
+    frag = trim_ws(frag);
+    if (frag.empty()) return;
+
+    const auto q1 = frag.find('"');
+    if (q1 == std::string_view::npos) {
+        // Bare `key value` form.
+        const auto sp = frag.find_first_of(" \t");
+        if (sp == std::string_view::npos) return;  // key without a value
+        const auto key = trim_ws(frag.substr(0, sp));
+        const auto value = trim_ws(frag.substr(sp));
+        if (key.empty() || value.empty()) return;
+        out.emplace_back(std::string{key}, std::string{value});
+        return;
+    }
+
+    const auto key = trim_ws(frag.substr(0, q1));
+    if (key.empty()) return;
+    // Find the closing quote, honoring backslash escapes.
+    size_t q2 = q1 + 1;
+    while (q2 < frag.size()) {
+        if (frag[q2] == '\\' && q2 + 1 < frag.size()) {
+            q2 += 2;
+            continue;
+        }
+        if (frag[q2] == '"') break;
+        ++q2;
+    }
+    if (q2 >= frag.size()) return;  // unclosed quote: drop the fragment
+    out.emplace_back(std::string{key}, gtf_unescape(std::string{frag.substr(q1 + 1, q2 - q1 - 1)}));
+}
+
 }  // namespace
 
 std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs) {
     std::vector<std::pair<std::string, std::string>> result;
-    size_t pos = 0;
-    while (pos < attrs.size()) {
-        size_t end = attrs.find(';', pos);
-        if (end == std::string::npos) {
-            end = attrs.size();
-        }
-        std::string frag{attrs.substr(pos, end - pos)};
-        pos = (end < attrs.size()) ? end + 1 : attrs.size();
-
-        const auto first = frag.find_first_not_of(" \t");
-        if (first == std::string::npos) {
+    // Split on ';' outside double quotes so a semicolon inside a quoted value
+    // (`note "a;b"`) is preserved; AGAT's parser does the same.
+    size_t frag_start = 0;
+    bool in_quote = false;
+    for (size_t i = 0; i < attrs.size(); ++i) {
+        const char c = attrs[i];
+        if (c == '\\' && in_quote && i + 1 < attrs.size()) {
+            ++i;
             continue;
         }
-        const auto last = frag.find_last_not_of(" \t");
-        frag = frag.substr(first, last - first + 1);
-
-        const auto q1 = frag.find('"');
-        if (q1 == std::string::npos || q1 == 0) {
-            continue;
+        if (c == '"') {
+            in_quote = !in_quote;
+        } else if (c == ';' && !in_quote) {
+            emit_gtf_fragment(attrs.substr(frag_start, i - frag_start), result);
+            frag_start = i + 1;
         }
-        const auto q2 = frag.rfind('"');
-        if (q2 == q1) {
-            continue;
-        }
-        std::string key = frag.substr(0, q1);
-        const auto klast = key.find_last_not_of(" \t");
-        if (klast == std::string::npos) {
-            continue;
-        }
-        key = key.substr(0, klast + 1);
-        const std::string raw_value = frag.substr(q1 + 1, q2 - q1 - 1);
-        if (key.empty() || raw_value.empty()) {
-            continue;
-        }
-        result.emplace_back(std::move(key), gtf_unescape(raw_value));
     }
+    emit_gtf_fragment(attrs.substr(frag_start), result);
     return result;
 }
 

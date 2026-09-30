@@ -22,13 +22,19 @@ add_library(gffsub_core STATIC
     src/subset.cpp
 )
 
+find_package(ZLIB REQUIRED)
+
 target_include_directories(gffsub_core PUBLIC
     src
 )
 
+target_link_libraries(gffsub_core PUBLIC ZLIB::ZLIB)
+
 target_compile_options(gffsub_core PRIVATE
     -Wall -O2
 )
+
+find_package(Threads REQUIRED)
 
 add_executable(gffsub
     src/gffsub.cpp
@@ -36,7 +42,7 @@ add_executable(gffsub
     src/cli_usage.cpp
 )
 
-target_link_libraries(gffsub PRIVATE gffsub_core)
+target_link_libraries(gffsub PRIVATE gffsub_core Threads::Threads)
 
 target_compile_options(gffsub PRIVATE
     -Wall -O2

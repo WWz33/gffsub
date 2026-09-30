@@ -65,3 +65,13 @@ chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
 | `-C` / `-C` | 向下 | 命中 + 所有后代 |
 | `-p` | 向上 | 命中 + 所有祖先到 gene |
 | `-m` | 双向 | 完整 gene 模型 |
+
+## --drop-orphans
+
+删除所有 Parent 引用都已不在保留集内的记录。在其他过滤之后执行，迭代到不动点，因此删除 transcript 会连带删除其 exon。无 Parent 的记录不会删除。
+
+```bash
+./gffsub demo.gff3 -t exon --drop-orphans
+```
+
+开启后输出中不会出现悬空的 `Parent=` 引用。

@@ -15,7 +15,13 @@ git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
 ```
 
-Produces `./gffsub`. Requires a C++17 compiler (g++ 9+, clang 10+), no external dependencies.
+Produces `./gffsub`. Requires a C++17 compiler (g++ 9+, clang 10+) and zlib (`-lz`; ships with macOS, install `zlib1g-dev` on Debian/Ubuntu).
+
+## Inputs
+
+- GFF3, GTF, or BED, detected from content (not the extension)
+- Plain or gzip-compressed files read directly (`ann.gtf.gz`)
+- `-` reads stdin, plain or gzip-compressed
 
 ## Example data
 

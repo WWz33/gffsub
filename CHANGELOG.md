@@ -4,6 +4,40 @@ All notable changes to gffsub are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions adhere to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Region complement (`--exclude-region`) and BED complement (`-b ^FILE`)
+- Strand-aware BED overlap (`--same-strand`, `--opposite-strand`)
+- Orphan removal (`--drop-orphans`): drops records all of whose Parent
+  references leave the kept set, to a fixpoint
+- Column-9 projection (`--out-attrs LIST`); ID and Parent are always kept
+- Transparent gzip input for files, stdin, and format sniffing
+- mmap-backed parsing for regular files
+- Per-seqid interval index (sorted starts + prefix max end) for BED overlap
+- Flat GTF `--name` lookup falls back to the gene_id attribute when the file
+  has no gene feature records
+- GTF attribute values may be unquoted; semicolons inside quoted values are
+  preserved; GFF3 attributes separated by `; ` are recognized
+- BED9/BED12 input detection; zero-length BED intervals map to a 1-based
+  point
+- Region arguments split on the last colon, so seqids containing `:` work
+- `##sequence-region` directives are pruned to surviving seqids;
+  `##gff-version` is always the first output line; `##gtf-version` is
+  filtered out of GFF3 output
+
+### Fixed
+- `-b/--bed` with an unopenable file exits 1 instead of silently dropping
+  every record
+- `--longest` is deterministic for multi-parent records: winner-priority
+  kept assignment, no cross-thread record writes
+- `-b/--bed` no longer mis-detects BED9/BED12 as GFF3
+- window subcommand accepts the documented `-i/-u/-D/-a` short forms
+- `--ids`/`--id-list` are repeatable and accumulate
+- Empty values for `--seqid`, `--source`, `--type`, `--name`, `--ids`,
+  `--region`, `--bed` are rejected
+- `--threads` help text and README state the actual default (6)
+
 ## [0.1.0] - 2026-08-16
 
 First tracked release. gffsub is a C++17 command-line tool for subsetting GFF3

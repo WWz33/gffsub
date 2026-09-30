@@ -42,7 +42,8 @@ Syntax: `-b FILE.bed`
 
 - BED is 0-based half-open (start included, end excluded)
 - Tab-separated, at least 3 columns (chrom, start, end)
-- Optional columns 4-6 (name, score, strand) parsed but not used for filtering
+- Optional columns 4-6 (name, score, strand); column 6 (strand) is used by `--same-strand`/`--opposite-strand`
+- Zero-length intervals (`start == end`) are accepted as insertion points
 - Keeps records overlapping any BED interval
 
 Example BED file (`regions.bed`):
@@ -54,6 +55,22 @@ chr2	199	700
 
 ```bash
 ./gffsub demo.gff3 -b regions.bed
+```
+
+Strand-aware overlap (BED strand column required; rows without one are skipped, and records with strand `.` never match):
+
+```bash
+./gffsub demo.gff3 -b regions.bed --same-strand
+./gffsub demo.gff3 -b regions.bed --opposite-strand
+```
+
+## Complement
+
+`--exclude-region` drops records overlapping a region; a `^` prefix on the `-b` value drops records overlapping the BED file:
+
+```bash
+./gffsub demo.gff3 --exclude-region chr1:200-600
+./gffsub demo.gff3 -b '^regions.bed'
 ```
 
 ## -S / --seqid

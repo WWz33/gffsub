@@ -25,11 +25,12 @@ struct CliArgs {
 
     // query-style selectors
     std::vector<std::string> ids;
-    std::string id_list_file;
+    std::vector<std::string> id_list_files;  // --ids/--id-list, repeatable
     std::string name;
     std::vector<std::pair<std::string, std::string>> attr_filters;
     std::string nearest_region_str;
     std::string region_str;
+    std::string exclude_region_str;  // --exclude-region
 
     // window shortcut
     std::string upstream_arg;
@@ -48,12 +49,16 @@ struct CliArgs {
     std::optional<char> strand_filter;
     std::optional<char> phase_filter;
     std::string bed_file;
+    bool bed_exclude = false;        // -b value prefixed with ^
+    char bed_strand_mode = 0;        // 0 = ignore, 's' = same, 'o' = opposite
     std::string type_filter;
     // isoform type for --longest; empty = auto-detect
     std::string longest_type;
     bool do_longest = false;
     size_t num_threads = 6;
     bool threads_set = false;
+    bool drop_orphans = false;       // --drop-orphans
+    std::vector<std::string> out_attrs;  // --out-attrs whitelist (empty = all)
 
     // grep / expr
     std::vector<GrepFilter> grep_filters;

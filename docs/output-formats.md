@@ -90,3 +90,14 @@ chr1	99	250	cds01	0	+
 ./gffsub input.gtf --format gff3
 ./gffsub demo.gff3 --format gtf -o output.gtf
 ```
+
+## --out-attrs
+
+Emit only the listed column-9 tags (comma-separated). `ID` and `Parent` are always kept so the feature tree stays consistent.
+
+```bash
+./gffsub demo.gff3 --out-attrs Name
+./gffsub demo.gff3 --out-attrs Name,gene_id --format gtf
+```
+
+Records whose column 9 is `.` are unaffected.

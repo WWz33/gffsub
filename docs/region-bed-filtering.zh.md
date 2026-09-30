@@ -42,7 +42,8 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 
 - BED 为 0-based 半开区间（start 包含，end 不包含）
 - 制表符分隔，至少 3 列（chrom、start、end）
-- 可选列 4-6（name、score、strand）会解析但不用于过滤
+- 可选列 4-6（name、score、strand）；列 6（strand）供 `--same-strand`/`--opposite-strand` 使用
+- 接受零长区间（`start == end`），视为插入位点
 - 保留与任一 BED interval 有重叠的记录
 
 示例 BED 文件（`regions.bed`）：
@@ -54,6 +55,22 @@ chr2	199	700
 
 ```bash
 ./gffsub demo.gff3 -b regions.bed
+```
+
+链向感知重叠（要求 BED 有 strand 列；无该列的行跳过；记录链为 `.` 时两种模式都不匹配）：
+
+```bash
+./gffsub demo.gff3 -b regions.bed --same-strand
+./gffsub demo.gff3 -b regions.bed --opposite-strand
+```
+
+## 反选
+
+`--exclude-region` 剔除与 region 重叠的记录；`-b` 的值加 `^` 前缀剔除与 BED 重叠的记录：
+
+```bash
+./gffsub demo.gff3 --exclude-region chr1:200-600
+./gffsub demo.gff3 -b '^regions.bed'
 ```
 
 ## -S / --seqid

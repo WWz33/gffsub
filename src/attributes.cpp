@@ -8,6 +8,13 @@ namespace gffsub {
 
 namespace {
 
+std::string_view trim_view(std::string_view s) {
+    const auto first = s.find_first_not_of(" \t");
+    if (first == std::string_view::npos) return {};
+    const auto last = s.find_last_not_of(" \t");
+    return s.substr(first, last - first + 1);
+}
+
 }  // namespace
 
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs) {
@@ -25,7 +32,9 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
         if (!pair.empty()) {
             const size_t eq = pair.find('=');
             if (eq != std::string_view::npos && eq != 0 && eq + 1 <= pair.size()) {
-                const std::string key{pair.substr(0, eq)};
+                // Trim spaces around the key: emitters write `ID=x; Parent=y`
+                // (spec allows unescaped spaces in column 9).
+                const std::string key{trim_view(pair.substr(0, eq))};
                 std::string_view value = pair.substr(eq + 1);
                 if (!key.empty()) {
                     // Split the RAW value on ',' before URL-decoding each part:

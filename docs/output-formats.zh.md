@@ -90,3 +90,14 @@ chr1	99	250	cds01	0	+
 ./gffsub input.gtf --format gff3
 ./gffsub demo.gff3 --format gtf -o output.gtf
 ```
+
+## --out-attrs
+
+只输出列出的第 9 列 tag（逗号分隔）。`ID` 与 `Parent` 始终保留，保证 feature 树一致。
+
+```bash
+./gffsub demo.gff3 --out-attrs Name
+./gffsub demo.gff3 --out-attrs Name,gene_id --format gtf
+```
+
+第 9 列为 `.` 的记录不受影响。

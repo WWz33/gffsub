@@ -3,7 +3,10 @@
 namespace gffsub {
 
 std::optional<Region> parse_region(std::string_view region_str) {
-    size_t colon = region_str.find(':');
+    // Split on the LAST colon: seqids may legally contain ':' (GFF3 spec
+    // column-1 charset includes ':' and '*', e.g. HLA or UCSC-style names);
+    // samtools uses the same convention.
+    size_t colon = region_str.rfind(':');
     if (colon == std::string_view::npos) return std::nullopt;
 
     std::string seqid(region_str.substr(0, colon));

@@ -11,12 +11,15 @@
 
 namespace gffsub {
 
-// Extract a `key "value";` attribute from a GTF column-9 string.
-// Handles escaped quotes in the value. Returns nullopt when absent.
+// Extract a `key value;` attribute (quoted or bare) from a GTF column-9
+// string. Handles escaped quotes in quoted values. Returns nullopt when
+// the key is absent.
 std::optional<std::string> extract_quoted_value(std::string_view attrs, std::string_view key);
 
-// Parse all `key "value";` pairs in original order, values unescaped.
-// Fragments without a quoted value are skipped.
+// Parse all `key value;` pairs in original order — quoted values
+// (`key "value";`) or bare ones (`key value;`). Semicolons inside quoted
+// values are preserved. Fragments with an unclosed quote or no value are
+// skipped.
 std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs);
 
 // Rewrite a GTF record's column 9 as GFF3 `tag=value` pairs, synthesizing
