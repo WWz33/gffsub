@@ -4,7 +4,9 @@
 #include <algorithm>
 #include <future>
 #include <map>
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace gffsub {
 
@@ -80,14 +82,30 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         }
     }
 
-    // Group genes by chromosome
-    std::unordered_map<std::string, std::vector<int>> chrom_to_gene_idx;
+    // Genes are the Parent of the competing isoforms. They come from a gene
+    // (L1) record, or, when the file has none (flat GTF, GFF3 without gene
+    // rows), from the parent ID attribute itself. Both are planned the same
+    // way; only an actual gene record can be dropped as childless.
+    struct ChromGroup {
+        std::vector<int> gene_indices;
+        std::vector<std::string> virtual_gene_ids;
+    };
+    std::unordered_map<std::string, ChromGroup> chrom_to_genes;
+    std::unordered_set<std::string> genes_with_record;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
         if (rec.feat_class == FeatureClass::Gene && rec.id) {
-            chrom_to_gene_idx[std::string{rec.seqid}].push_back(i);
+            genes_with_record.insert(*rec.id);
+            chrom_to_genes[std::string{rec.seqid}].gene_indices.push_back(i);
         }
+    }
+    for (const auto& [gene_id, iso_indices] : gene_to_isoforms) {
+        if (iso_indices.empty() || genes_with_record.count(gene_id) > 0) continue;
+        // Bucket by the seqid of the first isoform so the per-chromosome
+        // batching below applies to recordless genes too.
+        chrom_to_genes[std::string{data.records[iso_indices.front()].seqid}]
+            .virtual_gene_ids.push_back(gene_id);
     }
 
     // Two-phase design: phase 1 computes each gene's decision read-only
@@ -101,16 +119,13 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         std::vector<int> isoform_indices;
     };
 
-    auto plan_gene = [&](int gene_idx) -> std::optional<GenePlan> {
-        const auto& gene = data.records[gene_idx];
-        if (!gene.id) return std::nullopt;
-
-        auto isoform_it = gene_to_isoforms.find(*gene.id);
+    auto plan_gene = [&](const std::string& gene_id, int gene_idx) -> std::optional<GenePlan> {
+        auto isoform_it = gene_to_isoforms.find(gene_id);
         if (isoform_it == gene_to_isoforms.end()) {
             // gene with no isoform children: keep only if it has any
             // non-isoform children (e.g. TF_binding_site). A gene with
             // no children at all is dropped.
-            auto child_it = isoform_to_children.find(*gene.id);
+            auto child_it = isoform_to_children.find(gene_id);
             if (child_it == isoform_to_children.end()) {
                 GenePlan plan;
                 plan.gene_idx = gene_idx;
@@ -155,23 +170,18 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
             bool found = false;
 
             if (gene_has_cds) {
-                // Distinct CDS IDs under one transcript are alternative
-                // protein variants (spec EDEN example: cds00003/cds00004);
-                // score by the LONGEST variant, do not sum across variants.
-                // Lines sharing an ID are one discontinuous CDS (summed).
-                std::unordered_map<std::string, int64_t> variant_len;
+                // CDS length is the sum of every CDS segment under the
+                // transcript. Segments either share an ID (one discontinuous
+                // CDS) or carry distinct IDs (e.g. a CDS split by a
+                // translational frameshift, as in the GFF3 spec example);
+                // both count towards the transcript's coding length.
                 for (int child_idx : child_it->second) {
                     const auto& child = data.records[child_idx];
                     if (child.feat_class == FeatureClass::CDS) {
-                        const std::string key = child.id ? *child.id : std::string{};
-                        variant_len[key] += child.end - child.start + 1;
+                        len += child.end - child.start + 1;
                     }
                 }
-                if (variant_len.empty()) continue; // isoform without CDS is skipped
-                for (const auto& [key, vlen] : variant_len) {
-                    (void)key;
-                    if (vlen > len) len = vlen;
-                }
+                if (len == 0) continue; // isoform without CDS is skipped
             } else {
                 for (int child_idx : child_it->second) {
                     const auto& child = data.records[child_idx];
@@ -198,10 +208,17 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         return plan;
     };
 
-    auto plan_chromosome = [&](const std::vector<int>& gene_indices) {
+    auto plan_chromosome = [&](const ChromGroup& group) {
         std::vector<GenePlan> plans;
-        for (int gene_idx : gene_indices) {
-            if (auto plan = plan_gene(gene_idx)) {
+        for (int gene_idx : group.gene_indices) {
+            const auto& gene = data.records[gene_idx];
+            if (!gene.id) continue;
+            if (auto plan = plan_gene(*gene.id, gene_idx)) {
+                plans.push_back(std::move(*plan));
+            }
+        }
+        for (const auto& gene_id : group.virtual_gene_ids) {
+            if (auto plan = plan_gene(gene_id, -1)) {
                 plans.push_back(std::move(*plan));
             }
         }
@@ -210,9 +227,9 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
 
     std::vector<GenePlan> all_plans;
     if (num_threads <= 1) {
-        for (auto& [chrom, gene_indices] : chrom_to_gene_idx) {
+        for (auto& [chrom, group] : chrom_to_genes) {
             (void)chrom;
-            auto plans = plan_chromosome(gene_indices);
+            auto plans = plan_chromosome(group);
             all_plans.insert(all_plans.end(),
                              std::make_move_iterator(plans.begin()),
                              std::make_move_iterator(plans.end()));
@@ -222,10 +239,10 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         // have thousands of chromosomes, one future each would exhaust
         // thread limits. Batch: launch up to num_threads, then wait.
         std::vector<std::future<std::vector<GenePlan>>> futures;
-        for (auto& kv : chrom_to_gene_idx) {
-            std::vector<int> gene_indices = kv.second;
-            futures.push_back(std::async(std::launch::async, [&, gene_indices]() {
-                return plan_chromosome(gene_indices);
+        for (auto& kv : chrom_to_genes) {
+            ChromGroup group = kv.second;
+            futures.push_back(std::async(std::launch::async, [&, group]() {
+                return plan_chromosome(group);
             }));
             if (futures.size() >= num_threads) {
                 for (auto& f : futures) {

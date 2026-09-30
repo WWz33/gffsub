@@ -104,6 +104,62 @@ static bool write_quote_attr(const std::string& path) {
     return true;
 }
 
+// One transcript whose CDS carries two distinct IDs (the GFF3 spec's
+// frameshift example) against a second isoform with a single longer CDS.
+static bool write_cds_variants(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t100\t1000\t.\t+\t.\tID=gene01\n"
+        << "chr1\tsrc\tmRNA\t100\t1000\t.\t+\t.\tID=tx01;Parent=gene01\n"
+        << "chr1\tsrc\tCDS\t100\t250\t.\t+\t0\tID=cds01;Parent=tx01\n"
+        << "chr1\tsrc\tCDS\t500\t750\t.\t+\t2\tID=cds02;Parent=tx01\n"
+        << "chr1\tsrc\tmRNA\t100\t800\t.\t+\t.\tID=tx02;Parent=gene01\n"
+        << "chr1\tsrc\tCDS\t100\t400\t.\t+\t0\tID=cds03;Parent=tx02\n";
+    return true;
+}
+
+// Flat GTF: transcript/exon only, no gene rows.
+static bool write_flat_gtf_isoforms(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "chr1\tsrc\ttranscript\t1\t1000\t.\t+\t.\tgene_id \"G1\"; transcript_id \"TA\";\n"
+        << "chr1\tsrc\texon\t1\t100\t.\t+\t.\tgene_id \"G1\"; transcript_id \"TA\";\n"
+        << "chr1\tsrc\texon\t200\t500\t.\t+\t.\tgene_id \"G1\"; transcript_id \"TA\";\n"
+        << "chr1\tsrc\ttranscript\t1\t1000\t.\t+\t.\tgene_id \"G1\"; transcript_id \"TB\";\n"
+        << "chr1\tsrc\texon\t1\t50\t.\t+\t.\tgene_id \"G1\"; transcript_id \"TB\";\n";
+    return true;
+}
+
+// GFF3 with a space after every ';' separator.
+static bool write_spaced_separators(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t1\t100\t.\t+\t.\tID=g1\n"
+        << "chr1\tsrc\tmRNA\t1\t100\t.\t+\t.\tID=t1; Parent=g1\n"
+        << "chr1\tsrc\texon\t1\t50\t.\t+\t.\tID=e1; Parent=t1\n";
+    return true;
+}
+
+// Multi-value Parent: the record belongs to every listed parent.
+static bool write_parent_list(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tmRNA\t1\t10\t.\t+\t.\tID=t;Parent=g1,g2\n"
+        << "chr1\tsrc\tmRNA\t1\t10\t.\t+\t.\tID=u;Parent=g3\n";
+    return true;
+}
+
+// Smallest useful GFF3 line: 20 bytes, below the 22-byte libc++ SSO limit.
+static bool write_tiny_gff3(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "a\tb\tc\t1\t1\t.\t.\t.\tID=x\n";
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Output cleanup
 // ---------------------------------------------------------------------------
@@ -114,6 +170,9 @@ static void cleanup_outputs() {
         "regression_gtf_mrna.gtf", "regression_multi.gff3",
         "regression_esc.gff3", "regression_bad.gff3",
         "regression_url.gff3", "regression_quote.gff3",
+        "regression_cds_variants.gff3", "regression_flat.gtf",
+        "regression_spaced.gff3", "regression_parent_list.gff3",
+        "regression_tiny.gff3", "regression_tiny.gff3.gz",
         "reg_gtf_children.gff3", "reg_gtf_model.gff3",
         "reg_gtf_unsorted_id.gff3", "reg_gtf_out.gtf",
         "reg_gtf3_rename.gff3",
@@ -123,6 +182,11 @@ static void cleanup_outputs() {
         "reg_bad_coords.gff3",
         "reg_url_match.gff3",
         "reg_gtf_grep.gff3",
+        "reg_cds_sum.gff3", "reg_flat_longest.gff3",
+        "reg_spaced.gtf", "reg_parent_eq.gff3", "reg_parent_ne.gff3",
+        "reg_parent_grep.gff3", "reg_tiny_plain.gff3", "reg_tiny_gz.gff3",
+        "reg_max_down.gff3", "reg_bad_sep.err", "reg_bad_region.err",
+        "reg_query_empty.err",
         "reg_gtf_summary.tsv", "reg_gene_summary.tsv",
         "reg_json.json", "reg_json_quote.json",
         "reg_err_missing.err", "reg_err_up.err", "reg_err_threads.err",
@@ -335,10 +399,95 @@ static int test_gtf_attr_access(const std::string& exe, const std::string& gtf) 
     return 0;
 }
 
+// Group 11: --longest measures a transcript by the sum of its CDS, so
+// distinct CDS IDs are segments of the same transcript, not alternatives.
+// tx01 (151+251=402) beats tx02 (301).
+static int test_longest_cds_sum(const std::string& exe, const std::string& gff) {
+    if (run_command(exe + " " + gff + " --longest > reg_cds_sum.gff3") != 0 ||
+        require_contains("reg_cds_sum.gff3", "ID=tx01") != 0 ||
+        require_not_contains("reg_cds_sum.gff3", "ID=tx02") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 12: --longest works without gene rows: isoforms are grouped by their
+// parent attribute (flat GTF groups by gene_id).
+static int test_longest_without_gene_rows(const std::string& exe, const std::string& gtf) {
+    if (run_command(exe + " " + gtf + " --longest > reg_flat_longest.gff3") != 0 ||
+        require_contains("reg_flat_longest.gff3", "ID=TA") != 0 ||
+        require_not_contains("reg_flat_longest.gff3", "ID=TB") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 13: `; ` separators. Parent resolves, so GTF output carries the whole
+// gene_id/transcript_id chain instead of empty values.
+static int test_spaced_separators(const std::string& exe, const std::string& gff) {
+    if (run_command(exe + " " + gff + " --output-format gtf > reg_spaced.gtf") != 0 ||
+        require_contains("reg_spaced.gtf",
+                         "mRNA\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";") != 0 ||
+        require_contains("reg_spaced.gtf",
+                         "exon\t1\t50\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 14: multi-value attributes. A predicate matches when any value
+// matches; != matches only when no value does.
+static int test_multi_value_attributes(const std::string& exe, const std::string& gff) {
+    if (run_command(exe + " " + gff + " -I 'Parent == g2' > reg_parent_eq.gff3") != 0 ||
+        require_contains("reg_parent_eq.gff3", "ID=t") != 0 ||
+        require_not_contains("reg_parent_eq.gff3", "ID=u") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " -I 'Parent != g2' > reg_parent_ne.gff3") != 0 ||
+        require_contains("reg_parent_ne.gff3", "ID=u") != 0 ||
+        require_not_contains("reg_parent_ne.gff3", "ID=t") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " --grep Parent:g2 > reg_parent_grep.gff3") != 0 ||
+        require_contains("reg_parent_grep.gff3", "ID=t") != 0 ||
+        require_not_contains("reg_parent_grep.gff3", "ID=u") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 15: window arithmetic saturates and selectors reject empty values.
+static int test_cli_edge_cases(const std::string& exe, const std::string& tiny) {
+    // A tiny gzip input (~20 bytes) must survive the move from the parser's
+    // buffer into the index: a short string relocates on move.
+    if (run_command("gzip -c " + tiny + " > regression_tiny.gff3.gz") != 0 ||
+        run_command(exe + " " + tiny + " > reg_tiny_plain.gff3") != 0 ||
+        run_command(exe + " regression_tiny.gff3.gz > reg_tiny_gz.gff3") != 0 ||
+        run_command("cmp -s reg_tiny_plain.gff3 reg_tiny_gz.gff3") != 0 ||
+        run_command(exe + " regression_tiny.gff3.gz --id x > reg_tiny_gz.gff3") != 0 ||
+        require_contains("reg_tiny_gz.gff3", "ID=x") != 0) {
+        return 1;
+    }
+    // --down past INT64_MAX would overflow the window end and match nothing.
+    if (run_command(exe + " " + tiny + " --id x --down 9223372036854775807 > reg_max_down.gff3") != 0 ||
+        require_contains("reg_max_down.gff3", "ID=x") != 0) {
+        return 1;
+    }
+    // Empty seqid and empty query selector: rejected, not silently empty.
+    if (require_exit_one_with_error(exe + " " + tiny + " -r :1-100 > /dev/null 2> reg_bad_region.err",
+                                    "reg_bad_region.err", "invalid region") != 0 ||
+        require_exit_one_with_error(exe + " query " + tiny + " -i '' > /dev/null 2> reg_query_empty.err",
+                                    "reg_query_empty.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + tiny + " -w foo > /dev/null 2> reg_bad_sep.err",
+                                    "reg_bad_sep.err", "--where expects KEY=VALUE") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "usage: regression_smoke <gffsub-executable>\n";
@@ -354,11 +503,19 @@ int main(int argc, char* argv[]) {
     const std::string bad{"regression_bad.gff3"};
     const std::string url{"regression_url.gff3"};
     const std::string quote{"regression_quote.gff3"};
+    const std::string cds_variants{"regression_cds_variants.gff3"};
+    const std::string flat_gtf{"regression_flat.gtf"};
+    const std::string spaced{"regression_spaced.gff3"};
+    const std::string parent_list{"regression_parent_list.gff3"};
+    const std::string tiny{"regression_tiny.gff3"};
 
     if (!write_gtf_basic(gtf_basic) || !write_gtf_unsorted(gtf_unsorted) ||
         !write_gtf_mrna(gtf_mrna) || !write_multi_parent(multi) ||
         !write_escaped_comma(esc) || !write_bad_coords(bad) ||
-        !write_url_encoded(url) || !write_quote_attr(quote)) {
+        !write_url_encoded(url) || !write_quote_attr(quote) ||
+        !write_cds_variants(cds_variants) || !write_flat_gtf_isoforms(flat_gtf) ||
+        !write_spaced_separators(spaced) || !write_parent_list(parent_list) ||
+        !write_tiny_gff3(tiny)) {
         std::cerr << "cannot write regression fixtures\n";
         cleanup_outputs();
         return 1;
@@ -401,6 +558,26 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_gtf_attr_access(exe, gtf_basic) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_longest_cds_sum(exe, cds_variants) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_longest_without_gene_rows(exe, flat_gtf) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_spaced_separators(exe, spaced) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_multi_value_attributes(exe, parent_list) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_cli_edge_cases(exe, tiny) != 0) {
         cleanup_outputs();
         return 1;
     }

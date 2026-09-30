@@ -79,6 +79,16 @@ GTF input: `gene_id` / `transcript_id` resolve from record fields. Other attribu
 
 `start`, `end`, `length`, and `score` are numeric for `<`, `<=`, `>`, `>=`, `==`, `!=`.
 
+## Multi-value attributes
+
+A column-9 attribute can hold several values (`Parent=g1,g2`). A predicate
+matches when any value matches; `!=` and `!~` match only when no value does.
+
+```bash
+gffsub ann.gff3 -I 'Parent == g2'   # keeps Parent=g1,g2
+gffsub ann.gff3 -I 'Parent != g2'   # excludes it
+```
+
 ## Missing attributes
 
 - `==`, `~`, `<`, `<=`, `>`, `>=` do not match (record excluded by `-I`).

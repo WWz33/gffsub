@@ -28,6 +28,20 @@ All notable changes to gffsub are documented in this file. The format follows
   filtered out of GFF3 output
 
 ### Fixed
+- GFF3 attributes after `; ` keep their `Parent`/`gene_id`/`transcript_id`
+  values, so `--format gtf` no longer emits empty `gene_id ""`
+- `--longest` sums every CDS segment of a transcript; distinct CDS IDs under
+  one transcript are segments of it, not competing variants
+- `--longest` applies to files without gene records (flat GTF, GFF3 with
+  transcript rows only), grouping isoforms by their parent attribute
+- `-I`/`-E`/`--grep` on a multi-value attribute (`Parent=g1,g2`) match any
+  value; `!=`/`!~` match only when no value does
+- Records keep valid string views when a parsed buffer shorter than the SSO
+  limit is moved into the index
+- `--up`/`--down` saturate instead of overflowing the window coordinates
+- `-r :100-200` (empty seqid) and empty selectors on the `query`/`window`
+  subcommands are rejected instead of matching nothing
+- `-w VALUE` without `=` reports `--where`, not an unrelated option name
 - `-b/--bed` with an unopenable file exits 1 instead of silently dropping
   every record
 - `--longest` is deterministic for multi-parent records: winner-priority

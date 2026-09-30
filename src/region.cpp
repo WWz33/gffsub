@@ -1,5 +1,7 @@
 #include "region.hpp"
 
+#include <limits>
+
 namespace gffsub {
 
 std::optional<Region> parse_region(std::string_view region_str) {
@@ -7,7 +9,9 @@ std::optional<Region> parse_region(std::string_view region_str) {
     // column-1 charset includes ':' and '*', e.g. HLA or UCSC-style names);
     // samtools uses the same convention.
     size_t colon = region_str.rfind(':');
-    if (colon == std::string_view::npos) return std::nullopt;
+    // colon == 0 means an empty seqid (":1-100"), which no record has: reject
+    // it here rather than matching nothing silently.
+    if (colon == std::string_view::npos || colon == 0) return std::nullopt;
 
     std::string seqid(region_str.substr(0, colon));
     auto range_part = region_str.substr(colon + 1);
@@ -54,11 +58,12 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
         right_extension = upstream;
     }
 
-    int64_t start = rec.start - left_extension;
-    if (start < 1) {
-        start = 1;
-    }
-    return Region{std::string{rec.seqid}, start, rec.end + right_extension};
+    // Saturate instead of overflowing: --up/--down accept any non-negative
+    // int64, and start/end are int64 too.
+    const int64_t start = left_extension >= rec.start ? 1 : rec.start - left_extension;
+    const int64_t kMax = std::numeric_limits<int64_t>::max();
+    const int64_t end = right_extension > kMax - rec.end ? kMax : rec.end + right_extension;
+    return Region{std::string{rec.seqid}, start, end};
 }
 
 }  // namespace gffsub

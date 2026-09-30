@@ -11,11 +11,12 @@
 每个 gene 保留一个 transcript。长度度量:
 
 - gene 含 CDS 时用 CDS 长度 (CDS 片段之和)，否则用 exon 长度 (exon 片段之和)。
-- 不连续 CDS (同 ID 多行): 片段累加。
-- 同一 transcript 下多个 CDS 变体 (不同 ID): 取最长变体，不累加。
+- 每段 CDS 都计入: 同 ID 的不连续 CDS 与不同 ID 的 CDS 片段 (例如移码拆成的两段) 都累加。
 - 长度相同取第一个遇到的。
 - 自动检测 isoform 类型: 取文件中最多的 transcript 类类型（`mRNA`、`transcript`、`ncRNA`、`tRNA` 等）。数量并列时优先 `mRNA`，其次 `transcript`。
+- 只在检测到的类型内比较: 其他 transcript 类类型的记录原样保留，即使更长。
 - 单 isoform 的 gene 保持不变。
+- isoform 按其 Parent 属性分组，没有 gene 记录的文件 (扁平 GTF、只有 transcript 行的 GFF3) 同样生效。
 
 示例数据 (demo.gff3):
 

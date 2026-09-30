@@ -6,7 +6,6 @@
 #include <cctype>
 #include <cmath>
 #include <exception>
-#include <sstream>
 
 namespace gffsub {
 
@@ -28,29 +27,20 @@ bool is_supported_filter_field(std::string_view field) {
            field == "gene_id" || field == "transcript_id" || field == "locus_tag";
 }
 
-std::string join_filter_values(const std::vector<std::string>& values) {
-    std::ostringstream out;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            out << ',';
-        }
-        out << values[i];
-    }
-    return out.str();
-}
-
-std::optional<std::string> record_field_value(const GffRecord& rec, std::string_view field) {
-    if (field == "seqid") return std::string{rec.seqid};
-    if (field == "source") return std::string{rec.source};
-    if (field == "type") return std::string{rec.type};
-    if (field == "start") return std::to_string(rec.start);
-    if (field == "end") return std::to_string(rec.end);
-    if (field == "length") return std::to_string(rec.end - rec.start + 1);
-    if (field == "score") return std::string{rec.score_raw.empty() ? std::string_view{"."} : rec.score_raw};
-    if (field == "strand") return std::string(1, rec.strand);
-    if (field == "phase") return std::string(1, rec.phase);
-    if (field == "attrs") return std::string{rec.attr_raw};
-    if (field == "attributes") return std::string{rec.attr_raw};
+// Every value of a field. Scalar fields yield one value; attribute fields
+// yield one value per column-9 value, so Parent=g1,g2 gives {"g1", "g2"}.
+std::vector<std::string> record_field_values(const GffRecord& rec, std::string_view field) {
+    if (field == "seqid") return {std::string{rec.seqid}};
+    if (field == "source") return {std::string{rec.source}};
+    if (field == "type") return {std::string{rec.type}};
+    if (field == "start") return {std::to_string(rec.start)};
+    if (field == "end") return {std::to_string(rec.end)};
+    if (field == "length") return {std::to_string(rec.end - rec.start + 1)};
+    if (field == "score") return {std::string{rec.score_raw.empty() ? std::string_view{"."} : rec.score_raw}};
+    if (field == "strand") return {std::string(1, rec.strand)};
+    if (field == "phase") return {std::string(1, rec.phase)};
+    if (field == "attrs") return {std::string{rec.attr_raw}};
+    if (field == "attributes") return {std::string{rec.attr_raw}};
 
     std::string attr_key;
     if (field.rfind("attr.", 0) == 0) {
@@ -71,25 +61,30 @@ std::optional<std::string> record_field_value(const GffRecord& rec, std::string_
                field == "gene_id" || field == "transcript_id" || field == "locus_tag") {
         attr_key = std::string{field};
     } else {
-        return std::nullopt;
+        return {};
     }
 
-    // For GTF input, gene_id/transcript_id/ID/Parent are synthesized by the
-    // parser into rec fields but parse_attributes cannot parse GTF's
-    // key "value"; format. Check the rec fields first.
-    if (attr_key == "gene_id" && rec.gene_id) return *rec.gene_id;
-    if (attr_key == "transcript_id" && rec.transcript_id) return *rec.transcript_id;
-    if (attr_key == "ID" && rec.id) return *rec.id;
-    if (attr_key == "Parent" && rec.parent_id) return *rec.parent_id;
-
+    // The parsed attribute list first: it carries every value of a
+    // multi-value key, and for GTF input parse_attributes finds nothing, so
+    // the synthesized record fields below stay reachable.
     const auto attrs = parse_attributes(rec.attr_raw);
     const auto it = attrs.find(attr_key);
     if (it != attrs.end() && !it->second.empty()) {
-        return join_filter_values(it->second);
+        return it->second;
     }
+    // GTF input: gene_id/transcript_id/ID/Parent are synthesized by the
+    // parser into rec fields but parse_attributes cannot parse GTF's
+    // key "value"; format. Check the rec fields next.
+    if (attr_key == "gene_id" && rec.gene_id) return {*rec.gene_id};
+    if (attr_key == "transcript_id" && rec.transcript_id) return {*rec.transcript_id};
+    if (attr_key == "ID" && rec.id) return {*rec.id};
+    if (attr_key == "Parent" && rec.parent_id) return {*rec.parent_id};
     // GTF fallback: column 9 uses `key "value";` which parse_attributes cannot
     // parse. GFF3 attr_raw never matches that form, so this is format-agnostic.
-    return extract_quoted_value(rec.attr_raw, attr_key);
+    if (auto quoted = extract_quoted_value(rec.attr_raw, attr_key)) {
+        return {*quoted};
+    }
+    return {};
 }
 
 bool parse_number(std::string_view value, double& out) {
@@ -110,55 +105,84 @@ bool is_numeric_filter_field(std::string_view field) {
 }
 
 bool field_matches_grep(const GffRecord& rec, const GrepFilter& filter) {
-    const auto value = record_field_value(rec, filter.field);
-    if (!value) {
-        return false;
+    const auto values = record_field_values(rec, filter.field);
+    for (const auto& value : values) {
+        if (filter.use_regex) {
+            if (filter.compiled && std::regex_search(value, *filter.compiled)) {
+                return true;
+            }
+            continue;
+        }
+        if (filter.ignore_case) {
+            if (to_lower(value).find(to_lower(filter.pattern)) != std::string::npos) {
+                return true;
+            }
+            continue;
+        }
+        if (value.find(filter.pattern) != std::string::npos) {
+            return true;
+        }
     }
-    if (filter.use_regex) {
-        return filter.compiled && std::regex_search(*value, *filter.compiled);
-    }
-    if (filter.ignore_case) {
-        return to_lower(*value).find(to_lower(filter.pattern)) != std::string::npos;
-    }
-    return value->find(filter.pattern) != std::string::npos;
+    return false;
 }
 
 bool field_matches_expr(const GffRecord& rec, const ExprFilter& filter) {
-    const auto value = record_field_value(rec, filter.field);
-    if (!value) {
-        // Missing attribute: != and !~ should match (missing is not-equal),
-        // all other operators should not match.
-        return filter.op == ExprOp::NotEqual || filter.op == ExprOp::NotRegex;
-    }
-    const auto comparable_value = filter.ignore_case ? to_lower(*value) : std::string(*value);
+    // A predicate matches when any value of the field matches; != and !~ are
+    // the complement (no value matches). A field with no value at all is
+    // therefore equal to nothing, which keeps the documented rule that a
+    // missing attribute matches != and !~ only.
+    const auto values = record_field_values(rec, filter.field);
+    const bool numeric_field = is_numeric_filter_field(filter.field);
     const auto comparable_filter = filter.ignore_case ? to_lower(filter.value) : filter.value;
-    switch (filter.op) {
-        case ExprOp::Equal:
-        case ExprOp::NotEqual: {
-            if (is_numeric_filter_field(filter.field)) {
+
+    bool any_equal = false;
+    bool any_regex = false;
+    bool any_ordered = false;
+    for (const auto& raw : values) {
+        const auto comparable_value = filter.ignore_case ? to_lower(raw) : raw;
+        switch (filter.op) {
+            case ExprOp::Equal:
+            case ExprOp::NotEqual:
+                if (numeric_field) {
+                    double lhs = 0.0;
+                    double rhs = 0.0;
+                    any_equal = any_equal ||
+                                (parse_number(raw, lhs) && parse_number(filter.value, rhs) && lhs == rhs);
+                } else {
+                    any_equal = any_equal || comparable_value == comparable_filter;
+                }
+                break;
+            case ExprOp::Regex:
+            case ExprOp::NotRegex:
+                any_regex = any_regex || (filter.compiled && std::regex_search(raw, *filter.compiled));
+                break;
+            case ExprOp::Less:
+            case ExprOp::LessEqual:
+            case ExprOp::Greater:
+            case ExprOp::GreaterEqual: {
                 double lhs = 0.0;
                 double rhs = 0.0;
-                const bool numeric_match = parse_number(*value, lhs) && parse_number(filter.value, rhs) && lhs == rhs;
-                return filter.op == ExprOp::Equal ? numeric_match : !numeric_match;
+                if (!parse_number(raw, lhs) || !parse_number(filter.value, rhs)) {
+                    break;
+                }
+                if (filter.op == ExprOp::Less) any_ordered = any_ordered || lhs < rhs;
+                else if (filter.op == ExprOp::LessEqual) any_ordered = any_ordered || lhs <= rhs;
+                else if (filter.op == ExprOp::Greater) any_ordered = any_ordered || lhs > rhs;
+                else any_ordered = any_ordered || lhs >= rhs;
+                break;
             }
-            return filter.op == ExprOp::Equal ? comparable_value == comparable_filter : comparable_value != comparable_filter;
         }
-        case ExprOp::Regex: return filter.compiled && std::regex_search(*value, *filter.compiled);
-        case ExprOp::NotRegex: return filter.compiled && !std::regex_search(*value, *filter.compiled);
+    }
+
+    switch (filter.op) {
+        case ExprOp::Equal: return any_equal;
+        case ExprOp::NotEqual: return !any_equal;
+        case ExprOp::Regex: return any_regex;
+        case ExprOp::NotRegex: return !any_regex;
         case ExprOp::Less:
         case ExprOp::LessEqual:
         case ExprOp::Greater:
-        case ExprOp::GreaterEqual: {
-            double lhs = 0.0;
-            double rhs = 0.0;
-            if (!parse_number(*value, lhs) || !parse_number(filter.value, rhs)) {
-                return false;
-            }
-            if (filter.op == ExprOp::Less) return lhs < rhs;
-            if (filter.op == ExprOp::LessEqual) return lhs <= rhs;
-            if (filter.op == ExprOp::Greater) return lhs > rhs;
-            return lhs >= rhs;
-        }
+        case ExprOp::GreaterEqual: return any_ordered;
     }
     return false;
 }

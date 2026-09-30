@@ -221,7 +221,9 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 const std::string value{optarg};
                 const auto equal_pos = value.find('=');
                 if (equal_pos == std::string::npos || equal_pos == 0 || equal_pos + 1 == value.size()) {
-                    std::cerr << "Error: --" << long_options[option_index].name << " expects KEY=VALUE\n";
+                    // option_index is only set when a long option matched, so
+                    // `-w foo` would report whichever entry sat at index 0.
+                    std::cerr << "Error: --where expects KEY=VALUE\n";
                     return std::nullopt;
                 }
                 args.attr_filters.emplace_back(value.substr(0, equal_pos), value.substr(equal_pos + 1));

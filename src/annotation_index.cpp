@@ -391,7 +391,7 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
             }
             continue;
         }
-        // GTF fallback: `key "value";` attributes (same as record_field_value).
+        // GTF fallback: `key "value";` attributes (same as the selector path).
         if (extract_quoted_value(rec.attr_raw, skey) == std::optional<std::string>{svalue}) {
             matches.push_back(rec);
         }

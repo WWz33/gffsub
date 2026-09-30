@@ -101,21 +101,7 @@ public:
         }
 
         records = other.records;
-        if (old_size == 0) return;
-        const char* new_base = buffer.data();
-        const auto rebase = [&](std::string_view& v) {
-            if (v.empty()) return;
-            if (v.data() >= old_base && v.data() < old_base + old_size) {
-                v = std::string_view{new_base + (v.data() - old_base), v.size()};
-            }
-        };
-        for (auto& rec : records) {
-            rebase(rec.seqid);
-            rebase(rec.source);
-            rebase(rec.type);
-            rebase(rec.score_raw);
-            rebase(rec.attr_raw);
-        }
+        rebase_views(old_base, old_size);
     }
 
     void append(const GffRecord& rec) { records.push_back(rec); }
@@ -137,11 +123,44 @@ private:
     void move_from(GffData&& other) {
         records = std::move(other.records);
         directives = std::move(other.directives);
+        // Record views point into other's storage. A mapping keeps its
+        // addresses, and a heap buffer is stolen pointer and all, but a short
+        // (SSO) string copies its bytes into the new object, so views into the
+        // owned buffer are re-based afterwards.
+        const bool mapped = other.mapped_data_ != nullptr;
+        const char* old_base = mapped ? static_cast<const char*>(other.mapped_data_)
+                                      : other.buffer.data();
+        const size_t old_size = mapped ? other.mapped_size_ : other.buffer.size();
         buffer = std::move(other.buffer);
         mapped_data_ = other.mapped_data_;
         mapped_size_ = other.mapped_size_;
         other.mapped_data_ = nullptr;
         other.mapped_size_ = 0;
+        if (!mapped) {
+            rebase_views(old_base, old_size);
+        }
+    }
+
+    // Re-point record views that fall inside [old_base, old_base + old_size)
+    // onto the current buffer. Views into other storage (e.g. the literal
+    // source of BED records) are left untouched.
+    void rebase_views(const char* old_base, size_t old_size) {
+        if (old_base == nullptr || old_size == 0) return;
+        const char* new_base = buffer.data();
+        if (new_base == old_base) return;
+        const auto rebase = [&](std::string_view& v) {
+            if (v.empty()) return;
+            if (v.data() >= old_base && v.data() < old_base + old_size) {
+                v = std::string_view{new_base + (v.data() - old_base), v.size()};
+            }
+        };
+        for (auto& rec : records) {
+            rebase(rec.seqid);
+            rebase(rec.source);
+            rebase(rec.type);
+            rebase(rec.score_raw);
+            rebase(rec.attr_raw);
+        }
     }
 
     void release_mapping();

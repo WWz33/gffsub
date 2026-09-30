@@ -119,8 +119,9 @@ static std::optional<std::string> extract_attr_value(std::string_view attrs, std
         if (eq == std::string_view::npos || eq == 0) {
             continue;
         }
-        const auto found_key = pair.substr(0, eq);
-        if (found_key == key) {
+        // Trim around the key so `ID=x; Parent=y` resolves: the attribute
+        // indexer and --out-attrs trim the same way (attributes.cpp).
+        if (trim_view(pair.substr(0, eq)) == key) {
             const auto value = pair.substr(eq + 1);
             if (value.empty()) {
                 return std::nullopt;

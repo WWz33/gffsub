@@ -77,6 +77,15 @@ GTF 输入: `gene_id` / `transcript_id` 从记录字段解析。其他属性用 
 
 `start`、`end`、`length`、`score` 作为数值参与 `<`、`<=`、`>`、`>=`、`==`、`!=`。
 
+## 多值属性
+
+第 9 列的属性可以有多个值 (`Parent=g1,g2`)。任一值匹配即匹配；`!=` 和 `!~` 仅在没有任何值匹配时匹配。
+
+```bash
+gffsub ann.gff3 -I 'Parent == g2'   # 保留 Parent=g1,g2
+gffsub ann.gff3 -I 'Parent != g2'   # 排除它
+```
+
 ## 缺失属性
 
 - `==`、`~`、`<`、`<=`、`>`、`>=` 不匹配 (记录被 `-I` 排除)。

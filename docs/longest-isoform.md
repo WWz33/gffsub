@@ -11,11 +11,12 @@
 Keep one transcript per gene. Length metric:
 
 - CDS length (sum of CDS segments) if the gene has CDS, otherwise exon length (sum of exon segments).
-- Discontinuous CDS (same ID, multiple lines): segments summed.
-- Alternative CDS variants (distinct IDs under one transcript): longest variant used, not summed.
+- Every CDS segment counts once: segments of one discontinuous CDS (same ID) and segments carrying distinct IDs (e.g. a CDS split by a translational frameshift) are both summed.
 - Ties keep the first encountered.
 - Auto-detects isoform type: the most frequent transcript-class type in the file (`mRNA`, `transcript`, `ncRNA`, `tRNA`, ...). Ties prefer `mRNA`, then `transcript`.
+- Isoforms compete within the detected type: records of another transcript-class type are left unchanged, even when they are longer.
 - Genes with one isoform are left unchanged.
+- Isoforms are grouped by their parent ID attribute, so the filter also applies to files without gene records (flat GTF, GFF3 with transcript rows only).
 
 Sample data (demo.gff3):
 

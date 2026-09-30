@@ -55,6 +55,12 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
                 return std::nullopt;
             }
             ++i;
+            // Reject empty selectors like the main parser does: they would
+            // otherwise match nothing and exit 0.
+            if (argv[i][0] == '\0') {
+                std::cerr << "Error: " << option << " requires a non-empty value\n";
+                return std::nullopt;
+            }
             return std::string{argv[i]};
         };
 
@@ -176,6 +182,12 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
                 return std::nullopt;
             }
             ++i;
+            // Reject empty selectors like the main parser does: they would
+            // otherwise match nothing and exit 0.
+            if (argv[i][0] == '\0') {
+                std::cerr << "Error: " << option << " requires a non-empty value\n";
+                return std::nullopt;
+            }
             return std::string{argv[i]};
         };
 
