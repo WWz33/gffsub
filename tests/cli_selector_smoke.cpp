@@ -59,6 +59,18 @@ static void cleanup_outputs() {
     std::remove("selector_exon_mRNA_drop.gff3");
     std::remove("selector_out_attrs.gff3");
     std::remove("selector_out_attrs_note.gff3");
+    std::remove("selector_window.gff3");
+    std::remove("win_plain.gff3");
+    std::remove("win_strand.gff3");
+    std::remove("win_mrna.gff3");
+    std::remove("selector_gz_probe.gz");
+    std::remove("selector_gz_fifo");
+    std::remove("gz_ref.gff3");
+    std::remove("gz_file.gff3");
+    std::remove("gz_stdin.gff3");
+    std::remove("gz_fifo.gff3");
+    std::remove("gz_trunc.out");
+    std::remove("gz_trunc.err");
     std::remove("window_bad.out");
     std::remove("window_bad.err");
     std::remove("selector_bad.out");
@@ -1048,6 +1060,66 @@ int main(int argc, char* argv[]) {
                 std::cerr << "window guard failed to reject: " << extra << '\n';
                 return 1;
             }
+        }
+    }
+
+    // --- window subcommand functionality ---
+
+    {
+        std::ofstream wf{"selector_window.gff3"};
+        wf << "##gff-version 3\n"
+           << "chr1\t.\tgene\t5000\t6000\t.\t-\t.\tID=wg\n"
+           << "chr1\t.\tmRNA\t5000\t6000\t.\t-\t.\tID=wt;Parent=wg\n"
+           << "chr1\t.\texon\t4930\t4980\t.\t-\t.\tID=wleft;Parent=wt\n"
+           << "chr1\t.\texon\t6050\t6080\t.\t-\t.\tID=wright;Parent=wt\n";
+    }
+    // Plain window around wg: [4900,6010] keeps the left exon, not the right.
+    if (run_command(exe + " window selector_window.gff3 -i wg -u 100 -D 10 > win_plain.gff3") != 0 ||
+        require_contains("win_plain.gff3", "ID=wleft") != 0 ||
+        require_not_contains("win_plain.gff3", "ID=wright") != 0) {
+        return 1;
+    }
+    // Strand-aware on the minus strand: upstream extends toward larger
+    // coordinates, so the window is [4990,6100] and the right exon replaces
+    // the left one.
+    if (run_command(exe + " window selector_window.gff3 -i wg -u 100 -D 10 -a > win_strand.gff3") != 0 ||
+        require_contains("win_strand.gff3", "ID=wright") != 0 ||
+        require_not_contains("win_strand.gff3", "ID=wleft") != 0) {
+        return 1;
+    }
+    // The selector takes any record ID, not only a gene name.
+    if (run_command(exe + " window selector_window.gff3 -i wt -u 10 -D 10 > win_mrna.gff3") != 0 ||
+        require_contains("win_mrna.gff3", "ID=wt") != 0 ||
+        require_not_contains("win_mrna.gff3", "ID=wleft") != 0) {
+        return 1;
+    }
+
+    // --- gzip: file, stdin, and FIFO all agree ---
+
+    if (std::system("command -v gzip > /dev/null 2>&1") == 0 &&
+        std::system("command -v mkfifo > /dev/null 2>&1") == 0) {
+        if (run_command(exe + " " + gff + " > gz_ref.gff3") != 0 ||
+            run_command("gzip -c " + gff + " > selector_gz_probe.gz") != 0 ||
+            run_command(exe + " selector_gz_probe.gz > gz_file.gff3") != 0 ||
+            run_command("cat selector_gz_probe.gz | " + exe + " - > gz_stdin.gff3") != 0 ||
+            compare_files("gz_ref.gff3", "gz_file.gff3") != 0 ||
+            compare_files("gz_ref.gff3", "gz_stdin.gff3") != 0) {
+            return 1;
+        }
+        // FIFO carrying gzip data: the writer starts first and blocks until
+        // the reader opens the pipe.
+        if (run_command("rm -f selector_gz_fifo") != 0 ||
+            run_command("mkfifo selector_gz_fifo") != 0 ||
+            run_command("(cat selector_gz_probe.gz > selector_gz_fifo &) ; " + exe +
+                        " selector_gz_fifo > gz_fifo.gff3") != 0 ||
+            compare_files("gz_ref.gff3", "gz_fifo.gff3") != 0) {
+            return 1;
+        }
+        // Truncated gzip on stdin must fail, not silently emit nothing.
+        if (expect_command_failure("gzip -c " + gff + " | head -c 40 | " + exe +
+                                   " - > gz_trunc.out 2> gz_trunc.err") != 0 ||
+            require_contains("gz_trunc.err", "Error:") != 0) {
+            return 1;
         }
     }
 

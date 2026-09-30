@@ -157,10 +157,21 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
             }
         } else {
             // FIFO/device: a second open() would block waiting for a new
-            // writer, so read the already-open stream once and sniff the
-            // format from the loaded content.
+            // writer, so read the already-open stream once. Decompress and
+            // sniff from the loaded content, matching the stdin path.
             data.buffer = read_stream_chunked(probe);
             probe.close();
+            if (data.buffer.size() >= 2) {
+                const unsigned char magic[2] = {
+                    static_cast<unsigned char>(data.buffer[0]),
+                    static_cast<unsigned char>(data.buffer[1]),
+                };
+                if (is_gzip_magic(magic)) {
+                    std::string inflated;
+                    if (!inflate_memory(data.buffer, inflated)) return -1;
+                    data.buffer = std::move(inflated);
+                }
+            }
             format = infer_format_from_content(data.content());
         }
     }

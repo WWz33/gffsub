@@ -125,3 +125,7 @@ endif()
 
 # Installation
 install(TARGETS gffsub DESTINATION bin)
+
+# Benchmark harness: built on request via `cmake --build . --target bench_parse`.
+add_executable(bench_parse EXCLUDE_FROM_ALL bench_parse.cpp)
+target_compile_options(bench_parse PRIVATE -Wall -O2)

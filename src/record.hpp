@@ -78,15 +78,43 @@ public:
         mapped_size_ = size;
     }
 
-    // Copy the owned storage (records, directives, buffer). Never copies a
-    // mapping: record views keep pointing at the source's storage, so the
-    // source must outlive the copy — the same borrowed-storage contract as
-    // AnnotationIndex::from_data().
+    // Deep-copy the storage (records, directives, buffer), including the
+    // bytes a mapping points at. Every record view is re-based onto the new
+    // buffer, so the copy is self-contained: it stays valid after `other`
+    // dies. Views into static storage (e.g. the literal source of BED
+    // records) are outside the copied range and are left untouched.
     void copy_storage_from(const GffData& other) {
         release_mapping();
-        buffer = other.buffer;
-        records = other.records;
         directives = other.directives;
+
+        const char* old_base = nullptr;
+        size_t old_size = 0;
+        if (other.mapped_data_ != nullptr) {
+            old_base = static_cast<const char*>(other.mapped_data_);
+            old_size = other.mapped_size_;
+            buffer.assign(old_base, old_size);
+        } else {
+            old_base = other.buffer.data();
+            old_size = other.buffer.size();
+            buffer = other.buffer;
+        }
+
+        records = other.records;
+        if (old_size == 0) return;
+        const char* new_base = buffer.data();
+        const auto rebase = [&](std::string_view& v) {
+            if (v.empty()) return;
+            if (v.data() >= old_base && v.data() < old_base + old_size) {
+                v = std::string_view{new_base + (v.data() - old_base), v.size()};
+            }
+        };
+        for (auto& rec : records) {
+            rebase(rec.seqid);
+            rebase(rec.source);
+            rebase(rec.type);
+            rebase(rec.score_raw);
+            rebase(rec.attr_raw);
+        }
     }
 
     void append(const GffRecord& rec) { records.push_back(rec); }

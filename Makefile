@@ -60,9 +60,14 @@ CLI_SELECTOR_SMOKE = cli_selector_smoke
 REGRESSION_SMOKE = regression_smoke
 FEATURE_TYPES_SMOKE = feature_types_smoke
 
-.PHONY: all clean test install uninstall
+.PHONY: all clean test install uninstall bench
 
 all: $(TARGET)
+
+bench: bench_parse
+
+bench_parse: bench_parse.cpp
+	$(CXX) $(CXXFLAGS) -o $@ bench_parse.cpp
 
 $(LIB): $(LIB_OBJS)
 	$(AR) rcs $@ $(LIB_OBJS)
@@ -89,7 +94,7 @@ $(FEATURE_TYPES_SMOKE): tests/feature_types_smoke.cpp src/feature_types.cpp src/
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/feature_types_smoke.cpp src/feature_types.cpp src/string_utils.cpp
 
 clean:
-	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE)
+	rm -f $(TARGET) $(LIB) $(OBJS) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE) bench_parse
 
 test: $(TARGET) $(ANNOTATION_INDEX_SMOKE) $(CLI_OUTPUT_ATTRS_SMOKE) $(CLI_SELECTOR_SMOKE) $(REGRESSION_SMOKE) $(FEATURE_TYPES_SMOKE)
 	./$(ANNOTATION_INDEX_SMOKE)
