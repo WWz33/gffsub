@@ -1,5 +1,6 @@
 #include "cli.hpp"
 #include "expr_parser.hpp"
+#include "string_utils.hpp"
 
 #include <cctype>
 #include <cstring>
@@ -14,18 +15,6 @@
 namespace gffsub {
 
 // --- helpers ---
-
-static std::string trim_copy(std::string_view value) {
-    size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
-        ++start;
-    }
-    size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
-        --end;
-    }
-    return std::string{value.substr(start, end - start)};
-}
 
 static std::optional<char> parse_strand_filter(std::string_view value) {
     if (value.size() != 1) return std::nullopt;

@@ -20,6 +20,7 @@ add_library(gffsub_core STATIC
     src/query.cpp
     src/window.cpp
     src/subset.cpp
+    src/record.cpp
 )
 
 find_package(ZLIB REQUIRED)
@@ -60,6 +61,7 @@ if(BUILD_TESTING)
         src/gff3_parser.cpp
         src/gtf_parser.cpp
         src/region.cpp
+        src/record.cpp
     )
 
     target_include_directories(annotation_index_smoke PRIVATE

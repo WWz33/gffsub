@@ -11,6 +11,13 @@ namespace gffsub {
 // Lowercase a string view, returning a new std::string.
 std::string to_lower(std::string_view sv);
 
+// Trim leading and trailing spaces/tabs. Returns a view into the input;
+// the input must outlive the returned view.
+std::string_view trim_view(std::string_view s);
+
+// Trim leading and trailing spaces/tabs, returning a new std::string.
+std::string trim_copy(std::string_view s);
+
 // Split a string view on a single-character delimiter. Returns views into
 // the input, including empty fields (like split on '\t' for sparse GFF
 // columns). The input must outlive the returned views.

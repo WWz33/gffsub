@@ -187,20 +187,6 @@ bool expr_node_matches(const GffRecord& rec, const ExprNode& node) {
     return false;
 }
 
-std::string trim_copy(std::string_view value) {
-    size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
-        ++start;
-    }
-
-    size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
-        --end;
-    }
-
-    return std::string{value.substr(start, end - start)};
-}
-
 std::string unquote_expr_value(std::string value) {
     value = trim_copy(value);
     if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {

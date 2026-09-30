@@ -6,17 +6,6 @@
 
 namespace gffsub {
 
-namespace {
-
-std::string_view trim_view(std::string_view s) {
-    const auto first = s.find_first_not_of(" \t");
-    if (first == std::string_view::npos) return {};
-    const auto last = s.find_last_not_of(" \t");
-    return s.substr(first, last - first + 1);
-}
-
-}  // namespace
-
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs) {
     std::unordered_map<std::string, std::vector<std::string>> parsed;
     size_t pos = 0;

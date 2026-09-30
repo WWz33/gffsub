@@ -21,7 +21,8 @@ LIB_SRCS = src/feature_types.cpp \
        src/annotation_output.cpp \
        src/query.cpp \
        src/window.cpp \
-       src/subset.cpp
+       src/subset.cpp \
+       src/record.cpp
 
 CLI_SRCS = src/cli.cpp \
        src/cli_usage.cpp \
@@ -72,8 +73,8 @@ $(TARGET): $(CLI_OBJS) $(LIB)
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp $(LDLIBS)
+$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp $(LDLIBS)
 
 $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp

@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "string_utils.hpp"
 
 namespace gffsub {
 
@@ -51,19 +52,12 @@ std::string gtf_unescape(const std::string& s) {
     return out;
 }
 
-std::string_view trim_ws(std::string_view s) {
-    const auto first = s.find_first_not_of(" \t");
-    if (first == std::string_view::npos) return {};
-    const auto last = s.find_last_not_of(" \t");
-    return s.substr(first, last - first + 1);
-}
-
 // Emit one `;`-separated fragment as a key/value pair. Quoted values keep
 // `;` verbatim (handled by the caller's quote tracking); bare values
 // (non-standard GTF emitted by some tools) are accepted as-is.
 void emit_gtf_fragment(std::string_view frag,
                        std::vector<std::pair<std::string, std::string>>& out) {
-    frag = trim_ws(frag);
+    frag = trim_view(frag);
     if (frag.empty()) return;
 
     const auto q1 = frag.find('"');
@@ -71,14 +65,14 @@ void emit_gtf_fragment(std::string_view frag,
         // Bare `key value` form.
         const auto sp = frag.find_first_of(" \t");
         if (sp == std::string_view::npos) return;  // key without a value
-        const auto key = trim_ws(frag.substr(0, sp));
-        const auto value = trim_ws(frag.substr(sp));
+        const auto key = trim_view(frag.substr(0, sp));
+        const auto value = trim_view(frag.substr(sp));
         if (key.empty() || value.empty()) return;
         out.emplace_back(std::string{key}, std::string{value});
         return;
     }
 
-    const auto key = trim_ws(frag.substr(0, q1));
+    const auto key = trim_view(frag.substr(0, q1));
     if (key.empty()) return;
     // Find the closing quote, honoring backslash escapes.
     size_t q2 = q1 + 1;

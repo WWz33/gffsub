@@ -13,6 +13,17 @@ std::string to_lower(std::string_view sv) {
     return s;
 }
 
+std::string_view trim_view(std::string_view s) {
+    const auto first = s.find_first_not_of(" \t");
+    if (first == std::string_view::npos) return {};
+    const auto last = s.find_last_not_of(" \t");
+    return s.substr(first, last - first + 1);
+}
+
+std::string trim_copy(std::string_view s) {
+    return std::string{trim_view(s)};
+}
+
 std::vector<std::string_view> split_line(std::string_view line, char delimiter) {
     std::vector<std::string_view> cols;
     cols.reserve(delimiter == '\t' ? 9 : 4);

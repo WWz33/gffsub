@@ -172,14 +172,6 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
     return parse_content(data, format);
 }
 
-void GffData::release_mapping() {
-    if (mapped_data_ != nullptr) {
-        ::munmap(mapped_data_, mapped_size_);
-        mapped_data_ = nullptr;
-        mapped_size_ = 0;
-    }
-}
-
 int parse_content(GffData& data, InputFormat format) {
     const std::string_view content{data.content()};
     bool in_fasta = false;

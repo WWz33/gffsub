@@ -7,8 +7,10 @@
 #include "test_utils.hpp"
 
 using test_utils::compare_files;
+using test_utils::expect_command_failure;
 using test_utils::read_file;
 using test_utils::require_contains;
+using test_utils::require_exit_one_with_error;
 using test_utils::require_not_contains;
 using test_utils::run_command;
 
@@ -37,6 +39,25 @@ static void cleanup_outputs() {
     std::remove("cli_selector_smoke.gff3");
     std::remove("cli_selector_ids.txt");
     std::remove("cli_selector_patterns.txt");
+    std::remove("selector_overlap.bed");
+    std::remove("selector_bed_overlap.gff3");
+    std::remove("selector_bed_exclude.gff3");
+    std::remove("selector_bed_same.gff3");
+    std::remove("selector_bed_opp.gff3");
+    std::remove("selector_strand_bad.out");
+    std::remove("selector_strand_bad.err");
+    std::remove("selector_excl_region.gff3");
+    std::remove("selector_excl_touch.gff3");
+    std::remove("selector_mRNA_nodrop.gff3");
+    std::remove("selector_mRNA_drop.gff3");
+    std::remove("selector_exon_drop.gff3");
+    std::remove("selector_exon_mRNA_drop.gff3");
+    std::remove("selector_out_attrs.gff3");
+    std::remove("selector_out_attrs_note.gff3");
+    std::remove("window_bad.out");
+    std::remove("window_bad.err");
+    std::remove("selector_bad.out");
+    std::remove("selector_bad.err");
     std::remove("selector_id.gff3");
     std::remove("selector_query_id.gff3");
     std::remove("selector_attr_id.gff3");
@@ -823,6 +844,195 @@ int main(int argc, char* argv[]) {
         compare_files("selector_window_top.gff3", "selector_window_top_short.gff3") != 0 ||
         compare_files("selector_window_top.gff3", "selector_window_command.gff3") != 0 ||
         compare_files("selector_window_command.gff3", "selector_window_command_short.gff3") != 0) {
+        return 1;
+    }
+
+    // --- complement and strand-aware BED overlap ---
+
+    // A small BED set: one chr1 interval on +, one chr1 interval on -,
+    // one chr2 interval. Written by hand here because the tests below
+    // assert on its exact contents.
+    {
+        std::ofstream bed{"selector_overlap.bed"};
+        bed << "chr1\t99\t150\tp\t0\t+\n"
+            << "chr1\t599\t800\tm\t0\t-\n"
+            << "chr2\t99\t150\tc2\t0\t+\n";
+    }
+    // -b keeps overlapping records on both strands.
+    if (run_command(exe + " " + gff + " -b selector_overlap.bed > selector_bed_overlap.gff3") != 0 ||
+        require_contains("selector_bed_overlap.gff3", "ID=gene0001") != 0 ||   // chr1 100-400 hits [99,150)
+        require_contains("selector_bed_overlap.gff3", "ID=gene0002") != 0 ||   // chr1 600-700 hits [599,800)
+        require_contains("selector_bed_overlap.gff3", "ID=gene0003") != 0 ||   // chr2 100-200 hits [99,150)
+        require_not_contains("selector_bed_overlap.gff3", "ID=orphan_tx") != 0) {  // chr2 300-380 misses
+        return 1;
+    }
+    // -b ^FILE drops exactly what -b keeps.
+    if (run_command(exe + " " + gff + " -b '^selector_overlap.bed' > selector_bed_exclude.gff3") != 0 ||
+        require_not_contains("selector_bed_exclude.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_bed_exclude.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_bed_exclude.gff3", "ID=gene0003") != 0 ||
+        require_contains("selector_bed_exclude.gff3", "ID=orphan_tx") != 0) {
+        return 1;
+    }
+    // --same-strand: gene0001 (+ over the + interval) and gene0002
+    // (- over the - interval) both in; the chr2 interval is + and
+    // gene0003 is +, so it stays too. The exon2 record has strand '.' and
+    // must drop out under both strand modes even though it overlaps.
+    if (run_command(exe + " " + gff + " -b selector_overlap.bed --same-strand > selector_bed_same.gff3") != 0 ||
+        require_contains("selector_bed_same.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_bed_same.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_bed_same.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_bed_same.gff3", "ID=exon2") != 0) {
+        return 1;
+    }
+    // --opposite-strand: no record overlaps an interval of the opposite
+    // strand (the two chr1 candidates match same-strand intervals, chr2
+    // is + over +), so nothing survives but the header.
+    if (run_command(exe + " " + gff + " -b selector_overlap.bed --opposite-strand > selector_bed_opp.gff3") != 0 ||
+        require_not_contains("selector_bed_opp.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_bed_opp.gff3", "ID=gene0002") != 0 ||
+        require_not_contains("selector_bed_opp.gff3", "ID=gene0003") != 0 ||
+        require_not_contains("selector_bed_opp.gff3", "ID=orphan_tx") != 0) {
+        return 1;
+    }
+    // Strand modes require -b.
+    if (run_command(exe + " " + gff + " --same-strand > selector_strand_bad.out 2> selector_strand_bad.err") == 0 ||
+        require_contains("selector_strand_bad.err", "Error:") != 0) {
+        return 1;
+    }
+
+    // --- --exclude-region ---
+
+    if (run_command(exe + " " + gff + " --exclude-region chr1:100-400 > selector_excl_region.gff3") != 0 ||
+        require_not_contains("selector_excl_region.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_excl_region.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_excl_region.gff3", "ID=gene0002") != 0 ||
+        require_contains("selector_excl_region.gff3", "ID=gene0003") != 0) {
+        return 1;
+    }
+    // A touching-but-not-overlapping region keeps the feature (1-based
+    // inclusive): 401-500 does not overlap gene0001's 100-400.
+    if (run_command(exe + " " + gff + " --exclude-region chr1:401-500 > selector_excl_touch.gff3") != 0 ||
+        require_contains("selector_excl_touch.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_excl_touch.gff3", "ID=gene0002") != 0) {
+        return 1;
+    }
+
+    // --- --drop-orphans ---
+
+    // Without --drop-orphans the type filter is the only filter.
+    if (run_command(exe + " " + gff + " -t mRNA > selector_mRNA_nodrop.gff3") != 0 ||
+        require_contains("selector_mRNA_nodrop.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_mRNA_nodrop.gff3", "ID=orphan_tx") != 0) {
+        return 1;
+    }
+    // With it, tx1 is dropped: its Parent=gene0001 left the kept set when
+    // the type filter removed the gene. orphan_tx has no Parent, so it
+    // is never an orphan and survives.
+    if (run_command(exe + " " + gff + " -t mRNA --drop-orphans > selector_mRNA_drop.gff3") != 0 ||
+        require_not_contains("selector_mRNA_drop.gff3", "ID=tx1") != 0 ||
+        require_contains("selector_mRNA_drop.gff3", "ID=orphan_tx") != 0) {
+        return 1;
+    }
+    // Fixpoint: -t exon drops every parented exon (exon1's tx1 is gone,
+    // orphan_exon's orphan_tx is gone); only the parentless exon2 stays.
+    if (run_command(exe + " " + gff + " -t exon --drop-orphans > selector_exon_drop.gff3") != 0 ||
+        require_contains("selector_exon_drop.gff3", "ID=exon2") != 0 ||
+        require_not_contains("selector_exon_drop.gff3", "ID=exon1") != 0 ||
+        require_not_contains("selector_exon_drop.gff3", "ID=orphan_exon") != 0) {
+        return 1;
+    }
+    // Keeping mRNA too lets orphan_tx (no Parent) survive, and its child
+    // orphan_exon with it: one extra fixpoint iteration.
+    if (run_command(exe + " " + gff + " -t exon,mRNA --drop-orphans > selector_exon_mRNA_drop.gff3") != 0 ||
+        require_contains("selector_exon_mRNA_drop.gff3", "ID=orphan_tx") != 0 ||
+        require_contains("selector_exon_mRNA_drop.gff3", "ID=orphan_exon") != 0 ||
+        require_contains("selector_exon_mRNA_drop.gff3", "ID=exon2") != 0 ||
+        require_not_contains("selector_exon_mRNA_drop.gff3", "ID=tx1") != 0) {
+        return 1;
+    }
+
+    // --- --out-attrs ---
+
+    if (run_command(exe + " " + gff + " --out-attrs Name > selector_out_attrs.gff3") != 0 ||
+        require_contains("selector_out_attrs.gff3", "ID=gene0001;Name=ABC1") != 0 ||
+        require_contains("selector_out_attrs.gff3", "ID=tx1;Parent=gene0001;Name=ABC1.1") != 0 ||
+        require_not_contains("selector_out_attrs.gff3", "locus_tag") != 0 ||
+        require_not_contains("selector_out_attrs.gff3", "biotype") != 0) {
+        return 1;
+    }
+    // A tag not present on a record simply drops out; ID/Parent always survive.
+    if (run_command(exe + " " + gff + " --out-attrs Note,nonexistent > selector_out_attrs_note.gff3") != 0 ||
+        require_contains("selector_out_attrs_note.gff3", "ID=gene0002;Note=transposon-like") != 0 ||
+        require_contains("selector_out_attrs_note.gff3", "ID=exon1;Parent=tx1") != 0 ||
+        require_not_contains("selector_out_attrs_note.gff3", "Name=") != 0) {
+        return 1;
+    }
+
+    // --- window-shortcut guard rejects every non-window flag ---
+
+    // The window path (triggered by --up/--down/--strand-aware with one -i)
+    // only accepts -i/-u/-D/-a. Each flag below must be rejected; this is a
+    // blacklist guard that needs every future CliArgs field added to it, so
+    // we cover the surface explicitly.
+    {
+        const std::string wbase = exe + " " + gff + " -i gene0001 -u 50 ";
+        const std::vector<std::string> reject = {
+            "--ids nope.txt",          "-n ABC1",           "-w ID=gene0001",
+            "--grep type:gene",        "--grep-regex type:.+",
+            "--grep-file nope.txt",    "--grep-field type",
+            "--grep-file-regex",       "-I type==gene",     "-E type==gene",
+            "-v",                      "-y",
+            "-C",                      "-p",                "-m",
+            "-N chr1:1-100",           "-s",
+            "-r chr1:1-100",           "-b selector_overlap.bed",
+            "--exclude-region chr1:1-100",
+            "--same-strand",           "--opposite-strand",
+            "--drop-orphans",          "--out-attrs Name",
+            "-S chr1",                 "--source src",
+            "-c 0",                    "--strand +",        "--phase 0",
+            "-t gene",                 "-L",                "--longest-type mRNA",
+            "-@ 2",                    "-k start",          "-R",
+            "-f gtf",                  "-o /dev/null",
+        };
+        for (const auto& extra : reject) {
+            std::ofstream{"window_bad.out"};
+            if (expect_command_failure(wbase + extra + " > window_bad.out 2> window_bad.err") != 0 ||
+                require_contains("window_bad.err", "Error:") != 0) {
+                std::cerr << "window guard failed to reject: " << extra << '\n';
+                return 1;
+            }
+        }
+    }
+
+    // --- empty-value rejection on the guarded flags ---
+
+    if (require_exit_one_with_error(exe + " " + gff + " --nearest '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -N '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -k '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -o '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " --grep-file '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " --grep-field '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " --seqid '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -n '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -i '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -t '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " -r '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " --exclude-region '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0 ||
+        require_exit_one_with_error(exe + " " + gff + " --ids '' > selector_bad.out 2> selector_bad.err",
+                                    "selector_bad.err", "non-empty") != 0) {
         return 1;
     }
 
