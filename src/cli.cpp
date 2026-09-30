@@ -296,8 +296,20 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 args.nearest_region_str = optarg;
                 break;
             case 'C': args.include_children = true; break;
-            case 'u': args.upstream_arg = optarg; break;
-            case 'D': args.downstream_arg = optarg; break;
+            case 'u':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --up requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.upstream_arg = optarg;
+                break;
+            case 'D':
+                if (optarg[0] == '\0') {
+                    std::cerr << "Error: --down requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                args.downstream_arg = optarg;
+                break;
             case 'a': args.strand_aware = true; break;
             case 'S':
                 if (optarg[0] == '\0') {
@@ -504,6 +516,10 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         }
         std::string line;
         while (std::getline(in, line)) {
+            // Strip CR from CRLF files before trimming: trim_copy only
+            // handles spaces/tabs, so a pattern like "GeneA\r" would never
+            // match. Same handling as load_id_list_file.
+            if (!line.empty() && line.back() == '\r') line.pop_back();
             const auto pattern = trim_copy(line);
             if (pattern.empty()) continue;
             GrepFilter filter;

@@ -435,11 +435,9 @@ InputFormat sniff_format(const std::string& path) {
             // Read incrementally until one feature line is seen, so a gzipped
             // file with a long header of comments/directives still sniffs
             // from real content (the plain-file path has no byte cap).
-            std::string head;
             std::string line;
             char c = 0;
-            bool decided = false;
-            while (!decided && gzread(gz, &c, 1) == 1) {
+            while (gzread(gz, &c, 1) == 1) {
                 if (c == '\n') {
                     if (!line.empty() && line.back() == '\r') line.pop_back();
                     if (const auto fmt = sniff_line(line)) {
@@ -449,6 +447,13 @@ InputFormat sniff_format(const std::string& path) {
                     line.clear();
                 } else {
                     line.push_back(c);
+                }
+            }
+            // Last line without a trailing newline.
+            if (!line.empty()) {
+                if (const auto fmt = sniff_line(line)) {
+                    gzclose(gz);
+                    return *fmt;
                 }
             }
             gzclose(gz);

@@ -14,9 +14,13 @@ std::string to_lower(std::string_view sv) {
 }
 
 std::string_view trim_view(std::string_view s) {
-    const auto first = s.find_first_not_of(" \t");
+    // Space, tab, and CR. A raw CR inside a GFF3/GTF field is never legal
+    // (the specs require %0D / \r escaping), so trimming it only removes
+    // line-ending residue from CRLF input.
+    constexpr std::string_view kWhitespace = " \t\r";
+    const auto first = s.find_first_not_of(kWhitespace);
     if (first == std::string_view::npos) return {};
-    const auto last = s.find_last_not_of(" \t");
+    const auto last = s.find_last_not_of(kWhitespace);
     return s.substr(first, last - first + 1);
 }
 

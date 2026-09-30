@@ -40,12 +40,17 @@ static void cleanup_outputs() {
     std::remove("cli_selector_ids.txt");
     std::remove("cli_selector_patterns.txt");
     std::remove("selector_overlap.bed");
+    std::remove("selector_strand2.bed");
+    std::remove("selector_window_patterns.txt");
     std::remove("selector_bed_overlap.gff3");
     std::remove("selector_bed_exclude.gff3");
     std::remove("selector_bed_same.gff3");
     std::remove("selector_bed_opp.gff3");
     std::remove("selector_strand_bad.out");
     std::remove("selector_strand_bad.err");
+    std::remove("selector_strand2_any.gff3");
+    std::remove("selector_strand2_same.gff3");
+    std::remove("selector_strand2_opp.gff3");
     std::remove("selector_excl_region.gff3");
     std::remove("selector_excl_touch.gff3");
     std::remove("selector_mRNA_nodrop.gff3");
@@ -876,13 +881,11 @@ int main(int argc, char* argv[]) {
     }
     // --same-strand: gene0001 (+ over the + interval) and gene0002
     // (- over the - interval) both in; the chr2 interval is + and
-    // gene0003 is +, so it stays too. The exon2 record has strand '.' and
-    // must drop out under both strand modes even though it overlaps.
+    // gene0003 is +, so it stays too.
     if (run_command(exe + " " + gff + " -b selector_overlap.bed --same-strand > selector_bed_same.gff3") != 0 ||
         require_contains("selector_bed_same.gff3", "ID=gene0001") != 0 ||
         require_contains("selector_bed_same.gff3", "ID=gene0002") != 0 ||
-        require_contains("selector_bed_same.gff3", "ID=gene0003") != 0 ||
-        require_not_contains("selector_bed_same.gff3", "ID=exon2") != 0) {
+        require_contains("selector_bed_same.gff3", "ID=gene0003") != 0) {
         return 1;
     }
     // --opposite-strand: no record overlaps an interval of the opposite
@@ -898,6 +901,45 @@ int main(int argc, char* argv[]) {
     // Strand modes require -b.
     if (run_command(exe + " " + gff + " --same-strand > selector_strand_bad.out 2> selector_strand_bad.err") == 0 ||
         require_contains("selector_strand_bad.err", "Error:") != 0) {
+        return 1;
+    }
+
+    // Second strand fixture: exercises a '.'-strand record (exon2, overlaps
+    // the chr2 interval but has no strand) and gives --opposite-strand a
+    // positive control (gene0001/mRNA/cds2 are + and overlap the - interval).
+    {
+        std::ofstream bed{"selector_strand2.bed"};
+        bed << "chr1\t199\t260\topp\t0\t-\n"
+            << "chr2\t249\t281\td\t0\t+\n";
+    }
+    // Pattern file for the window-guard matrix below (valid so the command
+    // passes cross-validation and actually reaches the guard).
+    {
+        std::ofstream pat{"selector_window_patterns.txt"};
+        pat << "gene\n";
+    }
+    // No strand mode: exon2 overlaps and survives, proving the exclusion in
+    // the next two cases is due to its strand, not its position.
+    if (run_command(exe + " " + gff + " -b selector_strand2.bed > selector_strand2_any.gff3") != 0 ||
+        require_contains("selector_strand2_any.gff3", "ID=exon2") != 0 ||
+        require_contains("selector_strand2_any.gff3", "ID=cds2") != 0) {
+        return 1;
+    }
+    // --same-strand: nothing matches (the + records overlap only the -
+    // interval; exon2's '.' never matches).
+    if (run_command(exe + " " + gff + " -b selector_strand2.bed --same-strand > selector_strand2_same.gff3") != 0 ||
+        require_not_contains("selector_strand2_same.gff3", "ID=gene0001") != 0 ||
+        require_not_contains("selector_strand2_same.gff3", "ID=cds2") != 0 ||
+        require_not_contains("selector_strand2_same.gff3", "ID=exon2") != 0) {
+        return 1;
+    }
+    // --opposite-strand: the + records match the - interval (positive
+    // control); exon2 still drops out, so the dot-strand exclusion is
+    // exercised by a record that demonstrably overlaps.
+    if (run_command(exe + " " + gff + " -b selector_strand2.bed --opposite-strand > selector_strand2_opp.gff3") != 0 ||
+        require_contains("selector_strand2_opp.gff3", "ID=gene0001") != 0 ||
+        require_contains("selector_strand2_opp.gff3", "ID=cds2") != 0 ||
+        require_not_contains("selector_strand2_opp.gff3", "ID=exon2") != 0) {
         return 1;
     }
 
@@ -980,25 +1022,29 @@ int main(int argc, char* argv[]) {
         const std::vector<std::string> reject = {
             "--ids nope.txt",          "-n ABC1",           "-w ID=gene0001",
             "--grep type:gene",        "--grep-regex type:.+",
-            "--grep-file nope.txt",    "--grep-field type",
-            "--grep-file-regex",       "-I type==gene",     "-E type==gene",
-            "-v",                      "-y",
+            "--grep-file selector_window_patterns.txt --grep-field type",
+            "--grep-file selector_window_patterns.txt --grep-field type --grep-file-regex",
+            "-I type==gene",           "-E type==gene",
+            "-v --grep type:gene",     "-y",
             "-C",                      "-p",                "-m",
             "-N chr1:1-100",           "-s",
             "-r chr1:1-100",           "-b selector_overlap.bed",
             "--exclude-region chr1:1-100",
-            "--same-strand",           "--opposite-strand",
+            "-b selector_overlap.bed --same-strand",
+            "-b selector_overlap.bed --opposite-strand",
             "--drop-orphans",          "--out-attrs Name",
             "-S chr1",                 "--source src",
             "-c 0",                    "--strand +",        "--phase 0",
-            "-t gene",                 "-L",                "--longest-type mRNA",
+            "-t gene",                 "-L",                "-L --longest-type mRNA",
             "-@ 2",                    "-k start",          "-R",
             "-f gtf",                  "-o /dev/null",
         };
         for (const auto& extra : reject) {
-            std::ofstream{"window_bad.out"};
             if (expect_command_failure(wbase + extra + " > window_bad.out 2> window_bad.err") != 0 ||
-                require_contains("window_bad.err", "Error:") != 0) {
+                // Assert on the guard's own message, not just "Error:": a row
+                // that fails earlier (e.g. cross-validation) would otherwise
+                // pass without exercising the guard clause.
+                require_contains("window_bad.err", "window shortcut only supports") != 0) {
                 std::cerr << "window guard failed to reject: " << extra << '\n';
                 return 1;
             }

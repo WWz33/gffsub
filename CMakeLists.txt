@@ -68,6 +68,8 @@ if(BUILD_TESTING)
         src
     )
 
+    target_link_libraries(annotation_index_smoke PRIVATE ZLIB::ZLIB)
+
     target_compile_options(annotation_index_smoke PRIVATE
         -Wall -O2
     )
@@ -113,6 +115,8 @@ if(BUILD_TESTING)
     target_include_directories(feature_types_smoke PRIVATE
         src
     )
+
+    target_link_libraries(feature_types_smoke PRIVATE ZLIB::ZLIB)
 
     target_compile_options(feature_types_smoke PRIVATE
         -Wall -O2
