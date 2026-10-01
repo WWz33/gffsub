@@ -10,8 +10,9 @@
 
 每个 gene 保留一个 transcript。长度度量:
 
-- gene 含 CDS 时用 CDS 长度 (CDS 片段之和)，否则用 exon 长度 (exon 片段之和)。
-- 每段 CDS 都计入: 同 ID 的不连续 CDS 与不同 ID 的 CDS 片段 (例如移码拆成的两段) 都累加。
+- gene 含 CDS 时用 CDS 长度，否则用 exon 长度 (exon 片段之和)。
+- 不连续 CDS (同 ID 多行): 片段累加。
+- 同一 transcript 下不同 ID 的 CDS 是备选产物 (GFF3 规范的备选起始密码子): 取最长 CDS，不累加。
 - 长度相同取第一个遇到的。
 - 自动检测 isoform 类型: 取文件中最多的 transcript 类类型（`mRNA`、`transcript`、`ncRNA`、`tRNA` 等）。数量并列时优先 `mRNA`，其次 `transcript`。
 - 只在检测到的类型内比较: 其他 transcript 类类型的记录原样保留，即使更长。
@@ -34,12 +35,12 @@ chr2	src	exon	200	400	.	-	.	ID=ex04;Parent=tx03
 chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 ```
 
-- tx01 CDS 长度: 151 + 251 = 402 bp。
+- tx01 CDS 长度: max(151, 251) = 251 bp (cds01、cds02 是两个不同 CDS)。
 - tx02 CDS 长度: 301 bp。
 - tx03 exon 长度: 201 + 151 = 352 bp (无 CDS)。
 
 ```bash
-# gene01 保留 tx01 (402 bp)，gene02 保留 tx03 (唯一 isoform)
+# gene01 保留 tx02 (301 bp)，gene02 保留 tx03 (唯一 isoform)
 ./gffsub demo.gff3 --longest
 
 # 只输出最长 transcript 行 (去掉 gene/exon)

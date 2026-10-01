@@ -178,16 +178,26 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
             };
 
             if (gene_has_cds) {
-                // CDS length is the sum of every CDS segment under the
-                // transcript. Segments either share an ID (one discontinuous
-                // CDS) or carry distinct IDs (e.g. a CDS split by a
-                // translational frameshift, as in the GFF3 spec example);
-                // both count towards the transcript's coding length.
+                // CDS length per the GFF3 spec (canonical gene example):
+                // lines sharing an ID are one discontinuous CDS (summed);
+                // distinct IDs under one transcript are alternative products
+                // (the spec's cds00003/cds00004 alternative start codons), so
+                // the transcript's coding length is its LONGEST CDS, not the
+                // sum across CDSs.
+                std::unordered_map<std::string, int64_t> cds_len_by_id;
+                constexpr int64_t kLenMax = std::numeric_limits<int64_t>::max();
                 for (int child_idx : child_it->second) {
                     const auto& child = data.records[child_idx];
                     if (child.feat_class == FeatureClass::CDS) {
-                        add_segment(child.end - child.start + 1);
+                        const std::string key = child.id ? *child.id : std::string{};
+                        const int64_t seg = child.end - child.start + 1;
+                        int64_t& acc = cds_len_by_id[key];
+                        acc = (seg > kLenMax - acc) ? kLenMax : acc + seg;
                     }
+                }
+                for (const auto& [key, cds_len] : cds_len_by_id) {
+                    (void)key;
+                    if (cds_len > len) len = cds_len;
                 }
                 if (len == 0) continue; // isoform without CDS is skipped
             } else {

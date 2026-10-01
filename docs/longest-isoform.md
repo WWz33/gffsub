@@ -11,7 +11,8 @@
 Keep one transcript per gene. Length metric:
 
 - CDS length (sum of CDS segments) if the gene has CDS, otherwise exon length (sum of exon segments).
-- Every CDS segment counts once: segments of one discontinuous CDS (same ID) and segments carrying distinct IDs (e.g. a CDS split by a translational frameshift) are both summed.
+- Discontinuous CDS (same ID, multiple lines): segments summed.
+- Distinct CDS IDs under one transcript are alternative products (the GFF3 spec's alternative start codons): the longest CDS is used, not the sum.
 - Ties keep the first encountered.
 - Auto-detects isoform type: the most frequent transcript-class type in the file (`mRNA`, `transcript`, `ncRNA`, `tRNA`, ...). Ties prefer `mRNA`, then `transcript`.
 - Isoforms compete within the detected type: records of another transcript-class type are left unchanged, even when they are longer.
@@ -34,12 +35,12 @@ chr2	src	exon	200	400	.	-	.	ID=ex04;Parent=tx03
 chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 ```
 
-- tx01 CDS length: 151 + 251 = 402 bp.
+- tx01 CDS length: max(151, 251) = 251 bp (cds01, cds02 are distinct CDSs).
 - tx02 CDS length: 301 bp.
 - tx03 exon length: 201 + 151 = 352 bp (no CDS).
 
 ```bash
-# keep tx01 for gene01 (402 bp), tx03 for gene02 (only isoform)
+# keep tx02 for gene01 (301 bp), tx03 for gene02 (only isoform)
 ./gffsub demo.gff3 --longest
 
 # keep only the longest transcript rows (drop gene/exon)

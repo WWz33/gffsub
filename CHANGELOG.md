@@ -36,14 +36,19 @@ All notable changes to gffsub are documented in this file. The format follows
   real attribute; the hierarchy fields (ID/Parent/gene_id/transcript_id) of
   GTF records come from the quote-aware GTF parsers, and `-I`/`-E`/`--grep`
   prefer the record fields on GTF input
-- `--longest` saturates the CDS/exon segment sum so transcripts near the
-  coordinate limit cannot wrap negative and lose to a shorter isoform
-- GFF3 attributes after `; ` keep their `Parent`/`gene_id`/`transcript_id`
-  values, so `--format gtf` no longer emits empty `gene_id ""`
-- `--longest` sums every CDS segment of a transcript; distinct CDS IDs under
-  one transcript are segments of it, not competing variants
+- `--longest` saturates the per-CDS and per-exon segment sums so transcripts
+  near the coordinate limit cannot wrap negative and lose to a shorter isoform
+- `--longest` scores a transcript by its longest CDS. Lines sharing an ID are
+  one discontinuous CDS and are summed; distinct CDS IDs under one transcript
+  are alternative products (the spec's alternative start codons), not
+  segments, per the GFF3 specification's canonical gene example
 - `--longest` applies to files without gene records (flat GTF, GFF3 with
   transcript rows only), grouping isoforms by their parent attribute
+- GFF3 attributes after `; ` keep their `Parent`/`gene_id`/`transcript_id`
+  values, so `--format gtf` no longer emits empty `gene_id ""`
+- A feature ID reused by lines that differ in type, seqid or strand warns:
+  the spec requires unique IDs, and lineage lookups or GTF `gene_id`
+  assignment may otherwise pick the wrong line
 - `-I`/`-E`/`--grep` on a multi-value attribute (`Parent=g1,g2`) match any
   value; `!=`/`!~` match only when no value does
 - Records keep valid string views when a parsed buffer shorter than the SSO

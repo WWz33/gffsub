@@ -179,9 +179,38 @@ static bool write_cds_overflow(const std::string& path) {
         << "chr1\ts\tgene\t1\t9223372036854775807\t.\t+\t.\tID=g\n"
         << "chr1\ts\tmRNA\t1\t9223372036854775807\t.\t+\t.\tID=big;Parent=g\n"
         << "chr1\ts\tCDS\t1\t4611686018427387905\t.\t+\t0\tID=c1;Parent=big\n"
-        << "chr1\ts\tCDS\t1\t4611686018427387905\t.\t+\t0\tID=c2;Parent=big\n"
+        << "chr1\ts\tCDS\t1\t4611686018427387905\t.\t+\t0\tID=c1;Parent=big\n"
         << "chr1\ts\tmRNA\t1\t100\t.\t+\t.\tID=small;Parent=g\n"
         << "chr1\ts\tCDS\t1\t10\t.\t+\t0\tID=cs;Parent=small\n";
+    return true;
+}
+
+// One discontinuous CDS (same ID, two lines) against a shorter rival.
+static bool write_cds_discontinuous(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr1\ts\tgene\t1\t900\t.\t+\t.\tID=g\n"
+        << "chr1\ts\tmRNA\t1\t900\t.\t+\t.\tID=t1;Parent=g\n"
+        << "chr1\ts\tCDS\t1\t100\t.\t+\t0\tID=c;Parent=t1\n"
+        << "chr1\ts\tCDS\t500\t700\t.\t+\t0\tID=c;Parent=t1\n"
+        << "chr1\ts\tmRNA\t1\t900\t.\t+\t.\tID=t2;Parent=g\n"
+        << "chr1\ts\tCDS\t1\t150\t.\t+\t0\tID=d;Parent=t2\n";
+    return true;
+}
+
+// One transcript ID used by two different transcripts. The spec requires
+// unique IDs; the tool must warn instead of silently mis-assigning gene_id.
+static bool write_duplicate_transcript_id(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr2\tsrc\tgene\t1\t100\t.\t+\t.\tID=G2\n"
+        << "chr2\tsrc\tmRNA\t1\t80\t.\t+\t.\tID=T;Parent=G2\n"
+        << "chr2\tsrc\texon\t1\t80\t.\t+\t.\tID=E2;Parent=T\n"
+        << "chr1\tsrc\tgene\t1\t100\t.\t+\t.\tID=G1\n"
+        << "chr1\tsrc\tmRNA\t1\t40\t.\t+\t.\tID=T;Parent=G1\n"
+        << "chr1\tsrc\texon\t1\t40\t.\t+\t.\tID=E1;Parent=T\n";
     return true;
 }
 
@@ -229,6 +258,9 @@ static void cleanup_outputs() {
         "reg_gtf_quoted.gff3", "reg_gtf_quoted_expr.gff3",
         "reg_gtf_quoted_grep.gff3", "reg_sat_sum.gff3",
         "reg_mixed_id.gff3", "reg_mixed_children.gff3", "reg_mixed_expr.gff3",
+        "reg_cds_disc.gff3", "regression_cds_disc.gff3",
+        "regression_dup_id.gff3", "reg_dup.gtf", "reg_dup_gtf.err",
+        "reg_dup_id.gff3", "reg_dup_index.err", "reg_dup_disc.gff3", "reg_dup_disc.err",
         "reg_gtf_summary.tsv", "reg_gene_summary.tsv",
         "reg_json.json", "reg_json_quote.json",
         "reg_err_missing.err", "reg_err_up.err", "reg_err_threads.err",
@@ -441,13 +473,27 @@ static int test_gtf_attr_access(const std::string& exe, const std::string& gtf) 
     return 0;
 }
 
-// Group 11: --longest measures a transcript by the sum of its CDS, so
-// distinct CDS IDs are segments of the same transcript, not alternatives.
-// tx01 (151+251=402) beats tx02 (301).
-static int test_longest_cds_sum(const std::string& exe, const std::string& gff) {
+// Group 11: --longest scores a transcript by its LONGEST CDS. Distinct CDS
+// IDs under one transcript are alternative products (the GFF3 spec's
+// alternative start codons), so tx01 = max(151, 251) = 251 and tx02 (301)
+// wins. Same-ID lines are one discontinuous CDS and sum (checked by the
+// docs example fixtures elsewhere).
+static int test_longest_cds_max_variant(const std::string& exe, const std::string& gff) {
     if (run_command(exe + " " + gff + " --longest > reg_cds_sum.gff3") != 0 ||
-        require_contains("reg_cds_sum.gff3", "ID=tx01") != 0 ||
-        require_not_contains("reg_cds_sum.gff3", "ID=tx02") != 0) {
+        require_contains("reg_cds_sum.gff3", "ID=tx02") != 0 ||
+        require_not_contains("reg_cds_sum.gff3", "ID=tx01") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 11b: same-ID CDS lines are one discontinuous CDS and are summed:
+// t1 (100+201=301) beats t2 (150).
+static int test_longest_cds_discontinuous_sum(const std::string& exe,
+                                              const std::string& gff) {
+    if (run_command(exe + " " + gff + " --longest > reg_cds_disc.gff3") != 0 ||
+        require_contains("reg_cds_disc.gff3", "ID=t1") != 0 ||
+        require_not_contains("reg_cds_disc.gff3", "ID=t2") != 0) {
         return 1;
     }
     return 0;
@@ -547,7 +593,9 @@ static int test_gtf_quoted_value(const std::string& exe, const std::string& gtf)
     return 0;
 }
 
-// Group 17: --longest segment sums saturate instead of wrapping negative.
+// Group 17: --longest per-ID CDS sums and exon sums saturate instead of
+// wrapping negative. The big transcript's two same-ID segments each measure
+// 2^62+1 bp; their saturated sum must still beat the 10 bp rival.
 static int test_longest_sum_saturation(const std::string& exe, const std::string& gff) {
     if (run_command(exe + " " + gff + " --longest > reg_sat_sum.gff3") != 0 ||
         require_contains("reg_sat_sum.gff3", "ID=big") != 0 ||
@@ -578,6 +626,28 @@ static int test_gtf_mixed_keys(const std::string& exe, const std::string& gtf) {
     return 0;
 }
 
+// Group 19: a repeated transcript ID is invalid GFF3 (IDs must be unique).
+// Both consumers warn: the index for lineage lookups, the GTF writer for the
+// gene_id it hands to children. A discontinuous feature (same ID, matching
+// type/seqid/strand) stays silent.
+static int test_duplicate_id_warning(const std::string& exe, const std::string& gff,
+                                     const std::string& discontinuous) {
+    if (run_command(exe + " " + gff + " -f gtf > reg_dup.gtf 2> reg_dup_gtf.err") != 0 ||
+        require_contains("reg_dup_gtf.err", "Warning: transcript ID") != 0 ||
+        require_contains("reg_dup.gtf", "gene_id") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gff + " -i G2 -C > reg_dup_id.gff3 2> reg_dup_index.err") != 0 ||
+        require_contains("reg_dup_index.err", "Warning: ID") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + discontinuous + " --longest > reg_dup_disc.gff3 2> reg_dup_disc.err") != 0 ||
+        require_not_contains("reg_dup_disc.err", "Warning") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -603,6 +673,8 @@ int main(int argc, char* argv[]) {
     const std::string tiny{"regression_tiny.gff3"};
     const std::string gtf_quoted{"regression_gtf_quoted.gtf"};
     const std::string cds_overflow{"regression_cds_overflow.gff3"};
+    const std::string cds_disc{"regression_cds_disc.gff3"};
+    const std::string dup_id{"regression_dup_id.gff3"};
     const std::string gtf_mixed{"regression_gtf_mixed.gtf"};
 
     if (!write_gtf_basic(gtf_basic) || !write_gtf_unsorted(gtf_unsorted) ||
@@ -612,7 +684,9 @@ int main(int argc, char* argv[]) {
         !write_cds_variants(cds_variants) || !write_flat_gtf_isoforms(flat_gtf) ||
         !write_spaced_separators(spaced) || !write_parent_list(parent_list) ||
         !write_tiny_gff3(tiny) || !write_gtf_quoted_parent(gtf_quoted) ||
-        !write_cds_overflow(cds_overflow) || !write_gtf_mixed_keys(gtf_mixed)) {
+        !write_cds_overflow(cds_overflow) || !write_gtf_mixed_keys(gtf_mixed) ||
+        !write_cds_discontinuous(cds_disc) ||
+        !write_duplicate_transcript_id(dup_id)) {
         std::cerr << "cannot write regression fixtures\n";
         cleanup_outputs();
         return 1;
@@ -658,7 +732,11 @@ int main(int argc, char* argv[]) {
         cleanup_outputs();
         return 1;
     }
-    if (test_longest_cds_sum(exe, cds_variants) != 0) {
+    if (test_longest_cds_max_variant(exe, cds_variants) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_longest_cds_discontinuous_sum(exe, cds_disc) != 0) {
         cleanup_outputs();
         return 1;
     }
@@ -687,6 +765,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_gtf_mixed_keys(exe, gtf_mixed) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_duplicate_id_warning(exe, dup_id, cds_disc) != 0) {
         cleanup_outputs();
         return 1;
     }

@@ -4,12 +4,28 @@
 #include "parser.hpp"
 #include "record.hpp"
 #include "string_utils.hpp"
+#include <iostream>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace gffsub {
 
 namespace {
+
+// Loud enough to notice on a broken file, quiet enough for a big one.
+void warn_duplicate_transcript_id(std::string_view id) {
+    constexpr int kLimit = 5;
+    static int warned = 0;
+    if (warned > kLimit) return;
+    if (warned == kLimit) {
+        std::cerr << "Warning: further duplicate-transcript-ID warnings suppressed\n";
+    } else {
+        std::cerr << "Warning: transcript ID '" << id
+                  << "' is defined more than once with different parents; GTF"
+                     " gene_id assignment may be wrong\n";
+    }
+    ++warned;
+}
 
 // Keep only the listed tags (plus ID/Parent) in a GFF3 column-9 string.
 // Segments are re-emitted verbatim so existing URL encoding is preserved.
@@ -207,10 +223,17 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
 
     // Build mappings from ALL records (not just kept) so parent mRNAs
     // filtered out by subset still resolve gene_id for surviving children.
+    // A transcript ID defined twice with different parents is invalid input
+    // (spec: IDs are unique); the last definition wins for every child, so
+    // report it rather than hand out a silently wrong gene_id.
     std::unordered_map<std::string, std::string> mRNA_to_gene;
     std::unordered_set<std::string> gene_ids;
     for (const auto& rec : data) {
         if ((rec.feat_class == FeatureClass::Transcript) && rec.parent_id && rec.id) {
+            const auto existing = mRNA_to_gene.find(*rec.id);
+            if (existing != mRNA_to_gene.end() && existing->second != *rec.parent_id) {
+                warn_duplicate_transcript_id(*rec.id);
+            }
             mRNA_to_gene[*rec.id] = *rec.parent_id;
         }
         if (rec.feat_class == FeatureClass::Gene && rec.id) {

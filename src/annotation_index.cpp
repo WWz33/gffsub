@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
@@ -12,6 +13,27 @@
 #include <utility>
 
 namespace gffsub {
+
+namespace {
+
+// The spec requires IDs to be unique; a repeated ID on non-matching lines is
+// invalid input. This tool does not rewrite IDs, so report it instead.
+void warn_duplicate_feature_id(std::string_view id) {
+    constexpr int kLimit = 5;
+    static int warned = 0;
+    if (warned > kLimit) return;
+    if (warned == kLimit) {
+        std::cerr << "Warning: further duplicate-ID warnings suppressed\n";
+    } else {
+        std::cerr << "Warning: ID '" << id
+                  << "' is shared by lines that are not one feature; the GFF3"
+                     " spec requires unique IDs, so lineage lookups may pick"
+                     " the wrong line\n";
+    }
+    ++warned;
+}
+
+}  // namespace
 
 AnnotationIndex AnnotationIndex::from_file(const std::string& path) {
     GffData data;
@@ -120,8 +142,18 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
         if (rec.id) {
             id_to_record_.emplace(*rec.id, i);
             // GFF3 discontinuous features: the same ID may appear on multiple
-            // lines; keep every line index.
-            id_to_records_[*rec.id].push_back(i);
+            // lines; keep every line index. Lines that share an ID but differ
+            // in type/seqid/strand are not one feature, which the spec forbids
+            // (IDs must be unique); warned once here, looked up by first line.
+            auto& same_id_lines = id_to_records_[*rec.id];
+            if (!same_id_lines.empty()) {
+                const auto& first = records[same_id_lines.front()];
+                if (first.type != rec.type || first.seqid != rec.seqid ||
+                    first.strand != rec.strand) {
+                    warn_duplicate_feature_id(*rec.id);
+                }
+            }
+            same_id_lines.push_back(i);
         }
 
         if (rec.feat_class == FeatureClass::Gene) {
