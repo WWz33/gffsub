@@ -69,6 +69,50 @@ Longest isoform per gene:
 ./gffsub demo.gff3 --longest
 ```
 
+## Longer commands
+
+One line per stage. Selectors pick lines, `--longest`/`--drop-orphans`
+reshape the hierarchy, `--format` converts at output.
+
+Protein-coding strain, one isoform per gene, full model, as GTF:
+
+```bash
+./gffsub ann.gff3 -w biotype=protein_coding -L -m -f gtf -o coding.gtf
+```
+
+`-w` keeps the gene rows; `-m` re-expands each selected gene to its full
+model so the transcripts survive `--longest`.
+
+Region minus repeats, hierarchy cleaned up:
+
+```bash
+./gffsub ann.gff3 -S chr1 --exclude-region chr1:500000-800000 --drop-orphans
+```
+
+Genes from a list, models only, slimmed column 9:
+
+```bash
+./gffsub ann.gff3 --ids genes.txt -m --out-attrs Name,biotype
+```
+
+Nearest gene to a locus with its model:
+
+```bash
+./gffsub ann.gff3 -N chr1:1000000-1000500 -m
+```
+
+Sorted, gzipped input, BED out:
+
+```bash
+./gffsub ann.gff3.gz -k seqid,natural-seqid,start -t gene -f bed
+```
+
+Stages compose through stdin too:
+
+```bash
+./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
+```
+
 ## Command structure
 
 ```

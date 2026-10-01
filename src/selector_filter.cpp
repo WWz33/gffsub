@@ -64,28 +64,54 @@ std::vector<std::string> record_field_values(const GffRecord& rec, std::string_v
         return {};
     }
 
-    // For GTF, the synthesized record fields are authoritative: parse_attributes
-    // splits on `;`/`=` without quote awareness, so a quoted value containing
-    // "; Parent=..." would be misread as a real Parent entry. Check them
-    // before the attribute map. (GFF3 attr_raw never uses `key "value"`.)
+    // For GTF, prefer the quote-aware GTF parse: parse_attributes splits on
+    // `;`/`=` without quote awareness, so a quoted value containing
+    // "; Parent=..." would be misread as a real Parent entry. The GTF parse
+    // returns whole-token matches (including bare `key=value` fragments);
+    // a comma-separated value is split so multi-value semantics match GFF3.
+    // The record fields (synthesized by the parser) back it up for the
+    // hierarchy keys. (GFF3 attr_raw never uses `key "value"`.)
     if (rec.src_fmt == InputFormat::GTF) {
-        std::vector<std::string> rec_values;
-        if (attr_key == "gene_id" && rec.gene_id) rec_values = {*rec.gene_id};
-        else if (attr_key == "transcript_id" && rec.transcript_id) rec_values = {*rec.transcript_id};
-        else if (attr_key == "ID" && rec.id) rec_values = {*rec.id};
-        else if (attr_key == "Parent" && rec.parent_id) rec_values = {*rec.parent_id};
-        if (!rec_values.empty()) return rec_values;
+        if (attr_key == "ID" || attr_key == "Parent" ||
+            attr_key == "gene_id" || attr_key == "transcript_id") {
+            if (auto quoted = extract_quoted_value(rec.attr_raw, attr_key)) {
+                if (attr_key == "Parent" || attr_key == "gene_id" ||
+                    attr_key == "transcript_id") {
+                    std::vector<std::string> parts;
+                    size_t start = 0;
+                    while (start <= quoted->size()) {
+                        const size_t comma = quoted->find(',', start);
+                        const size_t end = (comma == std::string::npos) ? quoted->size() : comma;
+                        const std::string part = quoted->substr(start, end - start);
+                        if (!part.empty()) parts.push_back(part);
+                        if (comma == std::string::npos) break;
+                        start = comma + 1;
+                    }
+                    if (!parts.empty()) return parts;
+                } else {
+                    return {*quoted};
+                }
+            }
+            if (attr_key == "gene_id" && rec.gene_id) return {*rec.gene_id};
+            if (attr_key == "transcript_id" && rec.transcript_id) return {*rec.transcript_id};
+            if (attr_key == "ID" && rec.id) return {*rec.id};
+            if (attr_key == "Parent" && rec.parent_id) return {*rec.parent_id};
+        }
     }
 
     // The parsed attribute list next: it carries every value of a
-    // multi-value key.
+    // multi-value key (a bare `Parent=t1,t2` in a GTF file resolves here).
     const auto attrs = parse_attributes(rec.attr_raw);
     const auto it = attrs.find(attr_key);
     if (it != attrs.end() && !it->second.empty()) {
         return it->second;
     }
-    // GTF fallback for keys the parser did not synthesize (Name, biotype...):
-    // column 9 uses `key "value";` which parse_attributes cannot parse.
+    // Record fields (direct for GFF3 input).
+    if (attr_key == "gene_id" && rec.gene_id) return {*rec.gene_id};
+    if (attr_key == "transcript_id" && rec.transcript_id) return {*rec.transcript_id};
+    if (attr_key == "ID" && rec.id) return {*rec.id};
+    if (attr_key == "Parent" && rec.parent_id) return {*rec.parent_id};
+    // GTF fallback for keys the parser did not synthesize (Name, biotype...).
     if (auto quoted = extract_quoted_value(rec.attr_raw, attr_key)) {
         return {*quoted};
     }

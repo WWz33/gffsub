@@ -279,17 +279,16 @@ int parse_content(GffData& data, InputFormat format) {
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
                 rec.attr_raw = cols[8];
 
-                // Extract ID and Parent from col9. gene_id and transcript_id
-                // are GTF conventions but also appear in some GFF3 files, so
-                // they are only scanned when the key is present in col9 (quick
-                // substring check avoids a full col9 walk when absent).
                 // The `;`/`=` scan is GFF3-only: it is not quote-aware, so on
                 // GTF a quoted value containing "; Parent=..." would be read
-                // as a real Parent key. GTF col9 uses `key "value";` and goes
-                // through the quote-aware GTF parsers instead.
+                // as a real Parent key. GTF col9 goes through the quote-aware
+                // GTF parser instead, which accepts both `key "value";` and
+                // bare `key=value` fragments (mixed-format files).
                 if (format == InputFormat::GTF) {
                     rec.gene_id = extract_quoted_value(rec.attr_raw, "gene_id");
                     rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
+                    rec.id = extract_quoted_value(rec.attr_raw, "ID");
+                    rec.parent_id = extract_quoted_value(rec.attr_raw, "Parent");
                 } else {
                     rec.id = extract_attr_value(rec.attr_raw, "ID");
                     rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");

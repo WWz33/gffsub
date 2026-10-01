@@ -62,11 +62,17 @@ void emit_gtf_fragment(std::string_view frag,
 
     const auto q1 = frag.find('"');
     if (q1 == std::string_view::npos) {
-        // Bare `key value` form.
+        // Bare form: `key value` (non-standard GTF from some tools) or
+        // GFF3-style `key=value`. Cut at whichever separator comes first so
+        // `ID=e1` does not fall through the "key without a value" drop.
         const auto sp = frag.find_first_of(" \t");
-        if (sp == std::string_view::npos) return;  // key without a value
-        const auto key = trim_view(frag.substr(0, sp));
-        const auto value = trim_view(frag.substr(sp));
+        const auto eq = frag.find('=');
+        size_t cut = std::string_view::npos;
+        if (sp != std::string_view::npos) cut = sp;
+        if (eq != std::string_view::npos && (cut == std::string_view::npos || eq < cut)) cut = eq;
+        if (cut == std::string_view::npos) return;  // key without a value
+        const auto key = trim_view(frag.substr(0, cut));
+        const auto value = trim_view(frag.substr(cut + (cut == eq ? 1 : 0)));
         if (key.empty() || value.empty()) return;
         out.emplace_back(std::string{key}, std::string{value});
         return;
@@ -150,8 +156,11 @@ std::string gtf_attrs_to_gff3(const GffRecord& rec) {
     // Convert the remaining `key "value";` pairs to key=value.
     // Skip gene_id and transcript_id — they were synthesized into ID=/Parent=
     // above and must not be re-emitted (AGAT replaces them with Parent=).
+    // Skip a bare ID/Parent fragment too: it produced the synthesized value,
+    // and re-emitting it duplicates the pair above.
     for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-        if (key == "gene_id" || key == "transcript_id") {
+        if (key == "gene_id" || key == "transcript_id" ||
+            key == "ID" || key == "Parent") {
             continue;
         }
         parts.push_back(url_escape(key) + "=" + url_escape(value));

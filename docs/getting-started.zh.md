@@ -69,6 +69,49 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 ./gffsub demo.gff3 --longest
 ```
 
+## 长命令
+
+一行一个阶段。selector 挑行，`--longest`/`--drop-orphans` 整理层级，`--format` 在输出时转换格式。
+
+蛋白编码品系，每 gene 一个 isoform，完整 model，输出 GTF：
+
+```bash
+./gffsub ann.gff3 -w biotype=protein_coding -L -m -f gtf -o coding.gtf
+```
+
+`-w` 保留 gene 行；`-m` 把选中的 gene 重新展开成完整 model，transcript 得以在
+`--longest` 中参与竞争。
+
+区域去掉重复区，层级清理：
+
+```bash
+./gffsub ann.gff3 -S chr1 --exclude-region chr1:500000-800000 --drop-orphans
+```
+
+按列表取 gene，只留 model，精简第 9 列：
+
+```bash
+./gffsub ann.gff3 --ids genes.txt -m --out-attrs Name,biotype
+```
+
+离某个位点最近的 gene 及其 model：
+
+```bash
+./gffsub ann.gff3 -N chr1:1000000-1000500 -m
+```
+
+排序、gzip 输入、BED 输出：
+
+```bash
+./gffsub ann.gff3.gz -k seqid,natural-seqid,start -t gene -f bed
+```
+
+各阶段也可通过 stdin 串接：
+
+```bash
+./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
+```
+
 ## 命令结构
 
 ```

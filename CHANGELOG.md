@@ -28,6 +28,10 @@ All notable changes to gffsub are documented in this file. The format follows
   filtered out of GFF3 output
 
 ### Fixed
+- GTF col9 mixing quoted keys with bare GFF3-style `ID=x;Parent=y` keys
+  resolves the bare keys again: the quote-aware GTF parser accepts the
+  `key=value` bare form, and ID/Parent are read through it; a bare
+  multi-value `Parent=t1,t2` matches per value in `-I`/`-E`/`--grep`
 - GTF: `; Key=value` inside a quoted attribute value is no longer read as a
   real attribute; the hierarchy fields (ID/Parent/gene_id/transcript_id) of
   GTF records come from the quote-aware GTF parsers, and `-I`/`-E`/`--grep`

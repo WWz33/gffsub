@@ -185,6 +185,18 @@ static bool write_cds_overflow(const std::string& path) {
     return true;
 }
 
+// GTF col9 carrying both quoted GTF keys and bare GFF3-style keys.
+static bool write_gtf_mixed_keys(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "chr1\tsrc\tgene\t1\t1000\t.\t+\t.\tgene_id \"G1\"; ID=g1;\n"
+        << "chr1\tsrc\ttranscript\t1\t1000\t.\t+\t.\t"
+           "gene_id \"G1\"; transcript_id \"T1\"; ID=t1;Parent=g1;\n"
+        << "chr1\tsrc\texon\t100\t200\t.\t+\t.\t"
+           "gene_id \"G1\"; transcript_id \"T1\"; ID=e1;Parent=t1,t2;\n";
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Output cleanup
 // ---------------------------------------------------------------------------
@@ -199,6 +211,7 @@ static void cleanup_outputs() {
         "regression_spaced.gff3", "regression_parent_list.gff3",
         "regression_tiny.gff3", "regression_tiny.gff3.gz",
         "regression_gtf_quoted.gtf", "regression_cds_overflow.gff3",
+        "regression_gtf_mixed.gtf",
         "reg_gtf_children.gff3", "reg_gtf_model.gff3",
         "reg_gtf_unsorted_id.gff3", "reg_gtf_out.gtf",
         "reg_gtf3_rename.gff3",
@@ -215,6 +228,7 @@ static void cleanup_outputs() {
         "reg_query_empty.err",
         "reg_gtf_quoted.gff3", "reg_gtf_quoted_expr.gff3",
         "reg_gtf_quoted_grep.gff3", "reg_sat_sum.gff3",
+        "reg_mixed_id.gff3", "reg_mixed_children.gff3", "reg_mixed_expr.gff3",
         "reg_gtf_summary.tsv", "reg_gene_summary.tsv",
         "reg_json.json", "reg_json_quote.json",
         "reg_err_missing.err", "reg_err_up.err", "reg_err_threads.err",
@@ -543,6 +557,27 @@ static int test_longest_sum_saturation(const std::string& exe, const std::string
     return 0;
 }
 
+// Group 18: GTF col9 with both quoted GTF keys and bare GFF3-style keys.
+// The bare keys must resolve through the quote-aware parser: IDs select,
+// and a bare multi-value Parent matches per value.
+static int test_gtf_mixed_keys(const std::string& exe, const std::string& gtf) {
+    if (run_command(exe + " " + gtf + " --id e1 > reg_mixed_id.gff3") != 0 ||
+        require_contains("reg_mixed_id.gff3", "exon\t100\t200") != 0 ||
+        require_contains("reg_mixed_id.gff3", "ID=e1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gtf + " --id g1 -C > reg_mixed_children.gff3") != 0 ||
+        require_contains("reg_mixed_children.gff3", "ID=t1") != 0 ||
+        require_contains("reg_mixed_children.gff3", "ID=e1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gtf + " -I 'Parent == t2' > reg_mixed_expr.gff3") != 0 ||
+        require_contains("reg_mixed_expr.gff3", "exon\t100\t200") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -568,6 +603,7 @@ int main(int argc, char* argv[]) {
     const std::string tiny{"regression_tiny.gff3"};
     const std::string gtf_quoted{"regression_gtf_quoted.gtf"};
     const std::string cds_overflow{"regression_cds_overflow.gff3"};
+    const std::string gtf_mixed{"regression_gtf_mixed.gtf"};
 
     if (!write_gtf_basic(gtf_basic) || !write_gtf_unsorted(gtf_unsorted) ||
         !write_gtf_mrna(gtf_mrna) || !write_multi_parent(multi) ||
@@ -576,7 +612,7 @@ int main(int argc, char* argv[]) {
         !write_cds_variants(cds_variants) || !write_flat_gtf_isoforms(flat_gtf) ||
         !write_spaced_separators(spaced) || !write_parent_list(parent_list) ||
         !write_tiny_gff3(tiny) || !write_gtf_quoted_parent(gtf_quoted) ||
-        !write_cds_overflow(cds_overflow)) {
+        !write_cds_overflow(cds_overflow) || !write_gtf_mixed_keys(gtf_mixed)) {
         std::cerr << "cannot write regression fixtures\n";
         cleanup_outputs();
         return 1;
@@ -647,6 +683,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_longest_sum_saturation(exe, cds_overflow) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_gtf_mixed_keys(exe, gtf_mixed) != 0) {
         cleanup_outputs();
         return 1;
     }
