@@ -160,6 +160,31 @@ static bool write_tiny_gff3(const std::string& path) {
     return true;
 }
 
+// GTF with `; Parent=...` inside a quoted value: the naive `;`/`=` scan must
+// not read it as a real Parent key.
+static bool write_gtf_quoted_parent(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "chr1\tsrc\texon\t100\t200\t.\t+\t.\t"
+           "gene_id \"G1\"; transcript_id \"T1\"; note \"see; Parent=bad\";\n";
+    return true;
+}
+
+// Transcript with two huge CDS segments whose naive sum would wrap negative
+// and lose against a 10 bp rival.
+static bool write_cds_overflow(const std::string& path) {
+    std::ofstream out{path};
+    if (!out.is_open()) return false;
+    out << "##gff-version 3\n"
+        << "chr1\ts\tgene\t1\t9223372036854775807\t.\t+\t.\tID=g\n"
+        << "chr1\ts\tmRNA\t1\t9223372036854775807\t.\t+\t.\tID=big;Parent=g\n"
+        << "chr1\ts\tCDS\t1\t4611686018427387905\t.\t+\t0\tID=c1;Parent=big\n"
+        << "chr1\ts\tCDS\t1\t4611686018427387905\t.\t+\t0\tID=c2;Parent=big\n"
+        << "chr1\ts\tmRNA\t1\t100\t.\t+\t.\tID=small;Parent=g\n"
+        << "chr1\ts\tCDS\t1\t10\t.\t+\t0\tID=cs;Parent=small\n";
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Output cleanup
 // ---------------------------------------------------------------------------
@@ -173,6 +198,7 @@ static void cleanup_outputs() {
         "regression_cds_variants.gff3", "regression_flat.gtf",
         "regression_spaced.gff3", "regression_parent_list.gff3",
         "regression_tiny.gff3", "regression_tiny.gff3.gz",
+        "regression_gtf_quoted.gtf", "regression_cds_overflow.gff3",
         "reg_gtf_children.gff3", "reg_gtf_model.gff3",
         "reg_gtf_unsorted_id.gff3", "reg_gtf_out.gtf",
         "reg_gtf3_rename.gff3",
@@ -187,6 +213,8 @@ static void cleanup_outputs() {
         "reg_parent_grep.gff3", "reg_tiny_plain.gff3", "reg_tiny_gz.gff3",
         "reg_max_down.gff3", "reg_bad_sep.err", "reg_bad_region.err",
         "reg_query_empty.err",
+        "reg_gtf_quoted.gff3", "reg_gtf_quoted_expr.gff3",
+        "reg_gtf_quoted_grep.gff3", "reg_sat_sum.gff3",
         "reg_gtf_summary.tsv", "reg_gene_summary.tsv",
         "reg_json.json", "reg_json_quote.json",
         "reg_err_missing.err", "reg_err_up.err", "reg_err_threads.err",
@@ -485,6 +513,36 @@ static int test_cli_edge_cases(const std::string& exe, const std::string& tiny) 
     return 0;
 }
 
+// Group 16: `; Key=value` inside a GTF quoted value is data, not an
+// attribute. The synthesized hierarchy fields must come from the real
+// gene_id/transcript_id keys.
+static int test_gtf_quoted_value(const std::string& exe, const std::string& gtf) {
+    if (run_command(exe + " " + gtf + " > reg_gtf_quoted.gff3") != 0 ||
+        require_contains("reg_gtf_quoted.gff3", "Parent=T1") != 0 ||
+        require_contains("reg_gtf_quoted.gff3", "note=see%3B Parent%3Dbad") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gtf + " -I 'Parent == T1' > reg_gtf_quoted_expr.gff3") != 0 ||
+        require_contains("reg_gtf_quoted_expr.gff3", "exon\t100\t200") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " " + gtf + " --grep Parent:T1 > reg_gtf_quoted_grep.gff3") != 0 ||
+        require_contains("reg_gtf_quoted_grep.gff3", "exon\t100\t200") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Group 17: --longest segment sums saturate instead of wrapping negative.
+static int test_longest_sum_saturation(const std::string& exe, const std::string& gff) {
+    if (run_command(exe + " " + gff + " --longest > reg_sat_sum.gff3") != 0 ||
+        require_contains("reg_sat_sum.gff3", "ID=big") != 0 ||
+        require_not_contains("reg_sat_sum.gff3", "ID=small") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -508,6 +566,8 @@ int main(int argc, char* argv[]) {
     const std::string spaced{"regression_spaced.gff3"};
     const std::string parent_list{"regression_parent_list.gff3"};
     const std::string tiny{"regression_tiny.gff3"};
+    const std::string gtf_quoted{"regression_gtf_quoted.gtf"};
+    const std::string cds_overflow{"regression_cds_overflow.gff3"};
 
     if (!write_gtf_basic(gtf_basic) || !write_gtf_unsorted(gtf_unsorted) ||
         !write_gtf_mrna(gtf_mrna) || !write_multi_parent(multi) ||
@@ -515,7 +575,8 @@ int main(int argc, char* argv[]) {
         !write_url_encoded(url) || !write_quote_attr(quote) ||
         !write_cds_variants(cds_variants) || !write_flat_gtf_isoforms(flat_gtf) ||
         !write_spaced_separators(spaced) || !write_parent_list(parent_list) ||
-        !write_tiny_gff3(tiny)) {
+        !write_tiny_gff3(tiny) || !write_gtf_quoted_parent(gtf_quoted) ||
+        !write_cds_overflow(cds_overflow)) {
         std::cerr << "cannot write regression fixtures\n";
         cleanup_outputs();
         return 1;
@@ -578,6 +639,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_cli_edge_cases(exe, tiny) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_gtf_quoted_value(exe, gtf_quoted) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_longest_sum_saturation(exe, cds_overflow) != 0) {
         cleanup_outputs();
         return 1;
     }

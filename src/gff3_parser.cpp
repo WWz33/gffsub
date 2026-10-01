@@ -283,17 +283,26 @@ int parse_content(GffData& data, InputFormat format) {
                 // are GTF conventions but also appear in some GFF3 files, so
                 // they are only scanned when the key is present in col9 (quick
                 // substring check avoids a full col9 walk when absent).
-                rec.id = extract_attr_value(rec.attr_raw, "ID");
-                rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");
-                if (rec.attr_raw.find("gene_id=") != std::string::npos) {
-                    rec.gene_id = extract_attr_value(rec.attr_raw, "gene_id");
+                // The `;`/`=` scan is GFF3-only: it is not quote-aware, so on
+                // GTF a quoted value containing "; Parent=..." would be read
+                // as a real Parent key. GTF col9 uses `key "value";` and goes
+                // through the quote-aware GTF parsers instead.
+                if (format == InputFormat::GTF) {
+                    rec.gene_id = extract_quoted_value(rec.attr_raw, "gene_id");
+                    rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
+                } else {
+                    rec.id = extract_attr_value(rec.attr_raw, "ID");
+                    rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");
+                    if (rec.attr_raw.find("gene_id=") != std::string::npos) {
+                        rec.gene_id = extract_attr_value(rec.attr_raw, "gene_id");
+                    }
+                    if (rec.attr_raw.find("transcript_id=") != std::string::npos) {
+                        rec.transcript_id = extract_attr_value(rec.attr_raw, "transcript_id");
+                    }
+                    // Multi-parent Parent=tx1,tx2: extract_attr_value already keeps
+                    // only the first raw comma part; the index builds the full list
+                    // from parse_attributes.
                 }
-                if (rec.attr_raw.find("transcript_id=") != std::string::npos) {
-                    rec.transcript_id = extract_attr_value(rec.attr_raw, "transcript_id");
-                }
-                // Multi-parent Parent=tx1,tx2: extract_attr_value already keeps
-                // only the first raw comma part; the index builds the full list
-                // from parse_attributes.
 
                 if (format == InputFormat::GTF) {
                     apply_gtf_attributes(rec);

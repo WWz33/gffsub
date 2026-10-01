@@ -64,23 +64,28 @@ std::vector<std::string> record_field_values(const GffRecord& rec, std::string_v
         return {};
     }
 
-    // The parsed attribute list first: it carries every value of a
-    // multi-value key, and for GTF input parse_attributes finds nothing, so
-    // the synthesized record fields below stay reachable.
+    // For GTF, the synthesized record fields are authoritative: parse_attributes
+    // splits on `;`/`=` without quote awareness, so a quoted value containing
+    // "; Parent=..." would be misread as a real Parent entry. Check them
+    // before the attribute map. (GFF3 attr_raw never uses `key "value"`.)
+    if (rec.src_fmt == InputFormat::GTF) {
+        std::vector<std::string> rec_values;
+        if (attr_key == "gene_id" && rec.gene_id) rec_values = {*rec.gene_id};
+        else if (attr_key == "transcript_id" && rec.transcript_id) rec_values = {*rec.transcript_id};
+        else if (attr_key == "ID" && rec.id) rec_values = {*rec.id};
+        else if (attr_key == "Parent" && rec.parent_id) rec_values = {*rec.parent_id};
+        if (!rec_values.empty()) return rec_values;
+    }
+
+    // The parsed attribute list next: it carries every value of a
+    // multi-value key.
     const auto attrs = parse_attributes(rec.attr_raw);
     const auto it = attrs.find(attr_key);
     if (it != attrs.end() && !it->second.empty()) {
         return it->second;
     }
-    // GTF input: gene_id/transcript_id/ID/Parent are synthesized by the
-    // parser into rec fields but parse_attributes cannot parse GTF's
-    // key "value"; format. Check the rec fields next.
-    if (attr_key == "gene_id" && rec.gene_id) return {*rec.gene_id};
-    if (attr_key == "transcript_id" && rec.transcript_id) return {*rec.transcript_id};
-    if (attr_key == "ID" && rec.id) return {*rec.id};
-    if (attr_key == "Parent" && rec.parent_id) return {*rec.parent_id};
-    // GTF fallback: column 9 uses `key "value";` which parse_attributes cannot
-    // parse. GFF3 attr_raw never matches that form, so this is format-agnostic.
+    // GTF fallback for keys the parser did not synthesize (Name, biotype...):
+    // column 9 uses `key "value";` which parse_attributes cannot parse.
     if (auto quoted = extract_quoted_value(rec.attr_raw, attr_key)) {
         return {*quoted};
     }

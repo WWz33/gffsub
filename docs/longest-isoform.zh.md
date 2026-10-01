@@ -60,7 +60,7 @@ chr2	src	exon	450	600	.	-	.	ID=ex05;Parent=tx03
 
 ## -@ / --threads
 
-按染色体并行。默认 1，最大 256。
+按染色体并行。默认 6，最大 256。
 
 ```bash
 ./gffsub demo.gff3 --longest --threads 4

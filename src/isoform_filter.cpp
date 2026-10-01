@@ -3,6 +3,7 @@
 #include "record.hpp"
 #include <algorithm>
 #include <future>
+#include <limits>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -168,6 +169,13 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
 
             int64_t len = 0;
             bool found = false;
+            // Segment lengths are int64 and summed without clamping, so a
+            // pathological record near the coordinate limit must saturate
+            // instead of wrapping negative and beating every real isoform.
+            constexpr int64_t kLenMax = std::numeric_limits<int64_t>::max();
+            const auto add_segment = [&](int64_t seg) {
+                len = (seg > kLenMax - len) ? kLenMax : len + seg;
+            };
 
             if (gene_has_cds) {
                 // CDS length is the sum of every CDS segment under the
@@ -178,7 +186,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
                 for (int child_idx : child_it->second) {
                     const auto& child = data.records[child_idx];
                     if (child.feat_class == FeatureClass::CDS) {
-                        len += child.end - child.start + 1;
+                        add_segment(child.end - child.start + 1);
                     }
                 }
                 if (len == 0) continue; // isoform without CDS is skipped
@@ -186,7 +194,7 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
                 for (int child_idx : child_it->second) {
                     const auto& child = data.records[child_idx];
                     if (child.feat_class == FeatureClass::Exon) {
-                        len += child.end - child.start + 1;
+                        add_segment(child.end - child.start + 1);
                         found = true;
                     }
                 }

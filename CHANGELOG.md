@@ -28,6 +28,12 @@ All notable changes to gffsub are documented in this file. The format follows
   filtered out of GFF3 output
 
 ### Fixed
+- GTF: `; Key=value` inside a quoted attribute value is no longer read as a
+  real attribute; the hierarchy fields (ID/Parent/gene_id/transcript_id) of
+  GTF records come from the quote-aware GTF parsers, and `-I`/`-E`/`--grep`
+  prefer the record fields on GTF input
+- `--longest` saturates the CDS/exon segment sum so transcripts near the
+  coordinate limit cannot wrap negative and lose to a shorter isoform
 - GFF3 attributes after `; ` keep their `Parent`/`gene_id`/`transcript_id`
   values, so `--format gtf` no longer emits empty `gene_id ""`
 - `--longest` sums every CDS segment of a transcript; distinct CDS IDs under

@@ -60,7 +60,7 @@ Isoform type for `--longest` selection. Independent of `-t`: `--longest-type` pi
 
 ## -@ / --threads
 
-Parallelize by chromosome. Default 1, max 256.
+Parallelize by chromosome. Default 6, max 256.
 
 ```bash
 ./gffsub demo.gff3 --longest --threads 4
