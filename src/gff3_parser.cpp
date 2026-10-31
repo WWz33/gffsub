@@ -196,7 +196,6 @@ int parse_content(GffData& data, InputFormat format) {
                 }
 
                 if (format == InputFormat::GTF) {
-                    apply_gtf_attributes(rec);
                     // GTF has no ID=/Parent= attributes; synthesize from
                     // gene_id/transcript_id so the index can build parent/child links.
                     // Guard against empty-string optionals (e.g. Ensembl transcript_id "").

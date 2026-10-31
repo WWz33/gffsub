@@ -162,6 +162,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // --out-attrs has no column to apply to in BED output. Reject the
+    // combination instead of accepting and silently ignoring the flag.
+    if (expect_command_failure(exe + " " + gff + " -f bed --out-attrs Name > summary_bad.out 2> summary_bad.err") != 0 ||
+        require_contains("summary_bad.err", "--out-attrs cannot be used with BED output") != 0) {
+        return 1;
+    }
+
     cleanup_outputs();
     std::cout << "cli_output_attrs_smoke OK\n";
     return 0;

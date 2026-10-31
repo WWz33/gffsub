@@ -11,6 +11,7 @@
 #include <iostream>
 #include <iterator>
 #include <string>
+#include <sys/stat.h>
 #include <unordered_set>
 #include <vector>
 
@@ -470,6 +471,20 @@ int main(int argc, char* argv[]) {
     }
 
     // Output
+    // Opening the output truncates it. If it is the same file as a plain
+    // (mmap'd) input, Linux faults on pages past the new EOF before anything
+    // is printed. Reject the aliasing case: same dev/ino covers symlinks and
+    // hard links.
+    if (!a.output_file.empty() && a.input_file != "-") {
+        struct stat in_st{};
+        struct stat out_st{};
+        if (::stat(a.input_file.c_str(), &in_st) == 0 &&
+            ::stat(a.output_file.c_str(), &out_st) == 0 &&
+            in_st.st_dev == out_st.st_dev && in_st.st_ino == out_st.st_ino) {
+            std::cerr << "Error: input and output are the same file: " << a.input_file << '\n';
+            return 1;
+        }
+    }
     std::ofstream out_file;
     std::ostream* out = &std::cout;
     if (!a.output_file.empty()) {

@@ -20,7 +20,9 @@ std::optional<std::string> extract_quoted_value(std::string_view attrs, std::str
 }
 
 void apply_gtf_attributes(GffRecord& rec) {
-    // One pass over column 9; both keys come from the same parse.
+    // Callers that already extracted gene_id/transcript_id have nothing to
+    // fill here; kept as a public helper for library users that call it on a
+    // bare record. The parser does not call it (it would re-scan column 9).
     if (!rec.gene_id || !rec.transcript_id) {
         for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
             if (!rec.gene_id && key == "gene_id") {

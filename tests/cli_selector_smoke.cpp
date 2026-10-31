@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "test_utils.hpp"
 
@@ -81,6 +82,9 @@ static void cleanup_outputs() {
     std::remove("gz_file.gff3");
     std::remove("gz_stdin.gff3");
     std::remove("gz_fifo.gff3");
+    std::remove("selector_gz_trail.gz");
+    std::remove("gz_trail_file.gff3");
+    std::remove("gz_trail_stdin.gff3");
     std::remove("gz_trunc.out");
     std::remove("gz_trunc.err");
     std::remove("window_bad.out");
@@ -1182,6 +1186,16 @@ int main(int argc, char* argv[]) {
         if (expect_command_failure("gzip -c " + gff + " | head -c 40 | " + exe +
                                    " - > gz_trunc.out 2> gz_trunc.err") != 0 ||
             require_contains("gz_trunc.err", "Error:") != 0) {
+            return 1;
+        }
+        // Bytes after the last member are ignored by gzread. The stdin path
+        // must agree with the file path instead of trying to parse them.
+        if (run_command("cp selector_gz_probe.gz selector_gz_trail.gz") != 0 ||
+            run_command("head -c 4 /dev/zero >> selector_gz_trail.gz") != 0 ||
+            run_command(exe + " selector_gz_trail.gz > gz_trail_file.gff3") != 0 ||
+            run_command("cat selector_gz_trail.gz | " + exe + " - > gz_trail_stdin.gff3") != 0 ||
+            compare_files("gz_ref.gff3", "gz_trail_file.gff3") != 0 ||
+            compare_files("gz_ref.gff3", "gz_trail_stdin.gff3") != 0) {
             return 1;
         }
     }

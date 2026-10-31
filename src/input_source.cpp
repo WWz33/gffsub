@@ -74,8 +74,17 @@ bool inflate_memory(std::string_view in, std::string& out) {
             result.append(buf, sizeof(buf) - strm.avail_out);
         }
         if (ret == Z_STREAM_END) {
-            if (strm.avail_in == 0 && consumed >= in.size()) break;
-            // Concatenated members: rewind for the next gzip header.
+            // A member may be followed by another (cat a.gz b.gz) or by
+            // trailing bytes (padded archive, junk). gzread ignores the
+            // latter, so the in-memory path must too; only a real gzip magic
+            // starts another member. A truncated next member still fails on
+            // the next loop (no input before Z_STREAM_END).
+            const auto byte_at = [&](size_t i) -> int {
+                if (i < strm.avail_in) return strm.next_in[i];
+                const size_t pos = consumed + (i - strm.avail_in);
+                return pos < in.size() ? static_cast<unsigned char>(in[pos]) : -1;
+            };
+            if (byte_at(0) != 0x1f || byte_at(1) != 0x8b) break;
             if (inflateReset2(&strm, 15 + 16) != Z_OK) {
                 inflateEnd(&strm);
                 return false;
@@ -264,9 +273,12 @@ InputFormat sniff_format(const std::string& path) {
 
 int load_input(const std::string& filename, GffData& data, InputFormat& format) {
     // Probe for gzip only on regular files: reading a FIFO/pipe here would
-    // consume bytes the later streaming read cannot recover.
+    // consume bytes the later streaming read cannot recover. A directory
+    // would open and read zero bytes, which looks like an empty annotation.
     struct stat pst{};
-    const bool regular = (::stat(filename.c_str(), &pst) == 0) && S_ISREG(pst.st_mode);
+    const bool stat_ok = (::stat(filename.c_str(), &pst) == 0);
+    if (stat_ok && S_ISDIR(pst.st_mode)) return -1;
+    const bool regular = stat_ok && S_ISREG(pst.st_mode);
     std::ifstream probe(filename, std::ios::binary);
     if (!probe.is_open()) return -1;
     unsigned char magic[2] = {0, 0};

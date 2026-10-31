@@ -3,6 +3,7 @@
 #include "string_utils.hpp"
 
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <getopt.h>
 #include <fstream>
@@ -513,6 +514,11 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
     if (!args.longest_type.empty() && !args.do_longest) {
         std::cerr << "Error: --longest-type requires --longest\n";
+        return std::nullopt;
+    }
+
+    if (args.format == OutputFormat::BED && !args.out_attrs.empty()) {
+        std::cerr << "Error: --out-attrs cannot be used with BED output\n";
         return std::nullopt;
     }
 

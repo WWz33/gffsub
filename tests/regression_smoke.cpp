@@ -273,7 +273,10 @@ static void cleanup_outputs() {
         "reg_spec_version.gff3", "reg_spec_version.out",
         "reg_spec_phase.gff3", "reg_spec_phase.out", "reg_spec_phase.err",
         "reg_spec_multiparent.gff3", "reg_spec_multiparent.out",
-        "reg_spec_cycle.gff3", "reg_spec_cycle.out", "reg_spec_cycle.err"};
+        "reg_spec_cycle.gff3", "reg_spec_cycle.out", "reg_spec_cycle.err",
+        "reg_same.gff3", "reg_same.out", "reg_same.err",
+        "reg_dir.out", "reg_dir.err"};
+    std::system("rmdir reg_dir_input 2>/dev/null");
     for (const char* f : files) std::remove(f);
 }
 
@@ -796,6 +799,31 @@ static int spec_parent_cycle(const std::string& exe) {
     return 0;
 }
 
+// File-vs-file aliasing and non-file inputs: both used to be accepted and
+// produce destroyed or empty output.
+static int test_io_guards(const std::string& exe) {
+    const std::string same{"reg_same.gff3"};
+    {
+        std::ofstream out{same};
+        if (!out.is_open()) return 1;
+        out << "##gff-version 3\n"
+            << "chr1\tsrc\tgene\t1\t9\t.\t+\t.\tID=x\n";
+    }
+    if (expect_command_failure(exe + " " + same + " -o " + same +
+                               " > reg_same.out 2> reg_same.err") != 0 ||
+        require_contains("reg_same.err", "same file") != 0 ||
+        require_contains(same, "ID=x") != 0) {
+        return 1;
+    }
+    if (run_command("mkdir -p reg_dir_input") != 0 ||
+        expect_command_failure(exe + " reg_dir_input > reg_dir.out 2> reg_dir.err") != 0 ||
+        require_contains("reg_dir.err", "cannot parse") != 0) {
+        return 1;
+    }
+    run_command("rmdir reg_dir_input");
+    return 0;
+}
+
 static int test_spec_conformance(const std::string& exe) {
     return spec_quoted_gff3(exe) || spec_gtf_trailing_comment(exe) ||
            spec_gtf_escape_roundtrip(exe) || spec_comma_scope(exe) ||
@@ -908,6 +936,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_cli_edge_cases(exe, tiny) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_io_guards(exe) != 0) {
         cleanup_outputs();
         return 1;
     }
