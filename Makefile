@@ -15,6 +15,7 @@ LIB_SRCS = src/feature_types.cpp \
        src/attributes.cpp \
        src/annotation_index.cpp \
        src/gff3_parser.cpp \
+       src/input_source.cpp \
        src/region.cpp \
        src/annotation_filter.cpp \
        src/isoform_filter.cpp \
@@ -38,6 +39,7 @@ HDRS = src/annotation.hpp \
        src/filter.hpp \
        src/gff3.hpp \
        src/gtf_parser.hpp \
+       src/input_source.hpp \
        src/output.hpp \
        src/parser.hpp \
        src/query.hpp \
@@ -78,8 +80,8 @@ $(TARGET): $(CLI_OBJS) $(LIB)
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp $(LDLIBS)
+$(ANNOTATION_INDEX_SMOKE): tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp src/input_source.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/annotation_index_smoke.cpp src/feature_types.cpp src/string_utils.cpp src/attributes.cpp src/annotation_index.cpp src/gff3_parser.cpp src/gtf_parser.cpp src/region.cpp src/record.cpp src/input_source.cpp $(LDLIBS)
 
 $(CLI_OUTPUT_ATTRS_SMOKE): tests/cli_output_attrs_smoke.cpp tests/test_utils.hpp
 	$(CXX) $(CXXFLAGS) -o $@ tests/cli_output_attrs_smoke.cpp
