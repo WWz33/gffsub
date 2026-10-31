@@ -490,8 +490,9 @@ int main(int argc, char* argv[]) {
     } else {
         switch (a.format) {
             case OutputFormat::GFF3: print_gff3(*out, data, a.out_attrs); break;
-            case OutputFormat::GTF2: print_gtf(*out, data, a.format, a.out_attrs); break;
-            case OutputFormat::GTF3: print_gtf3(*out, data, a.out_attrs); break;
+            case OutputFormat::GTF3:
+            case OutputFormat::GTF25:
+            case OutputFormat::GTF22: print_gtf(*out, data, a.format, a.out_attrs); break;
             case OutputFormat::BED:  print_bed(*out, data); break;
         }
     }

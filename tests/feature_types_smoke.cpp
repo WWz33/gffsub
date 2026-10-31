@@ -109,28 +109,32 @@ static void test_classify_unknown() {
 
 static void test_gtf_type_label_mrna() {
     CHECK(gtf_type_label("mRNA", OutputFormat::GTF3) == "transcript");
-    CHECK(gtf_type_label("mRNA", OutputFormat::GTF2) == "mRNA");
+    CHECK(gtf_type_label("mRNA", OutputFormat::GTF25) == "transcript");
+    CHECK(gtf_type_label("mRNA", OutputFormat::GTF22) == "mRNA");
     CHECK(gtf_type_label("mRNA", OutputFormat::GFF3) == "mRNA");
 }
 
 static void test_gtf_type_label_passthrough() {
     CHECK(gtf_type_label("exon", OutputFormat::GTF3) == "exon");
-    CHECK(gtf_type_label("CDS", OutputFormat::GTF2) == "CDS");
+    CHECK(gtf_type_label("CDS", OutputFormat::GTF22) == "CDS");
     CHECK(gtf_type_label("gene", OutputFormat::GTF3) == "gene");
     CHECK(gtf_type_label("miRNA", OutputFormat::GTF3) == "miRNA");
 }
 
 static void test_gtf_type_label_utr() {
-    // GTF3 normalizes UTR spellings
+    // GTF3 normalizes UTR spellings to five_prime_utr / three_prime_utr
     CHECK(gtf_type_label("five_prime_UTR", OutputFormat::GTF3) == "five_prime_utr");
     CHECK(gtf_type_label("three_prime_UTR", OutputFormat::GTF3) == "three_prime_utr");
     CHECK(gtf_type_label("5UTR", OutputFormat::GTF3) == "five_prime_utr");
     CHECK(gtf_type_label("3utr", OutputFormat::GTF3) == "three_prime_utr");
-    // GTF2 uses 5UTR/3UTR form
-    CHECK(gtf_type_label("five_prime_UTR", OutputFormat::GTF2) == "5UTR");
-    CHECK(gtf_type_label("three_prime_utr", OutputFormat::GTF2) == "3UTR");
-    CHECK(gtf_type_label("5UTR", OutputFormat::GTF2) == "5UTR");
-    // Plain UTR stays as-is (can't determine 5' or 3')
+    // GTF2.5 collapses both to UTR
+    CHECK(gtf_type_label("five_prime_UTR", OutputFormat::GTF25) == "UTR");
+    CHECK(gtf_type_label("three_prime_utr", OutputFormat::GTF25) == "UTR");
+    // GTF2.2 uses the 5UTR/3UTR form
+    CHECK(gtf_type_label("five_prime_UTR", OutputFormat::GTF22) == "5UTR");
+    CHECK(gtf_type_label("three_prime_utr", OutputFormat::GTF22) == "3UTR");
+    CHECK(gtf_type_label("5UTR", OutputFormat::GTF22) == "5UTR");
+    // Plain UTR stays as-is in GTF3 (can't determine 5' or 3')
     CHECK(gtf_type_label("UTR", OutputFormat::GTF3) == "UTR");
 }
 
@@ -146,19 +150,36 @@ static void test_gtf_type_emittable() {
     CHECK(gtf_type_emittable("CDS", OutputFormat::GTF3));
     CHECK(gtf_type_emittable("start_codon", OutputFormat::GTF3));
     CHECK(gtf_type_emittable("stop_codon", OutputFormat::GTF3));
-    CHECK(gtf_type_emittable("mRNA", OutputFormat::GTF3));
-    CHECK(gtf_type_emittable("five_prime_UTR", OutputFormat::GTF3));  // case-insensitive bug fix
+    CHECK(gtf_type_emittable("five_prime_UTR", OutputFormat::GTF3));  // case-insensitive
     CHECK(gtf_type_emittable("three_prime_utr", OutputFormat::GTF3));
     CHECK(gtf_type_emittable("Selenocysteine", OutputFormat::GTF3));
-    CHECK(gtf_type_emittable("inter", OutputFormat::GTF3));
-    CHECK(gtf_type_emittable("inter_CNS", OutputFormat::GTF3));
-    CHECK(gtf_type_emittable("intron_CNS", OutputFormat::GTF3));
     // Non-whitelisted types filtered
     CHECK(!gtf_type_emittable("miRNA", OutputFormat::GTF3));
     CHECK(!gtf_type_emittable("promoter", OutputFormat::GTF3));
     CHECK(!gtf_type_emittable("pseudogene", OutputFormat::GTF3));
-    // GTF2/GFF3/BED: passthrough
-    CHECK(gtf_type_emittable("miRNA", OutputFormat::GTF2));
+    CHECK(!gtf_type_emittable("inter", OutputFormat::GTF3));
+
+    // GTF2.5: gene/transcript kept, UTR collapsed, inter types dropped
+    CHECK(gtf_type_emittable("gene", OutputFormat::GTF25));
+    CHECK(gtf_type_emittable("transcript", OutputFormat::GTF25));
+    CHECK(gtf_type_emittable("UTR", OutputFormat::GTF25));
+    CHECK(!gtf_type_emittable("five_prime_utr", OutputFormat::GTF25));
+    CHECK(!gtf_type_emittable("inter", OutputFormat::GTF25));
+
+    // GTF2.2: no gene/transcript rows at all
+    CHECK(!gtf_type_emittable("gene", OutputFormat::GTF22));
+    CHECK(!gtf_type_emittable("transcript", OutputFormat::GTF22));
+    CHECK(!gtf_type_emittable("mRNA", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("exon", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("CDS", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("5UTR", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("3UTR", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("inter", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("inter_CNS", OutputFormat::GTF22));
+    CHECK(gtf_type_emittable("intron_CNS", OutputFormat::GTF22));
+    CHECK(!gtf_type_emittable("UTR", OutputFormat::GTF22));
+
+    // GFF3/BED: passthrough
     CHECK(gtf_type_emittable("anything", OutputFormat::GFF3));
     CHECK(gtf_type_emittable("anything", OutputFormat::BED));
 }

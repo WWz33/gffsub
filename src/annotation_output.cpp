@@ -204,11 +204,12 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
 
 void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
                const std::vector<std::string>& out_attrs) {
-    // GTF header per AGAT spec
-    if (fmt == OutputFormat::GTF3) {
-        out << "##gtf-version 2.2.1\n";
-    } else {
-        out << "##gtf-version 2\n";
+    // Header names the GTF flavor whose vocabulary the rows below use.
+    switch (fmt) {
+        case OutputFormat::GTF3:  out << "##gtf-version 3\n"; break;
+        case OutputFormat::GTF25: out << "##gtf-version 2.5\n"; break;
+        case OutputFormat::GTF22: out << "##gtf-version 2.2\n"; break;
+        default: break;
     }
     // Preserve ## directives from input (##sequence-region, ##species, etc.)
     // but skip ##gff-version / ##gtf-version — the header line above already
@@ -226,18 +227,37 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
     // A transcript ID defined twice with different parents is invalid input
     // (spec: IDs are unique); the last definition wins for every child, so
     // report it rather than hand out a silently wrong gene_id.
-    std::unordered_map<std::string, std::string> mRNA_to_gene;
+    //
+    // The emitted identifier prefers the record's gene_id / transcript_id
+    // attribute over its ID/Parent. Ensembl GFF3 labels genes `gene:gene-X`
+    // and carries the canonical `gene_id=gene-X` alongside, and GTF consumers
+    // expect the unprefixed form.
+    std::unordered_map<std::string, std::string> tx_label;   // transcript ID -> emitted transcript_id
+    std::unordered_map<std::string, std::string> gene_label; // gene ID -> emitted gene_id
+    std::unordered_map<std::string, std::string> tx_parent;  // transcript ID -> gene ID
     std::unordered_set<std::string> gene_ids;
+    // stop_codon intervals per transcript, used to trim the terminal CDS
+    // (GTF2.2: "the stop codon is not included in the CDS for the terminal
+    // exon"). Keyed by the Parent value as written on the stop_codon line.
+    std::unordered_map<std::string, std::vector<std::pair<int64_t, int64_t>>> stop_codons;
     for (const auto& rec : data) {
-        if ((rec.feat_class == FeatureClass::Transcript) && rec.parent_id && rec.id) {
-            const auto existing = mRNA_to_gene.find(*rec.id);
-            if (existing != mRNA_to_gene.end() && existing->second != *rec.parent_id) {
-                warn_duplicate_transcript_id(*rec.id);
+        if (rec.feat_class == FeatureClass::Transcript && rec.id) {
+            if (rec.parent_id) {
+                const auto existing = tx_parent.find(*rec.id);
+                if (existing != tx_parent.end() && existing->second != *rec.parent_id) {
+                    warn_duplicate_transcript_id(*rec.id);
+                }
+                tx_parent[*rec.id] = *rec.parent_id;
             }
-            mRNA_to_gene[*rec.id] = *rec.parent_id;
+            tx_label[*rec.id] = rec.transcript_id ? *rec.transcript_id : *rec.id;
         }
         if (rec.feat_class == FeatureClass::Gene && rec.id) {
             gene_ids.insert(*rec.id);
+            gene_label[*rec.id] = rec.gene_id ? *rec.gene_id : *rec.id;
+        }
+        if (rec.feat_class == FeatureClass::Unknown && rec.parent_id &&
+            to_lower(rec.type) == "stop_codon") {
+            stop_codons[*rec.parent_id].emplace_back(rec.start, rec.end);
         }
     }
 
@@ -249,9 +269,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
         // being normalized to "five_prime_utr".
         std::string gtf_type{gtf_type_label(rec.type, fmt)};
 
-        if (fmt == OutputFormat::GTF3) {
-            if (!gtf_type_emittable(gtf_type, fmt)) continue;
-        }
+        if (!gtf_type_emittable(gtf_type, fmt)) continue;
 
         const std::string score_str = rec.score_raw.empty() ? std::string{"."} : std::string{rec.score_raw};
 
@@ -260,51 +278,90 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
 
         if (rec.feat_class == FeatureClass::Gene) {
             if (rec.id) {
-                gene_id_val = *rec.id;
+                const auto it = gene_label.find(*rec.id);
+                gene_id_val = (it != gene_label.end()) ? it->second : *rec.id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
         } else if (rec.feat_class == FeatureClass::Transcript) {
-            if (rec.parent_id) {
-                gene_id_val = *rec.parent_id;
-            } else if (rec.gene_id) {
-                gene_id_val = *rec.gene_id;
-            }
             if (rec.id) {
-                transcript_id_val = *rec.id;
+                const auto it = tx_label.find(*rec.id);
+                transcript_id_val = (it != tx_label.end()) ? it->second : *rec.id;
             } else if (rec.transcript_id) {
                 transcript_id_val = *rec.transcript_id;
             }
-        } else {
-            // Child features
-            if (rec.parent_id && mRNA_to_gene.count(*rec.parent_id)) {
-                gene_id_val = mRNA_to_gene[*rec.parent_id];
-                transcript_id_val = *rec.parent_id;
-            } else if (rec.parent_id && gene_ids.count(*rec.parent_id)) {
-                // Parent is a gene (e.g. TF_binding_site): no transcript to
-                // reference — leave transcript_id empty per the inter/inter_CNS
-                // convention instead of fabricating one from the gene ID.
-                gene_id_val = *rec.parent_id;
-            } else if (rec.parent_id) {
-                // Parent unresolvable to a gene/transcript record in this file
-                // (flat GTF with only exon/CDS lines): trust the source's
-                // gene_id attribute over the parent ID.
-                gene_id_val = rec.gene_id ? *rec.gene_id : *rec.parent_id;
-                transcript_id_val = *rec.parent_id;
+            if (rec.parent_id) {
+                const auto it = gene_label.find(*rec.parent_id);
+                gene_id_val = (it != gene_label.end()) ? it->second : *rec.parent_id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
+        } else {
+            // Child features: the source's own gene_id/transcript_id attribute
+            // wins; otherwise resolve through the parent chain so the emitted
+            // IDs match the parent transcript/gene rows.
+            if (rec.gene_id) gene_id_val = *rec.gene_id;
+            if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
+            if (rec.parent_id) {
+                const auto tx = tx_label.find(*rec.parent_id);
+                if (tx != tx_label.end()) {
+                    if (transcript_id_val.empty()) transcript_id_val = tx->second;
+                    if (gene_id_val.empty()) {
+                        const auto tp = tx_parent.find(*rec.parent_id);
+                        if (tp != tx_parent.end()) {
+                            const auto g = gene_label.find(tp->second);
+                            gene_id_val = (g != gene_label.end()) ? g->second : tp->second;
+                        }
+                    }
+                } else if (gene_label.count(*rec.parent_id) || gene_ids.count(*rec.parent_id)) {
+                    // Parent is a gene (e.g. TF_binding_site): no transcript to
+                    // reference — leave transcript_id empty per the
+                    // inter/inter_CNS convention instead of inventing one.
+                    if (gene_id_val.empty()) {
+                        const auto g = gene_label.find(*rec.parent_id);
+                        gene_id_val = (g != gene_label.end()) ? g->second : *rec.parent_id;
+                    }
+                } else {
+                    // Parent unresolvable to a gene/transcript record in this
+                    // file (flat GTF with only exon/CDS lines): trust the
+                    // parent ID as the transcript.
+                    if (transcript_id_val.empty()) transcript_id_val = *rec.parent_id;
+                    if (gene_id_val.empty()) gene_id_val = *rec.parent_id;
+                }
+            }
         }
 
-        // GTF2.2 requires gene_id on every feature line. When it cannot be
+        // GTF2.2: gene_id required on every feature line. When it cannot be
         // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
         // convention rather than dropping the feature silently.
         std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
                                             rec.feat_class == FeatureClass::Gene, rec,
                                             out_attrs);
 
+        // GTF excludes the stop codon from the terminal CDS. Trim only when
+        // the stop_codon sits hard against the CDS 3' end of the same
+        // transcript, so partially overlapping or shifted annotations pass
+        // through untouched.
+        int64_t start = rec.start;
+        int64_t end = rec.end;
+        if (rec.feat_class == FeatureClass::CDS && rec.parent_id) {
+            const auto it = stop_codons.find(*rec.parent_id);
+            if (it != stop_codons.end()) {
+                for (const auto& [stop_start, stop_end] : it->second) {
+                    if (rec.strand == '+' && stop_end == rec.end && stop_start > rec.start) {
+                        end = stop_start - 1;
+                        break;
+                    }
+                    if (rec.strand == '-' && stop_start == rec.start && stop_end < rec.end) {
+                        start = stop_end + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
         out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
-            << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
+            << start << '\t' << end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << attrs << '\n';
     }
 }

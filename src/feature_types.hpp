@@ -6,7 +6,7 @@
 
 namespace gffsub {
 
-enum class OutputFormat { GFF3, GTF2, GTF3, BED };
+enum class OutputFormat { GFF3, GTF3, GTF25, GTF22, BED };
 enum class InputFormat { GFF3, GTF, BED };
 
 // Coarse biological class of a GFF/GTF feature type, derived once at parse
@@ -41,15 +41,23 @@ FeatureClass classify_type(std::string_view type);
 // (GFF3 spec: multiline features must have an ID).
 bool is_spread_feature(std::string_view type);
 
-// Resolve the GTF column-3 label for a feature type. GTF3 rewrites "mRNA" to
-// "transcript" and normalizes UTR spellings to five_prime_utr /
-// three_prime_utr. GTF2 normalizes UTR to 5UTR / 3UTR. Every other type
-// passes through unchanged.
+// Resolve the GTF column-3 label for a feature type. GTF3 (Ensembl release
+// 82+) rewrites "mRNA" to "transcript" and normalizes UTR spellings to
+// five_prime_utr / three_prime_utr. GTF2.5 (Ensembl release 75+) also renames
+// mRNA to transcript but collapses both UTRs to "UTR". GTF2.2 normalizes UTR
+// to 5UTR / 3UTR and keeps every other type; its whitelist drops the
+// transcript row. Every other type passes through unchanged.
 std::string_view gtf_type_label(std::string_view type, OutputFormat fmt);
 
-// Should this type survive into the given output format? GTF3: strict
-// whitelist (case-insensitive, so GFF3 "five_prime_UTR"/"CDS" match). GTF2:
-// passthrough. GFF3/BED: always true.
+// Should this type survive into the given output format? Each GTF flavor has
+// its own whitelist (case-insensitive, so GFF3 "five_prime_UTR"/"CDS" match):
+//   GTF3  gene, transcript, exon, CDS, start_codon, stop_codon,
+//         five_prime_utr, three_prime_utr, Selenocysteine
+//   GTF2.5 gene, transcript, exon, CDS, start_codon, stop_codon, UTR,
+//         Selenocysteine
+//   GTF2.2 CDS, start_codon, stop_codon, exon, 5UTR, 3UTR, inter, inter_CNS,
+//         intron_CNS (no gene/transcript rows: the spec has neither)
+// GFF3/BED: always true.
 bool gtf_type_emittable(std::string_view type, OutputFormat fmt);
 
 }  // namespace gffsub

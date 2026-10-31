@@ -304,11 +304,12 @@ static int test_gtf_no_id_collision(const std::string& exe, const std::string& g
 }
 
 // Group 3: GTF output. Gene line has NO transcript_id; transcript/exon have
-// both gene_id and transcript_id. --format gtf3 renames mRNA -> transcript.
+// both gene_id and transcript_id. --format gtf is the GTF3 vocabulary: mRNA
+// is renamed to transcript. --format gtf22 drops gene/transcript rows.
 static int test_gtf_output(const std::string& exe, const std::string& gtf_basic,
                            const std::string& gtf_mrna) {
     if (run_command(exe + " " + gtf_basic + " --name G1 --model --output-format gtf > reg_gtf_out.gtf") != 0 ||
-        require_contains("reg_gtf_out.gtf", "##gtf-version 2") != 0 ||
+        require_contains("reg_gtf_out.gtf", "##gtf-version 3") != 0 ||
         // Gene line: gene_id present, no transcript_id on the same line.
         require_contains("reg_gtf_out.gtf", "gene\t100\t500\t.\t+\t.\tgene_id \"G1\";") != 0 ||
         require_not_contains("reg_gtf_out.gtf", "gene\t100\t500\t.\t+\t.\tgene_id \"G1\"; transcript_id") != 0 ||
@@ -318,9 +319,18 @@ static int test_gtf_output(const std::string& exe, const std::string& gtf_basic,
         return 1;
     }
     if (run_command(exe + " " + gtf_mrna + " --id T1 -C --output-format gtf3 > reg_gtf3_rename.gff3") != 0 ||
-        require_contains("reg_gtf3_rename.gff3", "##gtf-version 2.2.1") != 0 ||
+        require_contains("reg_gtf3_rename.gff3", "##gtf-version 3") != 0 ||
         require_contains("reg_gtf3_rename.gff3", "transcript\t100\t500") != 0 ||
         require_not_contains("reg_gtf3_rename.gff3", "mRNA") != 0) {
+        return 1;
+    }
+    // GTF2.2 has no gene/transcript feature: only exon-level rows survive.
+    if (run_command(exe + " " + gtf_mrna + " --id T1 -C --output-format gtf22 > reg_gtf22.gtf") != 0 ||
+        require_contains("reg_gtf22.gtf", "##gtf-version 2.2") != 0 ||
+        require_not_contains("reg_gtf22.gtf", "\tgene\t") != 0 ||
+        require_not_contains("reg_gtf22.gtf", "\ttranscript\t") != 0 ||
+        require_not_contains("reg_gtf22.gtf", "\tmRNA\t") != 0 ||
+        require_contains("reg_gtf22.gtf", "exon\t") != 0) {
         return 1;
     }
     return 0;
@@ -511,11 +521,12 @@ static int test_longest_without_gene_rows(const std::string& exe, const std::str
 }
 
 // Group 13: `; ` separators. Parent resolves, so GTF output carries the whole
-// gene_id/transcript_id chain instead of empty values.
+// gene_id/transcript_id chain instead of empty values. --format gtf uses the
+// GTF3 vocabulary, so the mRNA row is relabelled "transcript".
 static int test_spaced_separators(const std::string& exe, const std::string& gff) {
     if (run_command(exe + " " + gff + " --output-format gtf > reg_spaced.gtf") != 0 ||
         require_contains("reg_spaced.gtf",
-                         "mRNA\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";") != 0 ||
+                         "transcript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";") != 0 ||
         require_contains("reg_spaced.gtf",
                          "exon\t1\t50\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";") != 0) {
         return 1;

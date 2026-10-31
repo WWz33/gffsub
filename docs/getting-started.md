@@ -39,59 +39,42 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 
 ## Examples
 
-Subset by region:
-
 ```bash
+# records overlapping chr1:200-600
 ./gffsub demo.gff3 -r chr1:200-600
-```
 
-Select by ID with children:
-
-```bash
+# tx01 plus its exons and CDS
 ./gffsub demo.gff3 -i tx01 -C
-```
 
-Filter by type:
-
-```bash
+# exon rows only
 ./gffsub demo.gff3 -t exon
-```
 
-Convert to GTF:
-
-```bash
+# GTF3 output
 ./gffsub demo.gff3 --format gtf
-```
 
-Longest isoform per gene:
-
-```bash
+# one transcript per gene
 ./gffsub demo.gff3 --longest
 ```
 
-## Longer commands
+Filters combine in one invocation. Against a full annotation file:
 
 ```bash
+# protein-coding genes, longest isoform, full gene model, GTF output
 ./gffsub ann.gff3 -w biotype=protein_coding -L -m -f gtf -o coding.gtf
-```
 
-```bash
+# chr1 outside chr1:500000-800000, no dangling Parent references
 ./gffsub ann.gff3 -S chr1 --exclude-region chr1:500000-800000 --drop-orphans
-```
 
-```bash
+# IDs from a file, full gene models, column 9 reduced to Name and biotype
 ./gffsub ann.gff3 --ids genes.txt -m --out-attrs Name,biotype
-```
 
-```bash
+# gene nearest to a 500 bp region, with its full model
 ./gffsub ann.gff3 -N chr1:1000000-1000500 -m
-```
 
-```bash
+# gzipped input, sorted by seqid then start, gene rows as BED
 ./gffsub ann.gff3.gz -k seqid,natural-seqid,start -t gene -f bed
-```
 
-```bash
+# second pass reads the first pass from stdin
 ./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
 ```
 

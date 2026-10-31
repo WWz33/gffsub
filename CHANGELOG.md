@@ -7,6 +7,20 @@ All notable changes to gffsub are documented in this file. The format follows
 ## [Unreleased]
 
 ### Added
+- `-f gtf25` (GTF2.5 vocabulary) and `-f gtf22` (GTF2.2
+  vocabulary: CDS, exon, start_codon, stop_codon, 5UTR, 3UTR, inter,
+  inter_CNS, intron_CNS; no gene or transcript rows)
+- `--format gtf` writes the GTF3 vocabulary (gene, transcript, exon, CDS,
+  start_codon, stop_codon, five_prime_utr, three_prime_utr, Selenocysteine);
+  `gtf3` is an alias for it. This is what Ensembl, GENCODE, StringTie,
+  featureCounts and ballgown exchange
+- GTF headers name the vocabulary: `##gtf-version 3`, `##gtf-version 2.5`,
+  `##gtf-version 2.2`
+- GTF `gene_id` / `transcript_id` prefer the column-9 attribute of that name
+  and fall back to `ID` / `Parent`, so Ensembl GFF3 `gene:` / `transcript:`
+  prefixes no longer reach the GTF output
+- GTF output trims the terminal CDS at its `stop_codon` when the codon abuts
+  the CDS 3' end of the same transcript
 - Region complement (`--exclude-region`) and BED complement (`-b ^FILE`)
 - Strand-aware BED overlap (`--same-strand`, `--opposite-strand`)
 - Orphan removal (`--drop-orphans`): drops records all of whose Parent

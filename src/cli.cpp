@@ -464,12 +464,16 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             case 'f': {
                 const std::string fmt_str = optarg;
                 if (fmt_str == "gff3") args.format = OutputFormat::GFF3;
-                else if (fmt_str == "gtf" || fmt_str == "gtf2") args.format = OutputFormat::GTF2;
-                else if (fmt_str == "gtf3") args.format = OutputFormat::GTF3;
+                // gtf and gtf3 are the same output: the GTF3 vocabulary is
+                // what Ensembl/GENCODE ship and what StringTie, featureCounts
+                // and ballgown read.
+                else if (fmt_str == "gtf" || fmt_str == "gtf3") args.format = OutputFormat::GTF3;
+                else if (fmt_str == "gtf25") args.format = OutputFormat::GTF25;
+                else if (fmt_str == "gtf22") args.format = OutputFormat::GTF22;
                 else if (fmt_str == "bed") args.format = OutputFormat::BED;
                 else {
                     std::cerr << "Error: unknown output format " << fmt_str << '\n'
-                              << "Supported formats: gff3, gtf2, gtf3, bed\n";
+                              << "Supported formats: gff3, gtf (gtf3), gtf25, gtf22, bed\n";
                     return std::nullopt;
                 }
                 break;

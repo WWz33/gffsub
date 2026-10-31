@@ -39,59 +39,42 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 
 ## 示例
 
-按 region 提取：
-
 ```bash
+# 与 chr1:200-600 重叠的记录
 ./gffsub demo.gff3 -r chr1:200-600
-```
 
-按 ID 选择并带子 feature：
-
-```bash
+# tx01 及其 exon、CDS
 ./gffsub demo.gff3 -i tx01 -C
-```
 
-按 feature 类型过滤：
-
-```bash
+# 仅 exon 行
 ./gffsub demo.gff3 -t exon
-```
 
-转 GTF：
-
-```bash
+# 输出 GTF3
 ./gffsub demo.gff3 --format gtf
-```
 
-每个 gene 取最长 isoform：
-
-```bash
+# 每个 gene 只留一个转录本
 ./gffsub demo.gff3 --longest
 ```
 
-## 长命令
+多个过滤条件写在同一次调用里。对完整注释文件：
 
 ```bash
+# 蛋白编码基因，最长 isoform，完整 gene 模型，输出 GTF
 ./gffsub ann.gff3 -w biotype=protein_coding -L -m -f gtf -o coding.gtf
-```
 
-```bash
+# chr1 去掉 chr1:500000-800000，输出不含悬空 Parent 引用
 ./gffsub ann.gff3 -S chr1 --exclude-region chr1:500000-800000 --drop-orphans
-```
 
-```bash
+# ID 来自文件，取完整 gene 模型，第 9 列只留 Name 和 biotype
 ./gffsub ann.gff3 --ids genes.txt -m --out-attrs Name,biotype
-```
 
-```bash
+# 距 500 bp 区间最近的 gene，取其完整模型
 ./gffsub ann.gff3 -N chr1:1000000-1000500 -m
-```
 
-```bash
+# gzip 输入，按 seqid 再按起点排序，gene 行输出 BED
 ./gffsub ann.gff3.gz -k seqid,natural-seqid,start -t gene -f bed
-```
 
-```bash
+# 第二遍从 stdin 读第一遍的结果
 ./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
 ```
 

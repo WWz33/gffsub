@@ -205,7 +205,7 @@ See [Expression Filtering](expression-filtering.md) for field names and operator
 // src/output.hpp
 void print_gff3(std::ostream& out, const GffData& data);
 void print_gtf3(std::ostream& out, const GffData& data);
-void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);  // GTF2 or GTF3
+void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);  // GTF3, GTF25 or GTF22
 void print_bed(std::ostream& out, const GffData& data);
 ```
 
@@ -256,7 +256,7 @@ int main() {
     qp.include_children = true;
     gffsub::QueryResult res = gffsub::query(idx, qp);
 
-    gffsub::print_gtf(std::cout, res.records, gffsub::OutputFormat::GTF2);
+    gffsub::print_gtf(std::cout, res.records, gffsub::OutputFormat::GTF3);
 }
 ```
 
