@@ -90,17 +90,10 @@ std::unordered_set<std::string> collect_kept_seqids(const GffData& data) {
 
 void print_gff3(std::ostream& out, const GffData& data,
                 const std::vector<std::string>& out_attrs) {
-    // ##gff-version must be the topmost line (GFF3 spec). Take it from the
-    // input when present, otherwise synthesize; ##gtf-version is a GTF
-    // directive and must not leak into GFF3 output.
-    std::string_view version_line = "##gff-version 3";
-    for (const auto& d : data.directives) {
-        if (d.rfind("##gff-version", 0) == 0) {
-            version_line = d;
-            break;
-        }
-    }
-    out << version_line << '\n';
+    // ##gff-version must be the topmost line and names version 3 (GFF3 spec).
+    // An input line claiming an older version is not reproduced: the rows
+    // below are GFF3 whatever the source said.
+    out << "##gff-version 3\n";
     const auto kept_seqids = collect_kept_seqids(data);
     for (const auto& d : data.directives) {
         if (d.rfind("##gff-version", 0) == 0) continue;
@@ -261,6 +254,40 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
         }
     }
 
+    // Resolve the emitted gene_id / transcript_id for one parent link. The
+    // source's own gene_id/transcript_id attribute wins; otherwise the parent
+    // chain decides, so the IDs match the parent transcript/gene rows.
+    const auto resolve_child = [&](const std::string& pid, const GffRecord& rec,
+                                   std::string& gene_id_val, std::string& transcript_id_val) {
+        if (rec.gene_id) gene_id_val = *rec.gene_id;
+        if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
+        const auto tx = tx_label.find(pid);
+        if (tx != tx_label.end()) {
+            if (transcript_id_val.empty()) transcript_id_val = tx->second;
+            if (gene_id_val.empty()) {
+                const auto tp = tx_parent.find(pid);
+                if (tp != tx_parent.end()) {
+                    const auto g = gene_label.find(tp->second);
+                    gene_id_val = (g != gene_label.end()) ? g->second : tp->second;
+                }
+            }
+        } else if (gene_label.count(pid) || gene_ids.count(pid)) {
+            // Parent is a gene (e.g. TF_binding_site): no transcript to
+            // reference — leave transcript_id empty per the inter/inter_CNS
+            // convention instead of inventing one.
+            if (gene_id_val.empty()) {
+                const auto g = gene_label.find(pid);
+                gene_id_val = (g != gene_label.end()) ? g->second : pid;
+            }
+        } else {
+            // Parent unresolvable to a gene/transcript record in this file
+            // (flat GTF with only exon/CDS lines): trust the parent ID as the
+            // transcript.
+            if (transcript_id_val.empty()) transcript_id_val = pid;
+            if (gene_id_val.empty()) gene_id_val = pid;
+        }
+    };
+
     for (const auto& rec : data) {
         if (!rec.kept) continue;
 
@@ -273,17 +300,59 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
 
         const std::string score_str = rec.score_raw.empty() ? std::string{"."} : std::string{rec.score_raw};
 
-        std::string gene_id_val;
-        std::string transcript_id_val;
+        // One output row. parent_id selects the stop_codon used to trim the
+        // terminal CDS (empty for gene and transcript rows).
+        const auto emit_row = [&](const std::string& gene_id_val, const std::string& transcript_id_val,
+                                  const std::string& parent_id) {
+            // GTF2.2: gene_id required on every feature line. When it cannot
+            // be resolved, emit an empty value (gene_id "";) per the
+            // inter/inter_CNS convention rather than dropping the feature.
+            std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
+                                                rec.feat_class == FeatureClass::Gene, rec,
+                                                out_attrs);
+
+            // GTF excludes the stop codon from the terminal CDS. Trim only
+            // when the stop_codon sits hard against the CDS 3' end of the same
+            // transcript, so partially overlapping or shifted annotations pass
+            // through untouched.
+            int64_t start = rec.start;
+            int64_t end = rec.end;
+            if (rec.feat_class == FeatureClass::CDS && !parent_id.empty()) {
+                const auto it = stop_codons.find(parent_id);
+                if (it != stop_codons.end()) {
+                    for (const auto& [stop_start, stop_end] : it->second) {
+                        if (rec.strand == '+' && stop_end == rec.end && stop_start > rec.start) {
+                            end = stop_start - 1;
+                            break;
+                        }
+                        if (rec.strand == '-' && stop_start == rec.start && stop_end < rec.end) {
+                            start = stop_end + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
+                << start << '\t' << end << '\t' << score_str << '\t'
+                << rec.strand << '\t' << rec.phase << '\t' << attrs << '\n';
+        };
 
         if (rec.feat_class == FeatureClass::Gene) {
+            std::string gene_id_val;
             if (rec.id) {
                 const auto it = gene_label.find(*rec.id);
                 gene_id_val = (it != gene_label.end()) ? it->second : *rec.id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
-        } else if (rec.feat_class == FeatureClass::Transcript) {
+            emit_row(gene_id_val, std::string{}, std::string{});
+            continue;
+        }
+
+        if (rec.feat_class == FeatureClass::Transcript) {
+            std::string gene_id_val;
+            std::string transcript_id_val;
             if (rec.id) {
                 const auto it = tx_label.find(*rec.id);
                 transcript_id_val = (it != tx_label.end()) ? it->second : *rec.id;
@@ -296,73 +365,44 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
-        } else {
-            // Child features: the source's own gene_id/transcript_id attribute
-            // wins; otherwise resolve through the parent chain so the emitted
-            // IDs match the parent transcript/gene rows.
+            emit_row(gene_id_val, transcript_id_val, std::string{});
+            continue;
+        }
+
+        // Child features. GTF has no multi-parent feature: a shared exon
+        // becomes one row per parent transcript (the same expansion AGAT
+        // applies to level-3 features).
+        std::vector<std::string> parents;
+        if (rec.parent_id) parents.push_back(*rec.parent_id);
+        if (rec.attr_raw.find(',') != std::string_view::npos) {
+            std::vector<std::string> multi;
+            if (rec.src_fmt == InputFormat::GTF) {
+                for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
+                    if (key == "Parent" && !value.empty()) multi.push_back(value);
+                }
+            } else {
+                const auto parsed = parse_attributes(rec.attr_raw);
+                const auto it = parsed.find("Parent");
+                if (it != parsed.end()) multi = it->second;
+            }
+            if (!multi.empty()) parents = std::move(multi);
+        }
+
+        if (parents.empty()) {
+            std::string gene_id_val;
+            std::string transcript_id_val;
             if (rec.gene_id) gene_id_val = *rec.gene_id;
             if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
-            if (rec.parent_id) {
-                const auto tx = tx_label.find(*rec.parent_id);
-                if (tx != tx_label.end()) {
-                    if (transcript_id_val.empty()) transcript_id_val = tx->second;
-                    if (gene_id_val.empty()) {
-                        const auto tp = tx_parent.find(*rec.parent_id);
-                        if (tp != tx_parent.end()) {
-                            const auto g = gene_label.find(tp->second);
-                            gene_id_val = (g != gene_label.end()) ? g->second : tp->second;
-                        }
-                    }
-                } else if (gene_label.count(*rec.parent_id) || gene_ids.count(*rec.parent_id)) {
-                    // Parent is a gene (e.g. TF_binding_site): no transcript to
-                    // reference — leave transcript_id empty per the
-                    // inter/inter_CNS convention instead of inventing one.
-                    if (gene_id_val.empty()) {
-                        const auto g = gene_label.find(*rec.parent_id);
-                        gene_id_val = (g != gene_label.end()) ? g->second : *rec.parent_id;
-                    }
-                } else {
-                    // Parent unresolvable to a gene/transcript record in this
-                    // file (flat GTF with only exon/CDS lines): trust the
-                    // parent ID as the transcript.
-                    if (transcript_id_val.empty()) transcript_id_val = *rec.parent_id;
-                    if (gene_id_val.empty()) gene_id_val = *rec.parent_id;
-                }
-            }
+            emit_row(gene_id_val, transcript_id_val, std::string{});
+            continue;
         }
 
-        // GTF2.2: gene_id required on every feature line. When it cannot be
-        // resolved, emit an empty value (gene_id "";) per the inter/inter_CNS
-        // convention rather than dropping the feature silently.
-        std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
-                                            rec.feat_class == FeatureClass::Gene, rec,
-                                            out_attrs);
-
-        // GTF excludes the stop codon from the terminal CDS. Trim only when
-        // the stop_codon sits hard against the CDS 3' end of the same
-        // transcript, so partially overlapping or shifted annotations pass
-        // through untouched.
-        int64_t start = rec.start;
-        int64_t end = rec.end;
-        if (rec.feat_class == FeatureClass::CDS && rec.parent_id) {
-            const auto it = stop_codons.find(*rec.parent_id);
-            if (it != stop_codons.end()) {
-                for (const auto& [stop_start, stop_end] : it->second) {
-                    if (rec.strand == '+' && stop_end == rec.end && stop_start > rec.start) {
-                        end = stop_start - 1;
-                        break;
-                    }
-                    if (rec.strand == '-' && stop_start == rec.start && stop_end < rec.end) {
-                        start = stop_end + 1;
-                        break;
-                    }
-                }
-            }
+        for (const auto& pid : parents) {
+            std::string gene_id_val;
+            std::string transcript_id_val;
+            resolve_child(pid, rec, gene_id_val, transcript_id_val);
+            emit_row(gene_id_val, transcript_id_val, pid);
         }
-
-        out << rec.seqid << '\t' << rec.source << '\t' << gtf_type << '\t'
-            << start << '\t' << end << '\t' << score_str << '\t'
-            << rec.strand << '\t' << rec.phase << '\t' << attrs << '\n';
     }
 }
 

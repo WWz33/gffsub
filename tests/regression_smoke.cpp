@@ -264,7 +264,16 @@ static void cleanup_outputs() {
         "reg_gtf_summary.tsv", "reg_gene_summary.tsv",
         "reg_json.json", "reg_json_quote.json",
         "reg_err_missing.err", "reg_err_up.err", "reg_err_threads.err",
-        "reg_err_region.err", "reg_err_query_no_selector.err"};
+        "reg_err_region.err", "reg_err_query_no_selector.err",
+        "reg_gtf22.gtf",
+        "reg_spec_quote.gff3", "reg_spec_quote.out",
+        "reg_spec_comment.gtf", "reg_spec_comment.out",
+        "reg_spec_escape.gtf", "reg_spec_escape.out",
+        "reg_spec_comma.gff3", "reg_spec_comma.out",
+        "reg_spec_version.gff3", "reg_spec_version.out",
+        "reg_spec_phase.gff3", "reg_spec_phase.out", "reg_spec_phase.err",
+        "reg_spec_multiparent.gff3", "reg_spec_multiparent.out",
+        "reg_spec_cycle.gff3", "reg_spec_cycle.out", "reg_spec_cycle.err"};
     for (const char* f : files) std::remove(f);
 }
 
@@ -660,6 +669,141 @@ static int test_duplicate_id_warning(const std::string& exe, const std::string& 
 }
 
 // ---------------------------------------------------------------------------
+// Group 16: GFF3 / GTF conformance per the published specs
+// ---------------------------------------------------------------------------
+
+// A quoted value on the first data line must not flip a GFF3 file to GTF
+// parsing: GFF3 values are `tag=value`, GTF pairs are `tag "value"`.
+static int spec_quoted_gff3(const std::string& exe) {
+    const std::string f{"reg_spec_quote.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t1\t100\t.\t+\t.\tID=g1;Name=\"A\"\n"
+        << "chr1\tsrc\tmRNA\t1\t100\t.\t+\t.\tID=t1;Parent=g1\n";
+    out.close();
+    if (run_command(exe + " " + f + " > reg_spec_quote.out") != 0 ||
+        require_contains("reg_spec_quote.out", "ID=g1;Name=\"A\"") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// GTF2.2: `#` outside quotes starts a comment; it must not become an attribute.
+static int spec_gtf_trailing_comment(const std::string& exe) {
+    const std::string f{"reg_spec_comment.gtf"};
+    std::ofstream out{f};
+    out << "chr1\tsrc\texon\t1\t9\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; # tail\n";
+    out.close();
+    if (run_command(exe + " " + f + " -f gtf > reg_spec_comment.out") != 0 ||
+        require_contains("reg_spec_comment.out", "transcript_id \"t1\";\n") != 0 ||
+        require_not_contains("reg_spec_comment.out", "tail") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// GXF2 C-style escapes: `\t` decodes to a tab, and the writer re-escapes it,
+// so the round trip keeps the value.
+static int spec_gtf_escape_roundtrip(const std::string& exe) {
+    const std::string f{"reg_spec_escape.gtf"};
+    std::ofstream out{f};
+    out << "chr1\tsrc\texon\t1\t9\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; note \"a\\tb\";\n";
+    out.close();
+    if (run_command(exe + " " + f + " -f gtf > reg_spec_escape.out") != 0 ||
+        require_contains("reg_spec_escape.out", "note \"a\\tb\";") != 0 ||
+        require_not_contains("reg_spec_escape.out", "a\\\\tb") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Only Parent, Alias, Note, Dbxref and Ontology_term carry comma lists; a
+// comma in any other tag is part of the value.
+static int spec_comma_scope(const std::string& exe) {
+    const std::string f{"reg_spec_comma.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t1\t100\t.\t+\t.\tID=g1;Name=A,B;Note=x,y\n";
+    out.close();
+    if (run_command(exe + " " + f + " -f gtf > reg_spec_comma.out") != 0 ||
+        require_contains("reg_spec_comma.out", "Name \"A,B\";") != 0 ||
+        require_contains("reg_spec_comma.out", "Note \"x\"; Note \"y\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Output always declares GFF3 version 3, whatever the input claimed.
+static int spec_version_header(const std::string& exe) {
+    const std::string f{"reg_spec_version.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 2\nchr1\tsrc\tgene\t1\t100\t.\t+\t.\tID=g1\n";
+    out.close();
+    if (run_command(exe + " " + f + " > reg_spec_version.out") != 0 ||
+        require_contains("reg_spec_version.out", "##gff-version 3") != 0 ||
+        require_not_contains("reg_spec_version.out", "##gff-version 2") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// CDS without phase 0/1/2 is kept but reported.
+static int spec_cds_phase_warning(const std::string& exe) {
+    const std::string f{"reg_spec_phase.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tCDS\t1\t100\t.\t+\t.\tID=c1\n";
+    out.close();
+    if (run_command(exe + " " + f + " > reg_spec_phase.out 2> reg_spec_phase.err") != 0 ||
+        require_contains("reg_spec_phase.err", "without phase") != 0 ||
+        require_contains("reg_spec_phase.out", "CDS\t1\t100") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// GTF has no multi-parent feature: a shared exon becomes one row per parent.
+static int spec_multi_parent_gtf(const std::string& exe) {
+    const std::string f{"reg_spec_multiparent.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tgene\t1\t900\t.\t+\t.\tID=g1\n"
+        << "chr1\tsrc\tmRNA\t1\t400\t.\t+\t.\tID=t1;Parent=g1\n"
+        << "chr1\tsrc\tmRNA\t500\t900\t.\t+\t.\tID=t2;Parent=g1\n"
+        << "chr1\tsrc\texon\t1\t400\t.\t+\t.\tID=e1;Parent=t1,t2\n";
+    out.close();
+    if (run_command(exe + " " + f + " -f gtf > reg_spec_multiparent.out") != 0 ||
+        require_contains("reg_spec_multiparent.out", "transcript_id \"t1\";") != 0 ||
+        require_contains("reg_spec_multiparent.out", "transcript_id \"t2\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Parent links that form a cycle are invalid; the tool warns instead of
+// silently producing a wrong hierarchy.
+static int spec_parent_cycle(const std::string& exe) {
+    const std::string f{"reg_spec_cycle.gff3"};
+    std::ofstream out{f};
+    out << "##gff-version 3\n"
+        << "chr1\tsrc\tmRNA\t1\t100\t.\t+\t.\tID=a;Parent=b\n"
+        << "chr1\tsrc\tmRNA\t1\t100\t.\t+\t.\tID=b;Parent=a\n";
+    out.close();
+    if (run_command(exe + " " + f + " -i a -p > reg_spec_cycle.out 2> reg_spec_cycle.err") != 0 ||
+        require_contains("reg_spec_cycle.err", "Parent cycle") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_spec_conformance(const std::string& exe) {
+    return spec_quoted_gff3(exe) || spec_gtf_trailing_comment(exe) ||
+           spec_gtf_escape_roundtrip(exe) || spec_comma_scope(exe) ||
+           spec_version_header(exe) || spec_cds_phase_warning(exe) ||
+           spec_multi_parent_gtf(exe) || spec_parent_cycle(exe);
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
@@ -783,7 +927,10 @@ int main(int argc, char* argv[]) {
         cleanup_outputs();
         return 1;
     }
-
+    if (test_spec_conformance(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
     cleanup_outputs();
     std::cout << "regression_smoke OK\n";
     return 0;

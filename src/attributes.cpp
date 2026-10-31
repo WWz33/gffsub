@@ -3,6 +3,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 namespace gffsub {
 
@@ -26,6 +27,21 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
                 const std::string key{trim_view(pair.substr(0, eq))};
                 std::string_view value = pair.substr(eq + 1);
                 if (!key.empty()) {
+                    // GFF3 reserves the comma list for five tags; for any other
+                    // tag a comma is part of the value. Splitting everything
+                    // would turn `inference=ab initio,similar to` into two
+                    // values and duplicate the tag on GTF output.
+                    static const std::unordered_set<std::string> kMultiValue = {
+                        "Parent", "Alias", "Note", "Dbxref", "Ontology_term"
+                    };
+                    if (kMultiValue.count(key) == 0) {
+                        const std::string single = url_decode(value);
+                        if (!single.empty()) {
+                            parsed[key].push_back(single);
+                        }
+                        pos = (pair_end < attrs.size()) ? pair_end + 1 : attrs.size();
+                        continue;
+                    }
                     // Split the RAW value on ',' before URL-decoding each part:
                     // ',' is the value-list separator and a literal comma inside
                     // a single value must be escaped as %2C (GFF3 spec).

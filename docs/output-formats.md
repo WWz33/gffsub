@@ -39,12 +39,13 @@ All three GTF flavors share these rules:
 - The terminal CDS ends before its `stop_codon` when the codon abuts the CDS 3' end of the same transcript.
 - Types outside the selected vocabulary are dropped.
 - `mRNA` is renamed to `transcript` for GTF3 and GTF2.5.
+- A feature with several parents becomes one row per parent: GTF has no multi-parent feature.
 
 Header written per flavor: `##gtf-version 3`, `##gtf-version 2.5`, `##gtf-version 2.2`.
 
 ## GFF3
 
-- Header: `##gff-version 3`
+- Header: `##gff-version 3`, always. An input line claiming another version is not reproduced.
 - Column 9 preserved from input.
 - GTF input: column 9 rewritten as `tag=value` with `ID=`/`Parent=` and URL escaping.
 

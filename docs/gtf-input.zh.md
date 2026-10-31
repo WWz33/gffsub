@@ -8,13 +8,22 @@
 
 ## 格式识别
 
-gffsub 嗅探文件内容：第 9 列含 `=` 和 `;` 判为 GFF3；第 9 列含 `"` 判为 GTF；3 到 12 列且 start/end 为整数判为 BED；默认 GFF3。
+gffsub 看第一条数据行：第 9 列第一个片段决定格式。`tag=value` 是 GFF3，`tag "value"` 是 GTF，3 到 12 列且 start/end 为整数是 BED，默认 GFF3。
+
+只看第一个片段，所以值里的标点不会翻转判定：`ID=g1;Name="A"` 仍是 GFF3，`note "a=b"` 仍是 GTF。
 
 ## GTF 与 GFF3 attribute
 
 - GFF3：`key=value;` 对。
 - GTF：`key "value";` 对。
 - `gene_id` 和 `transcript_id` 提取到记录字段。
+
+GTF 第 9 列细则：
+
+- 引号外的 `#` 起注释，到行尾结束；引号内的 `#` 是数据。
+- `\"`、`\\`、`\t`、`\n`、`\r` 会被解码。
+- 未加引号的值也接受。
+- GFF3 风格的裸 `ID=x;Parent=y` 片段也接受；`key="value"` 的 tag 名取 `key`。
 
 ## Parent/child 合成
 

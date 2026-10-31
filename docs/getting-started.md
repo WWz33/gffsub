@@ -23,6 +23,15 @@ Produces `./gffsub`. Requires a C++17 compiler (g++ 9+, clang 10+) and zlib (`-l
 - Plain or gzip-compressed files read directly (`ann.gtf.gz`)
 - `-` reads stdin, plain or gzip-compressed
 
+## Parsing warnings
+
+Malformed input does not stop the run. Stderr reports, once per file:
+
+- lines skipped for having too few columns
+- lines skipped for invalid coordinates
+- CDS lines whose phase is not 0, 1 or 2
+- Parent links that form a cycle
+
 ## Example data
 
 Save as `demo.gff3`:

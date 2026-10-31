@@ -39,14 +39,20 @@ std::string gtf_unescape(const std::string& s) {
     std::string out;
     out.reserve(s.size());
     for (size_t j = 0; j < s.size(); ++j) {
-        if (s[j] == '\\' && j + 1 < s.size() && s[j + 1] == '"') {
-            out.push_back('"');
-            ++j;
-        } else if (s[j] == '\\' && j + 1 < s.size() && s[j + 1] == '\\') {
-            out.push_back('\\');
-            ++j;
-        } else {
+        if (s[j] != '\\' || j + 1 >= s.size()) {
             out.push_back(s[j]);
+            continue;
+        }
+        // GXF2 defines C-style escapes for non-printing characters, and the
+        // GTF writer emits \t, \n and \r, so decoding them keeps a round trip
+        // value-for-value.
+        switch (s[j + 1]) {
+            case '"':  out.push_back('"');  ++j; break;
+            case '\\': out.push_back('\\'); ++j; break;
+            case 't':  out.push_back('\t'); ++j; break;
+            case 'n':  out.push_back('\n'); ++j; break;
+            case 'r':  out.push_back('\r'); ++j; break;
+            default:   out.push_back('\\'); break;  // unknown escape kept as-is
         }
     }
     return out;
@@ -78,7 +84,12 @@ void emit_gtf_fragment(std::string_view frag,
         return;
     }
 
-    const auto key = trim_view(frag.substr(0, q1));
+    std::string key{trim_view(frag.substr(0, q1))};
+    // Non-standard `key="value"` (GFF3 separator before the quote): the `=`
+    // belongs to the separator, not to the tag name.
+    while (!key.empty() && (key.back() == '=' || key.back() == ' ' || key.back() == '\t')) {
+        key.pop_back();
+    }
     if (key.empty()) return;
     // Find the closing quote, honoring backslash escapes.
     size_t q2 = q1 + 1;
@@ -98,6 +109,24 @@ void emit_gtf_fragment(std::string_view frag,
 
 std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs) {
     std::vector<std::pair<std::string, std::string>> result;
+    // GTF2.2: a comment starts at `#` and continues to the end of the line,
+    // and may follow the attributes. `#` inside a quoted value is data.
+    {
+        bool quoted = false;
+        for (size_t i = 0; i < attrs.size(); ++i) {
+            const char c = attrs[i];
+            if (c == '\\' && quoted && i + 1 < attrs.size()) {
+                ++i;
+                continue;
+            }
+            if (c == '"') {
+                quoted = !quoted;
+            } else if (c == '#' && !quoted) {
+                attrs = attrs.substr(0, i);
+                break;
+            }
+        }
+    }
     // Split on ';' outside double quotes so a semicolon inside a quoted value
     // (`note "a;b"`) is preserved; AGAT's parser does the same.
     size_t frag_start = 0;

@@ -233,6 +233,39 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
             }
         }
     }
+
+    // GFF3 spec: Parent links that form a cycle are invalid. Every traversal
+    // here is visited-guarded, so a cycle cannot hang the tool, but the
+    // hierarchy it reports would be nonsense. Walk each identified feature up
+    // its parent chain and warn once per cycle head.
+    {
+        std::unordered_map<std::string, std::string> parent_of;
+        for (const auto& [id, lines] : id_to_records_) {
+            const auto& rec = records[lines.front()];
+            if (rec.parent_id && !rec.parent_id->empty()) {
+                parent_of.emplace(id, *rec.parent_id);
+            }
+        }
+        int reported = 0;
+        for (const auto& [id, parent] : parent_of) {
+            std::string cur = parent;
+            for (int step = 0; step < 64 && !cur.empty(); ++step) {
+                if (cur == id) {
+                    if (reported < 5) {
+                        std::cerr << "Warning: Parent cycle involving ID '" << id << "'\n";
+                    }
+                    ++reported;
+                    break;
+                }
+                const auto next = parent_of.find(cur);
+                if (next == parent_of.end()) break;
+                cur = next->second;
+            }
+        }
+        if (reported > 5) {
+            std::cerr << "Warning: " << (reported - 5) << " further Parent cycle warning(s) suppressed\n";
+        }
+    }
 }
 
 std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const {

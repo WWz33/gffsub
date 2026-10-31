@@ -42,6 +42,21 @@ All notable changes to gffsub are documented in this file. The format follows
   filtered out of GFF3 output
 
 ### Fixed
+- Format detection reads the first column-9 fragment instead of searching the
+  whole column: `ID=g1;Name="A"` stays GFF3 (`tag=value`) and
+  `note "a=b"` stays GTF (`tag "value"`), so a quoted GFF3 value no longer
+  sends the file through the GTF parser
+- GTF: a `#` outside a quoted value starts a comment instead of becoming an
+  attribute; `\t`, `\n` and `\r` are decoded so a value round-trips
+  unchanged; `key="value"` keeps `key` as the tag name
+- GFF3: the comma list is split only for Parent, Alias, Note, Dbxref and
+  Ontology_term; a comma in any other tag is part of the value
+- GFF3 output always declares `##gff-version 3`; an input line claiming
+  another version is not reproduced
+- GTF output writes one row per parent for a feature with several parents
+- Parsing reports what it skipped or could not check, once per file: lines
+  with too few columns, lines with invalid coordinates, CDS lines whose phase
+  is not 0/1/2, and Parent links that form a cycle
 - GTF col9 mixing quoted keys with bare GFF3-style `ID=x;Parent=y` keys
   resolves the bare keys again: the quote-aware GTF parser accepts the
   `key=value` bare form, and ID/Parent are read through it; a bare

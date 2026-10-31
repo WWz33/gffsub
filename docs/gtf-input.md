@@ -8,13 +8,22 @@
 
 ## Format detection
 
-gffsub sniffs file content: column 9 with `=` and `;` is GFF3; column 9 with `"` is GTF; 3-12 columns with integer start/end is BED; default GFF3.
+gffsub sniffs the first data line: the first column-9 fragment decides. `tag=value` is GFF3, `tag "value"` is GTF, 3-12 columns with integer start/end is BED, default GFF3.
+
+The first fragment decides, so punctuation inside a value does not flip the verdict: `ID=g1;Name="A"` stays GFF3, `note "a=b"` stays GTF.
 
 ## GTF vs GFF3 attributes
 
 - GFF3: `key=value;` pairs.
 - GTF: `key "value";` pairs.
 - `gene_id` and `transcript_id` extracted to record fields.
+
+GTF column 9 details:
+
+- `#` outside a quoted value starts a comment that runs to the end of the line; a `#` inside quotes is data.
+- `\"`, `\\`, `\t`, `\n`, `\r` are decoded.
+- Unquoted values are accepted.
+- A bare `ID=x;Parent=y` fragment (GFF3 style pasted into GTF) is accepted; `key="value"` keeps `key` as the tag name.
 
 ## Parent/child synthesis
 

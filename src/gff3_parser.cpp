@@ -20,6 +20,36 @@ namespace gffsub {
 
 namespace {
 
+// A filtering tool should not reject an annotation because a handful of lines
+// are malformed, but it should say so. Counted per parse and reported once.
+struct ParseIssues {
+    size_t short_lines = 0;       // fewer than 9 columns (or 3 for BED)
+    size_t bad_coordinates = 0;   // non-integer, non-positive, or start > end
+    size_t cds_without_phase = 0; // CDS whose phase is not 0, 1 or 2
+};
+thread_local ParseIssues g_issues;
+
+void reset_issues() { g_issues = ParseIssues{}; }
+
+void report_issues() {
+    if (g_issues.short_lines) {
+        std::cerr << "Warning: " << g_issues.short_lines
+                  << " line(s) skipped: too few columns\n";
+    }
+    if (g_issues.bad_coordinates) {
+        std::cerr << "Warning: " << g_issues.bad_coordinates
+                  << " line(s) skipped: invalid coordinates\n";
+    }
+    if (g_issues.cds_without_phase) {
+        std::cerr << "Warning: " << g_issues.cds_without_phase
+                  << " CDS line(s) without phase 0/1/2\n";
+    }
+}
+
+}  // namespace
+
+namespace {
+
 // Defined below next to the other stream helpers.
 std::string read_stream_chunked(std::istream& in);
 
@@ -217,6 +247,7 @@ int parse_content(GffData& data, InputFormat format) {
     const std::string_view content{data.content()};
     bool in_fasta = false;
     size_t pos = 0;
+    reset_issues();
 
     while (pos < content.size()) {
         size_t eol = content.find('\n', pos);
@@ -231,6 +262,8 @@ int parse_content(GffData& data, InputFormat format) {
 
         if (line.rfind("##FASTA", 0) == 0) { in_fasta = true; continue; }
         if (line.empty()) continue;
+        // GFF3 spec: a line beginning with `>` opens an implied ##FASTA section.
+        if (line[0] == '>') { in_fasta = true; continue; }
         if (line[0] == '#') {
             // Capture ## directives (##gff-version, ##sequence-region, etc.)
             // for re-emission on output. Single-line # comments are skipped.
@@ -247,7 +280,7 @@ int parse_content(GffData& data, InputFormat format) {
 
         if (format == InputFormat::GFF3 || format == InputFormat::GTF) {
             auto cols = split_line(line, '\t');
-            if (cols.size() < 9) continue;
+            if (cols.size() < 9) { ++g_issues.short_lines; continue; }
 
             try {
                 rec.seqid = cols[0];
@@ -277,6 +310,11 @@ int parse_content(GffData& data, InputFormat format) {
                 }
                 rec.strand = cols[6].empty() ? '.' : cols[6][0];
                 rec.phase = cols[7].empty() ? '.' : cols[7][0];
+                // GFF3 spec: phase is required for every CDS and is 0, 1 or 2.
+                if (rec.feat_class == FeatureClass::CDS &&
+                    rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
+                    ++g_issues.cds_without_phase;
+                }
                 rec.attr_raw = cols[8];
 
                 // The `;`/`=` scan is GFF3-only: it is not quote-aware, so on
@@ -340,11 +378,12 @@ int parse_content(GffData& data, InputFormat format) {
                     }
                 }
             } catch (const std::exception&) {
+                ++g_issues.bad_coordinates;
                 continue;
             }
         } else if (format == InputFormat::BED) {
             auto cols = split_line(line, '\t');
-            if (cols.size() < 3) continue;
+            if (cols.size() < 3) { ++g_issues.short_lines; continue; }
 
             try {
                 rec.seqid = cols[0];
@@ -383,6 +422,7 @@ int parse_content(GffData& data, InputFormat format) {
                 rec.transcript_id = std::nullopt;
                 rec.attr_raw = {};  // synthesized as "ID=..." at print_gff3 time
             } catch (const std::exception&) {
+                ++g_issues.bad_coordinates;
                 continue;
             }
         }
@@ -390,6 +430,7 @@ int parse_content(GffData& data, InputFormat format) {
         data.append(std::move(rec));
     }
 
+    report_issues();
     return 0;
 }
 
@@ -423,11 +464,19 @@ std::optional<InputFormat> sniff_line(std::string_view line) {
     };
     if (cols.size() >= 9) {
         const auto& a = cols[8];
-        if (a.find('"') != std::string_view::npos) {
-            return InputFormat::GTF;
+        // Column 9 shape decides. The first fragment separates the two grammars
+        // even when a value carries the other syntax's punctuation:
+        // GFF3 `ID=g1;Name="A"` (quote inside a value) and GTF
+        // `note "a=b"` (`=` inside a value) must not flip the verdict.
+        const auto semi = a.find(';');
+        const auto first = a.substr(0, semi == std::string_view::npos ? a.size() : semi);
+        const auto eq = first.find('=');
+        const auto quote = first.find('"');
+        if (quote != std::string_view::npos && (eq == std::string_view::npos || quote < eq)) {
+            return InputFormat::GTF;  // `tag "value"`
         }
-        if (a.find('=') != std::string_view::npos) {
-            return InputFormat::GFF3;
+        if (eq != std::string_view::npos) {
+            return InputFormat::GFF3;  // `tag=value`
         }
         // Unquoted GTF attributes: `key value; ...` (no quotes, no '=').
         // Shape check keeps BED9 (itemRgb, no semicolon/space) out of this.

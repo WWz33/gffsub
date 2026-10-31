@@ -39,12 +39,13 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 - 终止密码子紧贴同一转录本 CDS 的 3' 端时，末端 CDS 结束在密码子之前。
 - 词表之外的类型丢弃。
 - GTF3 与 GTF2.5 把 `mRNA` 改名为 `transcript`。
+- 一个 feature 有多个父时，按父各输出一行：GTF 没有多父 feature。
 
 抬头按版本分别写 `##gtf-version 3`、`##gtf-version 2.5`、`##gtf-version 2.2`。
 
 ## GFF3
 
-- 头部：`##gff-version 3`
+- 头部：`##gff-version 3`，恒定。输入若声称其他版本，不照抄。
 - 第 9 列保留输入原样。
 - GTF 输入时：第 9 列重写为 `tag=value`，带 `ID=`/`Parent=`，并做 URL 转义。
 
