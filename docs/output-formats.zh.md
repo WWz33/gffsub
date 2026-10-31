@@ -35,6 +35,7 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 - 每行都有 `gene_id`，非 gene 行还有 `transcript_id`，两者位于第 9 列最前。
 - `gene_id` 与 `transcript_id` 优先取同名的第 9 列属性，没有则取 `ID` / `Parent`。Ensembl GFF3 把基因标为 `gene:gene-X`，另带 `gene_id=gene-X`，GTF 输出用 `gene-X`。
 - 其余属性跟在必备两项之后，从 GFF3 做 URL 解码并加引号。
+- `ID` 与 `Parent` 作为额外引号属性保留，除非 `--out-attrs` 将其排除。
 - 值转义：`"`、`\`、tab、换行、CR。
 - 终止密码子紧贴同一转录本 CDS 的 3' 端时，末端 CDS 结束在密码子之前。
 - 词表之外的类型丢弃。
@@ -53,8 +54,9 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 
 - 6 列：chrom、start（0-based）、end、name、score、strand。
 - `start` = 记录起始 - 1。
-- `score` 取第 6 列，缺失或 `.` 时为 `0`。
+- `score` 取第 6 列；缺失、`.` 或非有限值（`inf`、`nan`）时为 `0`。
 - `name` 取 `ID`，缺失时取 type。
+- BED 输入必须配 `-f bed` 或 `-s`；BED 不转换为 GFF3 或 GTF。
 
 ## 示例
 

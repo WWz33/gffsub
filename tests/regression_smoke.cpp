@@ -275,7 +275,14 @@ static void cleanup_outputs() {
         "reg_spec_multiparent.gff3", "reg_spec_multiparent.out",
         "reg_spec_cycle.gff3", "reg_spec_cycle.out", "reg_spec_cycle.err",
         "reg_same.gff3", "reg_same.out", "reg_same.err",
-        "reg_dir.out", "reg_dir.err"};
+        "reg_dir.out", "reg_dir.err",
+        "reg_bed_in.bed", "reg_bed_gff3.out", "reg_bed_gff3.err",
+        "reg_bed_gtf.out", "reg_bed_gtf.err", "reg_bed_out.bed",
+        "reg_bed_sum.tsv", "reg_bed_q.out", "reg_bed_q.err",
+        "reg_bed_w.out", "reg_bed_w.err",
+        "reg_gtf_multiparent.gtf", "reg_mp_where.gff3",
+        "reg_mp_drop.gff3", "reg_mp_out.gtf",
+        "reg_idparent.gff3", "reg_idparent.gtf", "reg_idparent.bed"};
     std::system("rmdir reg_dir_input 2>/dev/null");
     for (const char* f : files) std::remove(f);
 }
@@ -824,6 +831,86 @@ static int test_io_guards(const std::string& exe) {
     return 0;
 }
 
+// BED is a BED-output and summary input only; converting it to GFF3/GTF is
+// rejected on every entry point.
+static int test_bed_conversion_removed(const std::string& exe) {
+    {
+        std::ofstream bed{"reg_bed_in.bed"};
+        if (!bed.is_open()) return 1;
+        bed << "chr1\t0\t10\tbedrec\t0\t+\n";
+    }
+    if (expect_command_failure(exe + " reg_bed_in.bed > reg_bed_gff3.out 2> reg_bed_gff3.err") != 0 ||
+        require_contains("reg_bed_gff3.err", "not converted") != 0 ||
+        expect_command_failure(exe + " reg_bed_in.bed -f gtf > reg_bed_gtf.out 2> reg_bed_gtf.err") != 0 ||
+        require_contains("reg_bed_gtf.err", "not converted") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_bed_in.bed -f bed > reg_bed_out.bed") != 0 ||
+        require_contains("reg_bed_out.bed", "chr1\t0\t10\tbedrec") != 0 ||
+        run_command(exe + " reg_bed_in.bed -s > reg_bed_sum.tsv") != 0 ||
+        require_contains("reg_bed_sum.tsv", "chr1\tregion\t1") != 0) {
+        return 1;
+    }
+    if (expect_command_failure(exe + " query reg_bed_in.bed -i bedrec > reg_bed_q.out 2> reg_bed_q.err") != 0 ||
+        require_contains("reg_bed_q.err", "not converted") != 0 ||
+        expect_command_failure(exe + " window reg_bed_in.bed -i bedrec > reg_bed_w.out 2> reg_bed_w.err") != 0 ||
+        require_contains("reg_bed_w.err", "not converted") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Quoted GTF Parent "t1,t2" is a two-parent list in every consumer: attribute
+// match, orphan retention, and one GTF row per parent.
+static int test_gtf_quoted_multi_parent(const std::string& exe) {
+    {
+        std::ofstream gtf{"reg_gtf_multiparent.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tgene\t1\t100\t.\t+\t.\tgene_id \"g1\";\n"
+            << "chr1\tx\ttranscript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";\n"
+            << "chr1\tx\ttranscript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t2\";\n"
+            << "chr1\tx\texon\t1\t50\t.\t+\t.\tgene_id \"g1\"; Parent \"t1,t2\";\n";
+    }
+    if (run_command(exe + " reg_gtf_multiparent.gtf -w Parent=t2 > reg_mp_where.gff3") != 0 ||
+        require_contains("reg_mp_where.gff3", "exon\t1\t50") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_gtf_multiparent.gtf --drop-orphans > reg_mp_drop.gff3") != 0 ||
+        require_contains("reg_mp_drop.gff3", "ID=t1") != 0 ||
+        require_contains("reg_mp_drop.gff3", "ID=t2") != 0 ||
+        require_contains("reg_mp_drop.gff3", "exon\t1\t50") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_gtf_multiparent.gtf -f gtf > reg_mp_out.gtf") != 0 ||
+        require_contains("reg_mp_out.gtf", "transcript_id \"t1\"; Parent \"t1,t2\";") != 0 ||
+        require_contains("reg_mp_out.gtf", "transcript_id \"t2\"; Parent \"t1,t2\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// GTF output keeps ID/Parent from GFF3 input (AGAT does the same) and drops
+// non-finite scores that BED cannot represent.
+static int test_gtf_attrs_and_bed_score(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_idparent.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\tx\tgene\t1\t100\tinf\t+\t.\tID=g1\n"
+            << "chr1\tx\tmRNA\t1\t100\t0.5\t+\t.\tID=t1;Parent=g1\n";
+    }
+    if (run_command(exe + " reg_idparent.gff3 -f gtf > reg_idparent.gtf") != 0 ||
+        require_contains("reg_idparent.gtf", "transcript_id \"t1\"; Parent \"g1\"; ID \"t1\";") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_idparent.gff3 -f bed > reg_idparent.bed") != 0 ||
+        require_contains("reg_idparent.bed", "chr1\t0\t100\tg1\t0\t+") != 0 ||
+        require_contains("reg_idparent.bed", "chr1\t0\t100\tt1\t0.5\t+") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 static int test_spec_conformance(const std::string& exe) {
     return spec_quoted_gff3(exe) || spec_gtf_trailing_comment(exe) ||
            spec_gtf_escape_roundtrip(exe) || spec_comma_scope(exe) ||
@@ -940,6 +1027,18 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_io_guards(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_bed_conversion_removed(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_gtf_quoted_multi_parent(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_gtf_attrs_and_bed_score(exe) != 0) {
         cleanup_outputs();
         return 1;
     }

@@ -21,15 +21,7 @@ void drop_orphans(GffData& data) {
     for (size_t i = 0; i < data.records.size(); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
-        const auto attrs = parse_attributes(rec.attr_raw);
-        const auto it = attrs.find("Parent");
-        if (it != attrs.end()) {
-            parents[i] = it->second;
-        }
-        if (rec.parent_id &&
-            std::find(parents[i].begin(), parents[i].end(), *rec.parent_id) == parents[i].end()) {
-            parents[i].push_back(*rec.parent_id);
-        }
+        parents[i] = parent_ids(rec);
     }
 
     bool changed = true;

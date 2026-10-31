@@ -38,6 +38,8 @@ public:
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
+    // Source format of the records, or nullopt when the index is empty.
+    std::optional<InputFormat> source_format() const;
 
     // Re-point recs_ after a move/copy: owned mode follows data_ into the
     // new object; borrowed mode keeps pointing at the external vector.

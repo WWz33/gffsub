@@ -7,7 +7,7 @@
 <!-- README-I18N:END -->
 
 Command-line tool for subsetting GFF3/GTF annotation files by region,
-feature ID, gene name, or attribute. Supports GTF/BED conversion, longest
+feature ID, gene name, or attribute. Supports GTF and BED output, longest
 isoform selection, and per-seqid summary output.
 
 ## Build
@@ -17,8 +17,9 @@ git clone https://github.com/WWz33/gffsub.git
 cd gffsub && make -j
 ```
 
-Requires zlib. Input can be GFF3, GTF, or BED, plain or gzip-compressed;
-`-` reads stdin.
+Requires zlib. Input can be GFF3 or GTF, plain or gzip-compressed; `-` reads
+stdin. BED input is accepted for BED output (`-f bed`) and summaries (`-s`)
+only; BED is not converted to GFF3 or GTF.
 
 ## Usage
 

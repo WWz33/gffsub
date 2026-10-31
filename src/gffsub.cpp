@@ -151,6 +151,10 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
 
     const auto index = try_load_index(input_file);
     if (!index) return 1;
+    if (!summary && index->source_format() == InputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3; use --summary or convert elsewhere\n";
+        return 1;
+    }
     const auto result = query(*index, params);
     if (summary) {
         print_summary(std::cout, result.records.records);
@@ -249,6 +253,10 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
 
     const auto index = try_load_index(input_file);
     if (!index) return 1;
+    if (index->source_format() == InputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3\n";
+        return 1;
+    }
     try {
         const auto result = window(*index, params);
         print_gff3(std::cout, result);
@@ -298,6 +306,10 @@ int run_window_from_args(const CliArgs& a) {
 
     const auto index = try_load_index(a.input_file);
     if (!index) return 1;
+    if (index->source_format() == InputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3\n";
+        return 1;
+    }
     try {
         const auto result = window(*index, wparams);
         print_gff3(std::cout, result);
@@ -403,6 +415,10 @@ int main(int argc, char* argv[]) {
 
         const auto index = try_load_index(a.input_file);
         if (!index) return 1;
+        if (index->source_format() == InputFormat::BED) {
+            std::cerr << "Error: BED input is not converted to GFF3; use -f bed or -s\n";
+            return 1;
+        }
         const auto result = query(*index, *qparams);
         print_gff3(std::cout, result.records, a.out_attrs);
         return 0;
@@ -423,6 +439,13 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: cannot parse " << a.input_file << '\n';
             return 1;
         }
+    }
+
+    // BED is accepted for BED output and summary only; converting it to
+    // GFF3/GTF is not supported.
+    if (input_fmt == InputFormat::BED && !a.summary && a.format != OutputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3/GTF; use -f bed or -s\n";
+        return 1;
     }
 
     // Query-style selectors: mark selected lines via query() API

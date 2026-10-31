@@ -42,44 +42,34 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     }
 
     // Build gene -> [isoform indices] index once.
-    // Use parse_attributes to get ALL Parent values so a multi-parent isoform
-    // (Parent=geneA,geneB) is registered under every gene it belongs to.
+    // parent_ids keeps ALL Parent values so a multi-parent isoform
+    // (Parent=geneA,geneB, or a quoted GTF list) is registered under every
+    // gene it belongs to.
     std::unordered_map<std::string, std::vector<int>> gene_to_isoforms;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
         if (rec.type != isoform_type) continue;
-        const auto attrs = parse_attributes(rec.attr_raw);
-        const auto parent_it = attrs.find("Parent");
-        if (parent_it != attrs.end()) {
-            for (const auto& parent_id : parent_it->second) {
-                auto& vec = gene_to_isoforms[parent_id];
-                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                    vec.push_back(i);
-                }
+        for (const auto& parent_id : parent_ids(rec)) {
+            auto& vec = gene_to_isoforms[parent_id];
+            if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                vec.push_back(i);
             }
-        } else if (rec.parent_id) {
-            gene_to_isoforms[*rec.parent_id].push_back(i);
         }
     }
 
     // Build isoform -> [child indices] index once, using the full Parent list
-    // (parse_attributes splits Parent=a,b) so shared children link to all parents.
+    // (parent_ids splits Parent=a,b and quoted GTF lists) so shared children
+    // link to all parents.
     std::unordered_map<std::string, std::vector<int>> isoform_to_children;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
-        const auto attrs = parse_attributes(rec.attr_raw);
-        const auto parent_it = attrs.find("Parent");
-        if (parent_it != attrs.end()) {
-            for (const auto& parent_id : parent_it->second) {
-                auto& vec = isoform_to_children[parent_id];
-                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                    vec.push_back(i);
-                }
+        for (const auto& parent_id : parent_ids(rec)) {
+            auto& vec = isoform_to_children[parent_id];
+            if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
+                vec.push_back(i);
             }
-        } else if (rec.parent_id) {
-            isoform_to_children[*rec.parent_id].push_back(i);
         }
     }
 

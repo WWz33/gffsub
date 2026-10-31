@@ -35,6 +35,7 @@ All three GTF flavors share these rules:
 - `gene_id` on every line, `transcript_id` on every non-gene line, both first in column 9.
 - `gene_id` and `transcript_id` are taken from the column-9 attribute of that name when the record has one, otherwise from `ID` / `Parent`. Ensembl GFF3 labels a gene `gene:gene-X` and carries `gene_id=gene-X`; the GTF output uses `gene-X`.
 - Remaining attributes follow the mandatory pair, URL-decoded from GFF3 and quoted.
+- `ID` and `Parent` are kept as extra quoted attributes unless `--out-attrs` excludes them.
 - Values are escaped: `"`, `\`, tab, newline, CR.
 - The terminal CDS ends before its `stop_codon` when the codon abuts the CDS 3' end of the same transcript.
 - Types outside the selected vocabulary are dropped.
@@ -53,8 +54,9 @@ Header written per flavor: `##gtf-version 3`, `##gtf-version 2.5`, `##gtf-versio
 
 - 6 columns: chrom, start (0-based), end, name, score, strand.
 - `start` = record start - 1.
-- `score` from column 6, or `0` when missing or `.`.
+- `score` from column 6; `0` when missing, `.`, or non-finite (`inf`, `nan`).
 - `name` from `ID`, or the type when `ID` is missing.
+- BED input requires `-f bed` or `-s`; BED is not converted to GFF3 or GTF.
 
 ## Example
 

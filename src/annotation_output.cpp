@@ -4,6 +4,7 @@
 #include "parser.hpp"
 #include "record.hpp"
 #include "string_utils.hpp"
+#include <cmath>
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
@@ -182,7 +183,7 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
         }
     } else {
         for (const auto& [key, values] : parse_attributes(rec.attr_raw)) {
-            if (!wanted(key) || key == "Parent" || key == "ID") continue;
+            if (!wanted(key)) continue;
             for (const auto& v : values) {
                 result += ' ';
                 result += key;
@@ -369,24 +370,10 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             continue;
         }
 
-        // Child features. GTF has no multi-parent feature: a shared exon
-        // becomes one row per parent transcript (the same expansion AGAT
-        // applies to level-3 features).
-        std::vector<std::string> parents;
-        if (rec.parent_id) parents.push_back(*rec.parent_id);
-        if (rec.attr_raw.find(',') != std::string_view::npos) {
-            std::vector<std::string> multi;
-            if (rec.src_fmt == InputFormat::GTF) {
-                for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-                    if (key == "Parent" && !value.empty()) multi.push_back(value);
-                }
-            } else {
-                const auto parsed = parse_attributes(rec.attr_raw);
-                const auto it = parsed.find("Parent");
-                if (it != parsed.end()) multi = it->second;
-            }
-            if (!multi.empty()) parents = std::move(multi);
-        }
+        // GTF has no multi-parent feature: a shared exon becomes one row per
+        // parent transcript. parent_ids handles Parent=a,b and a quoted GTF
+        // Parent "a,b" the same way.
+        const auto parents = parent_ids(rec);
 
         if (parents.empty()) {
             std::string gene_id_val;
@@ -418,7 +405,13 @@ void print_bed(std::ostream& out, const GffData& data) {
         if (!rec.kept) continue;
 
         std::string name = rec.id ? *rec.id : std::string{rec.type};
-        const std::string score_str = (rec.score_raw.empty() || rec.score_raw == ".") ? std::string{"0"} : std::string{rec.score_raw};
+        std::string score_str = "0";
+        if (!rec.score_raw.empty() && rec.score_raw != ".") {
+            score_str = std::string{rec.score_raw};
+            // BED score is an integer 0..1000. A GFF score like inf/nan has
+            // no BED representation, so fall back to 0.
+            if (rec.score && !std::isfinite(*rec.score)) score_str = "0";
+        }
 
         out << rec.seqid << '\t'
             << (rec.start - 1) << '\t'

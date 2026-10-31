@@ -19,7 +19,8 @@ Produces `./gffsub`. Requires a C++17 compiler (g++ 9+, clang 10+) and zlib (`-l
 
 ## Inputs
 
-- GFF3, GTF, or BED, detected from content (not the extension)
+- GFF3 or GTF, detected from content (not the extension)
+- BED files are read for BED output (`-f bed`) and summaries (`-s`) only; BED is not converted to GFF3 or GTF
 - Plain or gzip-compressed files read directly (`ann.gtf.gz`)
 - `-` reads stdin, plain or gzip-compressed
 
@@ -85,6 +86,34 @@ Filters combine in one invocation. Against a full annotation file:
 
 # second pass reads the first pass from stdin
 ./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
+```
+
+## Selector combination
+
+In the default command, selectors (`-i`, `--ids`, `-n`, `-w`, `-N`) choose candidate records and filters (`-r`, `-b`, `-t`, ...) narrow them. Both sides must match.
+
+```bash
+# ex01 spans chr1:100-250, so it does not overlap chr1:600-650
+./gffsub demo.gff3 -i ex01 -r chr1:600-650
+```
+
+```
+##gff-version 3
+```
+
+The `query` subcommand adds records from every selector instead. The same flags return ex01 by ID plus the records overlapping the region:
+
+```bash
+./gffsub query demo.gff3 -i ex01 -r chr1:600-650
+```
+
+```
+##gff-version 3
+chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
+chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
+chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
+chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 ```
 
 ## Command structure

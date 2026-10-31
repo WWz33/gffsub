@@ -203,23 +203,11 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
 
     for (int i = 0; i < static_cast<int>(records.size()); ++i) {
         const auto& rec = records[i];
-        const auto attrs = parse_attributes(rec.attr_raw);
-        const auto parent_it = attrs.find("Parent");
+        // GFF3 Parent= values and a quoted GTF Parent "a,b" list resolve the
+        // same way; rec.parent_id covers GTF without a Parent attribute.
+        const auto parents = parent_ids(rec);
 
-        // Collect parent IDs: from the Parent= attribute (GFF3) and from the
-        // synthesized rec.parent_id field (GTF, set by the parser from
-        // gene_id/transcript_id).
-        std::vector<std::string> parent_ids;
-        if (parent_it != attrs.end()) {
-            parent_ids = parent_it->second;
-        }
-        if (rec.parent_id) {
-            if (std::find(parent_ids.begin(), parent_ids.end(), *rec.parent_id) == parent_ids.end()) {
-                parent_ids.push_back(*rec.parent_id);
-            }
-        }
-
-        for (const auto& parent_id : parent_ids) {
+        for (const auto& parent_id : parents) {
             auto& children = children_by_parent_id_[parent_id];
             if (std::find(children.begin(), children.end(), i) == children.end()) {
                 children.push_back(i);
@@ -266,6 +254,11 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
             std::cerr << "Warning: " << (reported - 5) << " further Parent cycle warning(s) suppressed\n";
         }
     }
+}
+
+std::optional<InputFormat> AnnotationIndex::source_format() const {
+    if (recs_->empty()) return std::nullopt;
+    return recs_->front().src_fmt;
 }
 
 std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const {
@@ -440,8 +433,13 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
             matches.push_back(rec);
             continue;
         }
-        if (skey == "Parent" && rec.parent_id && *rec.parent_id == svalue) {
-            matches.push_back(rec);
+        if (skey == "Parent") {
+            for (const auto& pid : parent_ids(rec)) {
+                if (pid == svalue) {
+                    matches.push_back(rec);
+                    break;
+                }
+            }
             continue;
         }
 

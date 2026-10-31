@@ -55,6 +55,7 @@ public:
 // src/parser.hpp
 int parse_file(const std::string& filename, GffData& data, InputFormat format);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
+std::vector<std::string> parent_ids(const GffRecord& rec);
 InputFormat infer_input_format(const std::string& path);
 ```
 
@@ -80,6 +81,7 @@ public:
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
+    std::optional<InputFormat> source_format() const;
 };
 
 struct GeneModel {

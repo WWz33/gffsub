@@ -24,6 +24,7 @@ GTF 第 9 列细则：
 - `\"`、`\\`、`\t`、`\n`、`\r` 会被解码。
 - 未加引号的值也接受。
 - GFF3 风格的裸 `ID=x;Parent=y` 片段也接受；`key="value"` 的 tag 名取 `key`。
+- 引号多值 `Parent "t1,t2"` 按逗号拆分。记录同时连到两个转录本，`--where Parent=t1` 能命中，GTF 输出按父各写一行。
 
 ## Parent/child 合成
 

@@ -14,7 +14,7 @@ void usage(const char* prog) {
         << "         " << prog << " query <input> [options]\n"
         << "         " << prog << " window <input> -i ID [options]\n"
         << "\n"
-        << "Input:   GFF3, GTF, or BED; plain or gzip-compressed; - reads stdin.\n"
+        << "Input:   GFF3 or GTF; BED only with -f bed or -s; plain or gzip; - reads stdin.\n"
         << "\n"
         << "Options:\n"
         << "  -i, --id ID              record ID (repeatable)\n"

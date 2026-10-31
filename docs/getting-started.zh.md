@@ -19,7 +19,8 @@ cd gffsub && make -j
 
 ## 输入
 
-- GFF3、GTF 或 BED，按内容识别（不依赖扩展名）
+- GFF3 或 GTF，按内容识别（不依赖扩展名）
+- BED 文件只用于 BED 输出（`-f bed`）和统计输出（`-s`）；BED 不转换为 GFF3 或 GTF
 - 纯文本或 gzip 压缩文件均可直接读取（`ann.gtf.gz`）
 - `-` 读取 stdin，纯文本或 gzip 均可
 
@@ -85,6 +86,34 @@ chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 
 # 第二遍从 stdin 读第一遍的结果
 ./gffsub ann.gff3 -w biotype=protein_coding -C | ./gffsub - -L -t mRNA
+```
+
+## 选择条件组合
+
+默认命令中，选择器（`-i`、`--ids`、`-n`、`-w`、`-N`）给出候选记录，过滤器（`-r`、`-b`、`-t` 等）再收窄，两边必须同时满足。
+
+```bash
+# ex01 位于 chr1:100-250，与 chr1:600-650 不重叠
+./gffsub demo.gff3 -i ex01 -r chr1:600-650
+```
+
+```
+##gff-version 3
+```
+
+`query` 子命令把每个选择器命中的记录相加。同样的参数返回按 ID 命中的 ex01，以及与该区间重叠的记录：
+
+```bash
+./gffsub query demo.gff3 -i ex01 -r chr1:600-650
+```
+
+```
+##gff-version 3
+chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
+chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
+chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
+chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 ```
 
 ## 命令结构

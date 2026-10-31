@@ -41,6 +41,24 @@ All notable changes to gffsub are documented in this file. The format follows
   `##gff-version` is always the first output line; `##gtf-version` is
   filtered out of GFF3 output
 
+### Changed
+- BED input requires `-f bed` or `-s`; other output formats exit 1
+- GTF output keeps `ID` and `Parent` as extra quoted attributes from GFF3 input
+- A quoted GTF `Parent "t1,t2"` links to both parents in the attribute index,
+  `--drop-orphans`, `--longest` and GTF output; `--where Parent=t1` matches the
+  record and GTF output writes one row per parent
+- BED output writes `0` for non-finite scores (`inf`, `nan`)
+- `-o` naming the input file is rejected; Linux faulted on the mmap'd pages
+  after the output open truncated the same file
+- A directory path is rejected instead of parsing as an empty annotation
+- Bytes after the last gzip member are ignored on stdin and FIFO, matching the
+  file path
+- Missing `<cmath>` and `<vector>` includes are added so GCC/libstdc++ builds
+
+### Removed
+- BED to GFF3 and BED to GTF conversion
+- `CMakeLists.txt`; the Makefile is the only build
+
 ### Fixed
 - Format detection reads the first column-9 fragment instead of searching the
   whole column: `ID=g1;Name="A"` stays GFF3 (`tag=value`) and

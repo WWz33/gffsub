@@ -17,6 +17,9 @@ int parse_content(GffData& data, InputFormat format);
 // then parse. Returns 0 on success; format_out receives the sniffed format.
 int parse_stdin(GffData& data, InputFormat& format_out);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
+// All Parent values of a record. GFF3 Parent=a,b and a quoted GTF
+// Parent "a,b" both yield a and b; rec.parent_id is included as a fallback.
+std::vector<std::string> parent_ids(const GffRecord& rec);
 
 }  // namespace gffsub
 

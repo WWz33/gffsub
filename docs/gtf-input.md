@@ -24,6 +24,7 @@ GTF column 9 details:
 - `\"`, `\\`, `\t`, `\n`, `\r` are decoded.
 - Unquoted values are accepted.
 - A bare `ID=x;Parent=y` fragment (GFF3 style pasted into GTF) is accepted; `key="value"` keeps `key` as the tag name.
+- A quoted multi-value `Parent "t1,t2"` is split on commas. The record links to both transcripts, `--where Parent=t1` matches, and GTF output writes one row per parent.
 
 ## Parent/child synthesis
 
