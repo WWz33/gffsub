@@ -62,7 +62,7 @@ tx01
 ./gffsub demo.gff3 -n gene01 -C
 ```
 
-## -N / -N REGION
+## -N / --nearest REGION
 
 语法：`--nearest CHR:START-END`
 

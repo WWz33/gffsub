@@ -6,9 +6,11 @@
 
 <!-- I18N:END -->
 
+以下三个 flag 均可重复；同一 flag 的多次出现之间为 OR。
+
 ## -w / --where KEY=VALUE
 
-对第 9 列属性做精确匹配。可重复；多个 flag 之间为 OR。
+对第 9 列属性做精确匹配。
 
 ```bash
 ./gffsub demo.gff3 -w biotype=protein_coding
@@ -16,7 +18,7 @@
 
 ## --grep FIELD:PATTERN
 
-对字段或属性做子串匹配。可重复；多个 flag 之间为 OR。
+对字段或属性做子串匹配。
 
 列字段: `seqid`、`source`、`type`、`start`、`end`、`length`、`score`、`strand`、`phase`、`attrs`。
 
@@ -28,7 +30,7 @@
 
 ## --grep-regex FIELD:REGEX
 
-正则匹配 (ECMAScript)。可重复；多个 flag 之间为 OR。
+正则匹配 (ECMAScript)。
 
 ```bash
 ./gffsub demo.gff3 --grep-regex ID:exon.*

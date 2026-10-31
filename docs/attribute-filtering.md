@@ -6,9 +6,11 @@
 
 <!-- I18N:END -->
 
+Each of these flags is repeatable; repeats of the same flag are OR'd.
+
 ## -w / --where KEY=VALUE
 
-Exact match on a column-9 attribute. Repeatable; multiple flags are OR'd.
+Exact match on a column-9 attribute.
 
 ```bash
 ./gffsub demo.gff3 -w biotype=protein_coding
@@ -16,7 +18,7 @@ Exact match on a column-9 attribute. Repeatable; multiple flags are OR'd.
 
 ## --grep FIELD:PATTERN
 
-Substring match on a field or attribute. Repeatable; multiple flags are OR'd.
+Substring match on a field or attribute.
 
 Column fields: `seqid`, `source`, `type`, `start`, `end`, `length`, `score`, `strand`, `phase`, `attrs`.
 
@@ -28,7 +30,7 @@ Attribute fields: `ID`, `Name`, `Parent`, `Alias`, `Dbxref`, `Note`, `biotype`, 
 
 ## --grep-regex FIELD:REGEX
 
-Regex match (ECMAScript). Repeatable; multiple flags are OR'd.
+Regex match (ECMAScript).
 
 ```bash
 ./gffsub demo.gff3 --grep-regex ID:exon.*

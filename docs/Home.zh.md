@@ -16,7 +16,7 @@
 - [Expression 过滤](expression-filtering.zh.md)：`-I`、`-E`
 - [最长 Isoform 选择](longest-isoform.zh.md)：`--longest`、`-@`
 - [Window 子命令](window-subcommand.zh.md)：`window`、`-u`、`-D`、`-a`
-- [输出格式](output-formats.zh.md)：`-t`
+- [输出格式](output-formats.zh.md)：`-f`
 - [Summary 输出](summary-output.zh.md)：`-s`、`--summary`
 - [GTF 输入处理](gtf-input.zh.md)
 - [Library API](library-api.zh.md)

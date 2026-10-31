@@ -31,13 +31,13 @@ Requires zlib. Input can be GFF3, GTF, or BED, plain or gzip-compressed;
 ./gffsub annot.gff3 -b regions.bed -f gtf
 ```
 
-Run `./gffsub -h` for the full option list, `./gffsub -h` under the `query`
-and `window` subcommands for theirs.
+Run `./gffsub -h` for the full option list. The `query` and `window`
+subcommands take their own `-h`.
 
 ## Documentation
 
-[docs/](docs/Home.md) — usage guides (English and Chinese)
-[CHANGELOG.md](CHANGELOG.md) — version history
+- [docs/](docs/Home.md): usage guides, English and Chinese
+- [CHANGELOG.md](CHANGELOG.md): version history
 
 ## License
 

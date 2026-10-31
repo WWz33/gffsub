@@ -16,7 +16,7 @@ Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene m
 - [Expression Filtering](expression-filtering.md): `-I`, `-E`
 - [Longest Isoform Selection](longest-isoform.md): `--longest`, `-@`
 - [Window Subcommand](window-subcommand.md): `window`, `-u`, `-D`, `-a`
-- [Output Formats](output-formats.md): `-t`
+- [Output Formats](output-formats.md): `-f`
 - [Summary Output](summary-output.md): `-s`, `--summary`
 - [GTF Input Handling](gtf-input.md)
 - [Library API](library-api.md)

@@ -83,8 +83,8 @@ GTF 输入: `gene_id` / `transcript_id` 从记录字段解析。其他属性用 
 第 9 列的属性可以有多个值 (`Parent=g1,g2`)。任一值匹配即匹配；`!=` 和 `!~` 仅在没有任何值匹配时匹配。
 
 ```bash
-gffsub ann.gff3 -I 'Parent == g2'   # 保留 Parent=g1,g2
-gffsub ann.gff3 -I 'Parent != g2'   # 排除它
+./gffsub ann.gff3 -I 'Parent == g2'   # 保留 Parent=g1,g2
+./gffsub ann.gff3 -I 'Parent != g2'   # 排除它
 ```
 
 ## 缺失属性
@@ -95,7 +95,7 @@ gffsub ann.gff3 -I 'Parent != g2'   # 排除它
 ## 示例
 
 ```bash
-gffsub ann.gff3 -t exon -I 'length >= 100'
-gffsub ann.gff3 -E 'length < 10'
-gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
+./gffsub ann.gff3 -t exon -I 'length >= 100'
+./gffsub ann.gff3 -E 'length < 10'
+./gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
 ```

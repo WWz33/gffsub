@@ -22,15 +22,15 @@ gffsub <input> -i ID -u N -D N
 
 目标 feature 的 ID 或 gene name。优先匹配 ID；未命中时按 gene name 查找（Name、gene_id、locus_tag、Alias、Dbxref）。必填。
 
-## -u / -u N / --upstream N
+## -u / --up N
 
 feature 起始位置上游碱基数。默认 0。须为非负整数；尾部非法字符（如 `50abc`）会被拒绝。
 
-## -D / -D N / --downstream N
+## -D / --down N
 
 feature 结束位置下游碱基数。默认 0。须为非负整数。
 
-## -a / -a
+## -a / --strand-aware
 
 - 正链：上游向 start 左侧延伸，下游向 end 右侧延伸。
 - 负链：上游向 end 右侧延伸，下游向 start 左侧延伸。

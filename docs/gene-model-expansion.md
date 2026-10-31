@@ -20,6 +20,9 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 chr1	src	mRNA	100	800	.	+	.	ID=tx02;Parent=gene01
 chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
+chr2	src	gene	200	600	.	-	.	ID=gene02;Name=XYZ1
+chr2	src	mRNA	200	600	.	-	.	ID=tx03;Parent=gene02
+chr2	src	exon	200	400	.	-	.	ID=ex04;Parent=tx03
 ```
 
 ## -C / --children
@@ -27,18 +30,37 @@ chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
 Include the selector hit and all its descendants.
 
 ```bash
-# gene01 + all mRNAs, exons, CDS
 ./gffsub demo.gff3 -i gene01 -C
+```
 
-# tx01 + its exons and CDS
+```
+##gff-version 3
+chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
+chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
+chr1	src	CDS	100	250	.	+	0	ID=cds01;Parent=tx01
+chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
+chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
+chr1	src	mRNA	100	800	.	+	.	ID=tx02;Parent=gene01
+chr1	src	exon	100	800	.	+	.	ID=ex03;Parent=tx02
+```
+
+Selecting a transcript stops below it:
+
+```bash
 ./gffsub demo.gff3 -i tx01 -C
 ```
 
-`-i gene01 -C` returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
+```
+##gff-version 3
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
+chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
+chr1	src	CDS	100	250	.	+	0	ID=cds01;Parent=tx01
+chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
+chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
+```
 
-`-i tx01 -C` returns: tx01, ex01, cds01, ex02, cds02.
-
-## -p / -p
+## -p / --parents
 
 Include the selector hit and all its ancestors up to the gene.
 
@@ -46,9 +68,14 @@ Include the selector hit and all its ancestors up to the gene.
 ./gffsub demo.gff3 -i ex01 -p
 ```
 
-Returns: ex01, tx01, gene01.
+```
+##gff-version 3
+chr1	src	gene	100	1000	.	+	.	ID=gene01;Name=BRCA1
+chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
+chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
+```
 
-## -m / -m
+## -m / --model
 
 Include the full gene model: the gene, the selector hit, all sibling transcripts, and all their children.
 
@@ -56,13 +83,13 @@ Include the full gene model: the gene, the selector hit, all sibling transcripts
 ./gffsub demo.gff3 -i tx01 -m
 ```
 
-Returns: gene01, tx01, ex01, cds01, ex02, cds02, tx02, ex03.
+The output is the same as `-i gene01 -C` above, because tx01 belongs to gene01 and gene01 has no other children.
 
 ## Comparison
 
 | Flag | Direction | Includes |
 |------|-----------|----------|
-| `-C` / `-C` | downward | selector hit + all descendants |
+| `-C` / `--children` | downward | selector hit + all descendants |
 | `-p` | upward | selector hit + all ancestors to gene |
 | `-m` | both | full gene model |
 
@@ -74,4 +101,8 @@ Remove records all of whose Parent references point outside the kept set. Applie
 ./gffsub demo.gff3 -t exon --drop-orphans
 ```
 
-With this flag the output contains no dangling `Parent=` references.
+```
+##gff-version 3
+```
+
+`-t exon` removes the transcript rows, so every exon loses its parent and the fixpoint drops the whole set.

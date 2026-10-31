@@ -50,7 +50,7 @@ tx01
 
 ## -n / --name
 
-Syntax: `-n NAME` or `-n NAME`
+Syntax: `-n NAME` or `--name NAME`
 
 - Gene lookup by multiple keys: `ID`, `gene_id`, `Name`, `locus_tag`, `Alias`, `Dbxref`
 - Only matches gene-type features
@@ -62,7 +62,7 @@ Syntax: `-n NAME` or `-n NAME`
 ./gffsub demo.gff3 -n gene01 -C
 ```
 
-## -N / -N REGION
+## -N / --nearest REGION
 
 Syntax: `--nearest CHR:START-END`
 

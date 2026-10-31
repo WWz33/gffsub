@@ -22,15 +22,15 @@ gffsub <input> -i ID -u N -D N
 
 Target feature ID or gene name. An ID match takes priority; if none matches, gene-name lookup runs next (Name, gene_id, locus_tag, Alias, Dbxref). Required.
 
-## -u / -u N / --upstream N
+## -u / --up N
 
 Bases upstream of the feature start. Default 0. Must be a non-negative integer; trailing garbage (e.g. `50abc`) is rejected.
 
-## -D / -D N / --downstream N
+## -D / --down N
 
 Bases downstream of the feature end. Default 0. Must be a non-negative integer.
 
-## -a / -a
+## -a / --strand-aware
 
 - Plus strand: upstream extends left of start, downstream extends right of end.
 - Minus strand: upstream extends right of end, downstream extends left of start.

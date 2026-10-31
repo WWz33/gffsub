@@ -34,8 +34,8 @@ stdin。
 
 ## 文档
 
-[docs/](docs/Home.zh.md) — 使用指南（中英双语）
-[CHANGELOG.md](CHANGELOG.md) — 版本记录
+- [docs/](docs/Home.zh.md)：使用指南，中英双语
+- [CHANGELOG.md](CHANGELOG.md)：版本记录
 
 ## License
 

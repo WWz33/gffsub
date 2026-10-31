@@ -85,8 +85,8 @@ A column-9 attribute can hold several values (`Parent=g1,g2`). A predicate
 matches when any value matches; `!=` and `!~` match only when no value does.
 
 ```bash
-gffsub ann.gff3 -I 'Parent == g2'   # keeps Parent=g1,g2
-gffsub ann.gff3 -I 'Parent != g2'   # excludes it
+./gffsub ann.gff3 -I 'Parent == g2'   # keeps Parent=g1,g2
+./gffsub ann.gff3 -I 'Parent != g2'   # excludes it
 ```
 
 ## Missing attributes
@@ -97,7 +97,7 @@ gffsub ann.gff3 -I 'Parent != g2'   # excludes it
 ## Examples
 
 ```bash
-gffsub ann.gff3 -t exon -I 'length >= 100'
-gffsub ann.gff3 -E 'length < 10'
-gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
+./gffsub ann.gff3 -t exon -I 'length >= 100'
+./gffsub ann.gff3 -E 'length < 10'
+./gffsub ann.gff3 -t exon -I 'length >= 200 && strand == "+"'
 ```

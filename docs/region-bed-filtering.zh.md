@@ -31,6 +31,8 @@ chr2	src	gene	200	600	.	-	.	ID=gene02
 输出：
 
 ```
+##gff-version 3
+chr1	src	gene	100	1000	.	+	.	ID=gene01
 chr1	src	mRNA	100	1000	.	+	.	ID=tx01;Parent=gene01
 chr1	src	exon	100	250	.	+	.	ID=ex01;Parent=tx01
 chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
