@@ -44,6 +44,10 @@ class GffData {
 public:
     std::vector<GffRecord> records;
     std::vector<std::string> directives;
+    // Input format the records were parsed from. Kept on the data so a file
+    // with no records still reports the format it was read as (an empty BED
+    // file is still BED).
+    InputFormat source_format = InputFormat::GFF3;
     // Backing storage for record string_views. Either an owned buffer filled
     // once by parse_file (never grows afterwards, so views stay valid) or an
     // mmap'd file exposed through content(); never both.
@@ -123,6 +127,7 @@ private:
     void move_from(GffData&& other) {
         records = std::move(other.records);
         directives = std::move(other.directives);
+        source_format = other.source_format;
         // Record views point into other's storage. A mapping keeps its
         // addresses, and a heap buffer is stolen pointer and all, but a short
         // (SSO) string copies its bytes into the new object, so views into the

@@ -20,3 +20,4 @@
 - [Summary 输出](summary-output.zh.md)：`-s`、`--summary`
 - [GTF 输入处理](gtf-input.zh.md)
 - [Library API](library-api.zh.md)
+- [缺陷审查记录](defect-review.zh.md)：`f2e171b` 已复核的缺陷

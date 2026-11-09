@@ -57,6 +57,7 @@ All notable changes to gffsub are documented in this file. The format follows
 
 ### Removed
 - BED to GFF3 and BED to GTF conversion
+- JSON summary output (`--summary-format json`); the TSV form remains
 - `CMakeLists.txt`; the Makefile is the only build
 
 ### Fixed
@@ -120,7 +121,60 @@ All notable changes to gffsub are documented in this file. The format follows
   CR, matching the plain-file path
 - `--out-attrs` matches keys after the same trim the attribute indexer
   applies
-- `--threads` help text and README state the actual default (6)
+- `--threads` help text states the actual default (6)
+
+### Fixed (defect review 2026-11-09)
+
+Details, commands, and before/after output for each entry are in
+`docs/defect-review.md`.
+
+- A GTF transcript carrying a `Parent` attribute keeps its `gene_id` link, so
+  `--longest` no longer drops the gene as childless; a transcript is never
+  listed as its own parent
+- GTF row expansion for a multi-parent child writes each parent's transcript
+  on its own row: an existing `transcript_id` no longer overwrites the row's
+  parent, and the repeated Parent list is dropped, so re-reading the output
+  keeps the row count instead of doubling it
+- A `stop_codon` shared by several transcripts trims each parent's terminal
+  CDS, not only the first
+- `--parents` and `--model` expand an ID-less child through its own Parent
+  links instead of returning the child alone
+- A quoted GTF `Parent` list is URL-decoded, matching the GFF3 path
+- GTF to GFF3 output writes the full `Parent` list, not just the first value
+- The Parent cycle warning walks every Parent of every line, with no depth
+  cutoff: a cycle reachable only through a non-first parent is reported
+- A Parent that names no record in an input GFF3 file is reported once
+- An empty BED file is still recognized as BED, so the conversion guard fires;
+  an empty file takes its format from the `.bed` / `.gtf` suffix
+- BED `score` is written as an integer clamped to 0..1000; fractional,
+  negative, out-of-range, unparseable and non-finite values write `0`
+- A write failure after a successful open (full disk, closed stdout) exits 1
+  instead of 0 with a truncated file
+- A closed stdin exits 1 instead of printing an empty annotation
+- A UTF-8 BOM is stripped before parsing and format sniffing, so it no longer
+  becomes part of the first seqid or hides a `##` directive
+- GFF3/GTF rows with more than nine columns (BED: more than 12) are reported
+  and skipped instead of silently dropping the extra fields
+- Multi-character strand and phase values are rejected; the row is skipped
+  instead of truncating `++` to `+`
+- `parse_list` trims each item, so `-t "mRNA, exon"` keeps both types
+- Summary lengths, sums, coverage and the median saturate at the int64 limit
+  instead of printing negative values
+- `-t`/`-@` validation: a whitespace-prefixed negative thread count is
+  rejected like an unspaced one
+- A second positional operand is a usage error instead of an ignored file
+- `query` and `window` accept `--flag=value` like the default CLI
+- Input errors keep the operating system's reason (`No such file or
+  directory`, `Permission denied`, `is a directory`)
+- `--longest` dedups isoform and child indices with a set: a gene with tens of
+  thousands of isoforms no longer costs quadratic time
+- `docs/library-api.md`: field names match the headers (`type`, `filter_by_type`,
+  `std::string_view` record fields), `infer_input_format` is attributed to
+  `input_source.hpp`, `from_owned` / `find_all_genes` / `parents_of_record` are
+  documented, the borrowed-index lifetime requirement is stated, and the link
+  command includes `-lz`
+- `docs/output-formats.md`: the GTF examples show the `ID` / `Parent`
+  attributes the writer emits
 
 ## [0.1.0] - 2026-08-16
 
@@ -142,7 +196,7 @@ and GTF annotation files by region, feature ID, attribute, or gene model.
 - Column filters: `--seqid`, `--source`, `--score`, `--strand`, `--phase`
 - Longest isoform selection (`-L`, `--longest`) with multi-threading (`-@`, `--threads`)
 - Output format conversion: GFF3, GTF2, GTF3 (Ensembl), BED (`-t`, `--format`)
-- Summary output in TSV or JSON (`--summary`)
+- Summary output in TSV (`--summary`); the JSON formatter was removed before the first release
 - Selected attribute projection (`--out-attrs`)
 - `query` and `window` subcommands for query-style API access
 - Input format auto-detection by content sniffing (GFF3, GTF, BED)

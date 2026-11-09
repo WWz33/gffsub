@@ -54,7 +54,7 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 
 - 6 列：chrom、start（0-based）、end、name、score、strand。
 - `start` = 记录起始 - 1。
-- `score` 取第 6 列；缺失、`.` 或非有限值（`inf`、`nan`）时为 `0`。
+- `score` 取第 6 列，按整数写出：向零取整并限制在 0..1000。缺失、`.`、无法解析或非有限值（`inf`、`nan`）写 `0`。
 - `name` 取 `ID`，缺失时取 type。
 - BED 输入必须配 `-f bed` 或 `-s`；BED 不转换为 GFF3 或 GTF。
 
@@ -75,20 +75,20 @@ GTF3（`-f gtf`）：
 
 ```
 ##gtf-version 3
-chr1	src	gene	100	1000	.	+	.	gene_id "gene01"; Name "BRCA1";
-chr1	src	transcript	100	1000	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01";
-chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01";
+chr1	src	gene	100	1000	.	+	.	gene_id "gene01"; Name "BRCA1"; ID "gene01";
+chr1	src	transcript	100	1000	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "gene01"; ID "tx01";
+chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "ex01";
+chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "cds01";
+chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "stop01";
 ```
 
 GTF2.2（`-f gtf22`）丢掉 gene 和 transcript 行，CDS 照样裁剪：
 
 ```
 ##gtf-version 2.2
-chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01";
-chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01";
+chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "ex01";
+chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "cds01";
+chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "stop01";
 ```
 
 BED：

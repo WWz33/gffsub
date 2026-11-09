@@ -17,8 +17,11 @@ namespace {
 // are malformed, but it should say so. Counted per parse and reported once.
 struct ParseIssues {
     size_t short_lines = 0;       // fewer than 9 columns (or 3 for BED)
+    size_t extra_columns = 0;     // more than 9 columns (or 12 for BED)
     size_t bad_coordinates = 0;   // non-integer, non-positive, or start > end
     size_t cds_without_phase = 0; // CDS whose phase is not 0, 1 or 2
+    size_t bad_strand = 0;        // strand that is not +, -, ., or ?
+    size_t bad_phase = 0;         // phase that is not 0, 1, 2, or .
 };
 thread_local ParseIssues g_issues;
 
@@ -29,9 +32,21 @@ void report_issues() {
         std::cerr << "Warning: " << g_issues.short_lines
                   << " line(s) skipped: too few columns\n";
     }
+    if (g_issues.extra_columns) {
+        std::cerr << "Warning: " << g_issues.extra_columns
+                  << " line(s) skipped: too many columns\n";
+    }
     if (g_issues.bad_coordinates) {
         std::cerr << "Warning: " << g_issues.bad_coordinates
                   << " line(s) skipped: invalid coordinates\n";
+    }
+    if (g_issues.bad_strand) {
+        std::cerr << "Warning: " << g_issues.bad_strand
+                  << " line(s) skipped: invalid strand (expected +, -, ., or ?)\n";
+    }
+    if (g_issues.bad_phase) {
+        std::cerr << "Warning: " << g_issues.bad_phase
+                  << " line(s) skipped: invalid phase (expected 0, 1, 2, or .)\n";
     }
     if (g_issues.cds_without_phase) {
         std::cerr << "Warning: " << g_issues.cds_without_phase
@@ -98,10 +113,19 @@ int parse_file(const std::string& filename, GffData& data, InputFormat format) {
 }
 
 int parse_content(GffData& data, InputFormat format) {
-    const std::string_view content{data.content()};
+    std::string_view content{data.content()};
+    // Strip a UTF-8 byte-order mark: it is not part of the first seqid and
+    // would otherwise glue to it, or hide a ## directive from the parser.
+    if (content.size() >= 3 &&
+        static_cast<unsigned char>(content[0]) == 0xEF &&
+        static_cast<unsigned char>(content[1]) == 0xBB &&
+        static_cast<unsigned char>(content[2]) == 0xBF) {
+        content.remove_prefix(3);
+    }
     bool in_fasta = false;
     size_t pos = 0;
     reset_issues();
+    data.source_format = format;
 
     while (pos < content.size()) {
         size_t eol = content.find('\n', pos);
@@ -135,6 +159,10 @@ int parse_content(GffData& data, InputFormat format) {
         if (format == InputFormat::GFF3 || format == InputFormat::GTF) {
             auto cols = split_line(line, '\t');
             if (cols.size() < 9) { ++g_issues.short_lines; continue; }
+            // GFF3 and GTF both define exactly nine columns. A tenth field has
+            // no place in the format and would be dropped on output, so the
+            // row is reported instead of silently losing data.
+            if (cols.size() > 9) { ++g_issues.extra_columns; continue; }
 
             try {
                 rec.seqid = cols[0];
@@ -162,13 +190,27 @@ int parse_content(GffData& data, InputFormat format) {
                         if (spos == cols[5].size()) rec.score = s;
                     } catch (...) { rec.score = std::nullopt; }
                 }
-                rec.strand = cols[6].empty() ? '.' : cols[6][0];
-                rec.phase = cols[7].empty() ? '.' : cols[7][0];
-                // GFF3 spec: phase is required for every CDS and is 0, 1 or 2.
-                if (rec.feat_class == FeatureClass::CDS &&
-                    rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
-                    ++g_issues.cds_without_phase;
-                }
+                // GFF3 spec: strand is +, -, ., or ?. Phase is 0, 1, 2, or .; it is
+                    // required on every CDS. A multi-character field is not
+                    // a valid value, and truncating it to one character would
+                    // invent data.
+                    const auto valid_strand = [](std::string_view s) {
+                        return s.size() == 1 &&
+                               (s[0] == '+' || s[0] == '-' || s[0] == '.' || s[0] == '?');
+                    };
+                    const auto valid_phase = [](std::string_view s) {
+                        return s.size() == 1 &&
+                               (s[0] == '0' || s[0] == '1' || s[0] == '2' || s[0] == '.');
+                    };
+                    if (!valid_strand(cols[6])) { ++g_issues.bad_strand; continue; }
+                    if (!valid_phase(cols[7])) { ++g_issues.bad_phase; continue; }
+                    rec.strand = cols[6][0];
+                    rec.phase = cols[7][0];
+                    // GFF3 spec: phase is required for every CDS and is 0, 1 or 2.
+                    if (rec.feat_class == FeatureClass::CDS &&
+                        rec.phase != '0' && rec.phase != '1' && rec.phase != '2') {
+                        ++g_issues.cds_without_phase;
+                    }
                 rec.attr_raw = cols[8];
 
                 // The `;`/`=` scan is GFF3-only: it is not quote-aware, so on
@@ -181,6 +223,15 @@ int parse_content(GffData& data, InputFormat format) {
                     rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
                     rec.id = extract_quoted_value(rec.attr_raw, "ID");
                     rec.parent_id = extract_quoted_value(rec.attr_raw, "Parent");
+                    // A quoted GTF Parent may carry a comma list. The scalar
+                    // parent_id holds one ID, the way the GFF3 scalar holds the
+                    // first Parent value; parent_ids() expands the full list.
+                    if (rec.parent_id) {
+                        const auto comma = rec.parent_id->find(',');
+                        if (comma != std::string::npos) {
+                            rec.parent_id = trim_copy(rec.parent_id->substr(0, comma));
+                        }
+                    }
                 } else {
                     rec.id = extract_attr_value(rec.attr_raw, "ID");
                     rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");
@@ -217,13 +268,19 @@ int parse_content(GffData& data, InputFormat format) {
                             rec.id = std::nullopt;
                         }
                     }
-                    if (!rec.parent_id || rec.parent_id->empty()) {
-                        if (rec.feat_class == FeatureClass::Gene) {
-                            rec.parent_id = std::nullopt;
-                        } else if (rec.feat_class == FeatureClass::Transcript &&
-                                   rec.gene_id && !rec.gene_id->empty()) {
-                            rec.parent_id = rec.gene_id;
-                        } else if (rec.transcript_id && !rec.transcript_id->empty()) {
+                    // A GTF transcript's hierarchy parent is its gene. A
+                    // non-standard Parent attribute on a transcript row does
+                    // not replace that link: doing so hides the gene from
+                    // --longest and from the parent index. gene_id is the only
+                    // gene reference GTF defines.
+                    if (rec.feat_class == FeatureClass::Gene) {
+                        rec.parent_id = std::nullopt;
+                    } else if (rec.feat_class == FeatureClass::Transcript) {
+                        rec.parent_id = (rec.gene_id && !rec.gene_id->empty())
+                                            ? rec.gene_id
+                                            : std::nullopt;
+                    } else if (!rec.parent_id || rec.parent_id->empty()) {
+                        if (rec.transcript_id && !rec.transcript_id->empty()) {
                             rec.parent_id = rec.transcript_id;
                         } else {
                             rec.parent_id = std::nullopt;
@@ -237,6 +294,7 @@ int parse_content(GffData& data, InputFormat format) {
         } else if (format == InputFormat::BED) {
             auto cols = split_line(line, '\t');
             if (cols.size() < 3) { ++g_issues.short_lines; continue; }
+            if (cols.size() > 12) { ++g_issues.extra_columns; continue; }
 
             try {
                 rec.seqid = cols[0];
@@ -267,7 +325,13 @@ int parse_content(GffData& data, InputFormat format) {
                         if (spos == cols[4].size()) rec.score = s;
                     } catch (...) { rec.score = std::nullopt; }
                 }
-                rec.strand = (cols.size() > 5 && !cols[5].empty()) ? cols[5][0] : '.';
+                rec.strand = (cols.size() > 5 && (cols[5] == "+" || cols[5] == "-" || cols[5] == "."))
+                                 ? cols[5][0]
+                                 : '.';
+                if (cols.size() > 5 && !cols[5].empty() &&
+                    cols[5] != "+" && cols[5] != "-" && cols[5] != ".") {
+                    ++g_issues.bad_strand;
+                }
                 rec.phase = '.';
                 rec.id = (cols.size() > 3 && !cols[3].empty()) ? std::optional<std::string>(cols[3]) : std::nullopt;
                 rec.parent_id = std::nullopt;

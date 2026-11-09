@@ -54,7 +54,7 @@ Header written per flavor: `##gtf-version 3`, `##gtf-version 2.5`, `##gtf-versio
 
 - 6 columns: chrom, start (0-based), end, name, score, strand.
 - `start` = record start - 1.
-- `score` from column 6; `0` when missing, `.`, or non-finite (`inf`, `nan`).
+- `score` from column 6, written as an integer: rounded toward zero and clamped to 0..1000. A missing, `.`, unparseable, or non-finite (`inf`, `nan`) score writes `0`.
 - `name` from `ID`, or the type when `ID` is missing.
 - BED input requires `-f bed` or `-s`; BED is not converted to GFF3 or GTF.
 
@@ -75,20 +75,20 @@ GTF3 (`-f gtf`):
 
 ```
 ##gtf-version 3
-chr1	src	gene	100	1000	.	+	.	gene_id "gene01"; Name "BRCA1";
-chr1	src	transcript	100	1000	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01";
-chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01";
+chr1	src	gene	100	1000	.	+	.	gene_id "gene01"; Name "BRCA1"; ID "gene01";
+chr1	src	transcript	100	1000	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "gene01"; ID "tx01";
+chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "ex01";
+chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "cds01";
+chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "stop01";
 ```
 
 GTF2.2 (`-f gtf22`) drops the gene and transcript rows. The CDS is still trimmed:
 
 ```
 ##gtf-version 2.2
-chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01";
-chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01";
-chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01";
+chr1	src	exon	100	250	.	+	.	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "ex01";
+chr1	src	CDS	100	247	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "cds01";
+chr1	src	stop_codon	248	250	.	+	0	gene_id "gene01"; transcript_id "tx01"; Parent "tx01"; ID "stop01";
 ```
 
 BED:

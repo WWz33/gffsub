@@ -11,8 +11,12 @@
 #include <iostream>
 #include <iterator>
 #include <string>
+#include <cerrno>
+#include <cstring>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 using namespace gffsub;
@@ -27,6 +31,40 @@ std::optional<AnnotationIndex> try_load_index(const std::string& path) {
         std::cerr << "Error: " << e.what() << '\n';
         return std::nullopt;
     }
+}
+
+// Describe why a path could not be read, keeping the operating system's
+// reason. A missing file, a permission problem, and a corrupt gzip all used
+// to print the same sentence.
+std::string describe_path_error(const std::string& path) {
+    if (path != "-") {
+        struct stat st{};
+        if (::stat(path.c_str(), &st) != 0) return std::strerror(errno);
+        if (S_ISDIR(st.st_mode)) return "is a directory";
+        if (::access(path.c_str(), R_OK) != 0) return std::strerror(errno);
+    }
+    return {};
+}
+
+// Flush and report a failed write. A full disk or a closed descriptor used to
+// exit 0 with a truncated or empty file.
+bool finish_output(std::ostream& out, const std::string& path) {
+    out.flush();
+    if (out.good()) return true;
+    std::cerr << "Error: cannot write " << (path.empty() ? "stdout" : path) << '\n';
+    return false;
+}
+
+// Split `--flag=value` into the flag and its attached value. A `-`/`--`
+// argument without '=' returns the argument unchanged with no attached value.
+std::pair<std::string, std::optional<std::string>> split_long_option(const std::string& arg) {
+    if (arg.size() > 2 && arg[0] == '-' && arg[1] == '-') {
+        const auto eq = arg.find('=');
+        if (eq != std::string::npos && eq > 2) {
+            return {arg.substr(0, eq), arg.substr(eq + 1)};
+        }
+    }
+    return {arg, std::nullopt};
 }
 
 }  // namespace
@@ -49,17 +87,26 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     bool summary = false;
 
     for (int i = 2; i < argc; ++i) {
-        const std::string arg = argv[i];
-        auto require_value = [&](const char* option) -> std::optional<std::string> {
+        const auto option = split_long_option(argv[i]);
+        const std::string& arg = option.first;
+        const std::optional<std::string>& attached = option.second;
+        auto require_value = [&](const char* name) -> std::optional<std::string> {
+            if (attached) {
+                if (attached->empty()) {
+                    std::cerr << "Error: " << name << " requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                return *attached;
+            }
             if (i + 1 >= argc) {
-                std::cerr << "Error: " << option << " requires a value\n";
+                std::cerr << "Error: " << name << " requires a value\n";
                 return std::nullopt;
             }
             ++i;
             // Reject empty selectors like the main parser does: they would
             // otherwise match nothing and exit 0.
             if (argv[i][0] == '\0') {
-                std::cerr << "Error: " << option << " requires a non-empty value\n";
+                std::cerr << "Error: " << name << " requires a non-empty value\n";
                 return std::nullopt;
             }
             return std::string{argv[i]};
@@ -161,7 +208,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     } else {
         print_gff3(std::cout, result.records);
     }
-    return 0;
+    return finish_output(std::cout, {}) ? 0 : 1;
 }
 
 // --- window subcommand (gffsub window <file> [opts]) ---
@@ -180,17 +227,26 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
     WindowParams params;
 
     for (int i = 2; i < argc; ++i) {
-        const std::string arg = argv[i];
-        auto require_value = [&](const char* option) -> std::optional<std::string> {
+        const auto option = split_long_option(argv[i]);
+        const std::string& arg = option.first;
+        const std::optional<std::string>& attached = option.second;
+        auto require_value = [&](const char* name) -> std::optional<std::string> {
+            if (attached) {
+                if (attached->empty()) {
+                    std::cerr << "Error: " << name << " requires a non-empty value\n";
+                    return std::nullopt;
+                }
+                return *attached;
+            }
             if (i + 1 >= argc) {
-                std::cerr << "Error: " << option << " requires a value\n";
+                std::cerr << "Error: " << name << " requires a value\n";
                 return std::nullopt;
             }
             ++i;
             // Reject empty selectors like the main parser does: they would
             // otherwise match nothing and exit 0.
             if (argv[i][0] == '\0') {
-                std::cerr << "Error: " << option << " requires a non-empty value\n";
+                std::cerr << "Error: " << name << " requires a non-empty value\n";
                 return std::nullopt;
             }
             return std::string{argv[i]};
@@ -264,7 +320,7 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
-    return 0;
+    return finish_output(std::cout, {}) ? 0 : 1;
 }
 
 // --- main ---
@@ -317,7 +373,7 @@ int run_window_from_args(const CliArgs& a) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
-    return 0;
+    return finish_output(std::cout, {}) ? 0 : 1;
 }
 
 // True when CliArgs has no subset filters (only query-style selectors are set).
@@ -421,7 +477,7 @@ int main(int argc, char* argv[]) {
         }
         const auto result = query(*index, *qparams);
         print_gff3(std::cout, result.records, a.out_attrs);
-        return 0;
+        return finish_output(std::cout, {}) ? 0 : 1;
     }
 
     // --- main subset path ---
@@ -436,7 +492,10 @@ int main(int argc, char* argv[]) {
     } else {
         input_fmt = infer_input_format(a.input_file);
         if (parse_file(a.input_file, data, input_fmt) != 0) {
-            std::cerr << "Error: cannot parse " << a.input_file << '\n';
+            const auto why = describe_path_error(a.input_file);
+            std::cerr << "Error: cannot parse " << a.input_file;
+            if (!why.empty()) std::cerr << " (" << why << ")";
+            std::cerr << '\n';
             return 1;
         }
     }
@@ -532,6 +591,17 @@ int main(int argc, char* argv[]) {
             case OutputFormat::GTF25:
             case OutputFormat::GTF22: print_gtf(*out, data, a.format, a.out_attrs); break;
             case OutputFormat::BED:  print_bed(*out, data); break;
+        }
+    }
+    if (!finish_output(*out, a.output_file)) {
+        if (out == &out_file) out_file.close();
+        return 1;
+    }
+    if (out == &out_file) {
+        out_file.close();
+        if (out_file.fail()) {
+            std::cerr << "Error: cannot write " << a.output_file << '\n';
+            return 1;
         }
     }
 

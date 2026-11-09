@@ -55,7 +55,10 @@ std::unordered_set<std::string> parse_list(std::string_view sv, bool& exclude) {
     while (pos < sv.size()) {
         auto comma = sv.find(',', pos);
         if (comma == std::string_view::npos) comma = sv.size();
-        if (comma > pos) result.emplace(sv.substr(pos, comma - pos));
+        // Trim each part: users write `-t "mRNA, exon"` with a space after the
+        // comma, and an untrimmed item matches no type.
+        const auto part = trim_view(sv.substr(pos, comma - pos));
+        if (!part.empty()) result.emplace(part);
         pos = comma + 1;
     }
     return result;

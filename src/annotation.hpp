@@ -32,14 +32,18 @@ public:
     std::optional<GffRecord> find_gene(std::string_view id) const;
     std::vector<GffRecord> find_all_genes(std::string_view id) const;
     std::vector<GffRecord> parents_of(std::string_view id) const;
+    // Parents of one record, resolved from its own Parent list. Works for a
+    // record without an ID, which parents_of cannot address.
+    std::vector<GffRecord> parents_of_record(const GffRecord& rec) const;
     std::vector<GffRecord> children_of(std::string_view parent_id) const;
     std::vector<GffRecord> descendants_of(std::string_view parent_id) const;
     std::vector<GffRecord> overlap(std::string_view seqid, int64_t start, int64_t end) const;
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
-    // Source format of the records, or nullopt when the index is empty.
-    std::optional<InputFormat> source_format() const;
+    // Format of the input the index was built from. Known even when the file
+    // held no records, so an empty BED file is still recognized as BED.
+    InputFormat source_format() const { return source_format_; }
 
     // Re-point recs_ after a move/copy: owned mode follows data_ into the
     // new object; borrowed mode keeps pointing at the external vector.
@@ -59,6 +63,7 @@ private:
     std::unordered_map<std::string, std::vector<int>> gene_lookup_;
     std::unordered_map<std::string, std::vector<int>> parents_by_child_id_;
     std::unordered_map<std::string, std::vector<int>> children_by_parent_id_;
+    InputFormat source_format_ = InputFormat::GFF3;
 
     explicit AnnotationIndex(GffData data);
     // Build the lookup maps over a record vector (owned or borrowed).

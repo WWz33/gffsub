@@ -12,7 +12,7 @@
 
 ```makefile
 CXXFLAGS = -std=c++17 -I/path/to/gffsub/src
-LDFLAGS = -L/path/to/gffsub -lgffsub_core -pthread
+LDFLAGS = -L/path/to/gffsub -lgffsub_core -lz -pthread
 ```
 
 ## Data model
@@ -20,13 +20,13 @@ LDFLAGS = -L/path/to/gffsub -lgffsub_core -pthread
 ```cpp
 // src/record.hpp
 struct GffRecord {
-    std::string seqid, source, type;
+    std::string_view seqid, source, type;  // views into GffData::buffer
     FeatureClass feat_class = FeatureClass::Unknown;
     int64_t start, end;
     std::optional<double> score;
-    std::string score_raw;
+    std::string_view score_raw;
     char strand, phase;
-    std::string attr_raw;
+    std::string_view attr_raw;
     std::optional<std::string> id;
     std::optional<std::string> parent_id;
     std::optional<std::string> gene_id;
@@ -40,6 +40,7 @@ class GffData {
 public:
     std::vector<GffRecord> records;
     std::vector<std::string> directives;
+    InputFormat source_format = InputFormat::GFF3;
     void append(const GffRecord&);
     void append(GffRecord&&);
     size_t size() const;
@@ -56,6 +57,8 @@ public:
 int parse_file(const std::string& filename, GffData& data, InputFormat format);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
 std::vector<std::string> parent_ids(const GffRecord& rec);
+
+// src/input_source.hpp
 InputFormat infer_input_format(const std::string& path);
 ```
 
@@ -70,18 +73,21 @@ public:
     static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
     static AnnotationIndex from_data(const GffData& data);
+    static AnnotationIndex from_owned(GffData data);
 
     std::optional<GffRecord> find_by_id(std::string_view id) const;
     std::vector<GffRecord> find_all_by_id(std::string_view id) const;
     std::optional<GffRecord> find_gene(std::string_view id) const;
+    std::vector<GffRecord> find_all_genes(std::string_view id) const;
     std::vector<GffRecord> parents_of(std::string_view id) const;
+    std::vector<GffRecord> parents_of_record(const GffRecord& rec) const;
     std::vector<GffRecord> children_of(std::string_view parent_id) const;
     std::vector<GffRecord> descendants_of(std::string_view parent_id) const;
     std::vector<GffRecord> overlap(std::string_view seqid, int64_t start, int64_t end) const;
     std::optional<GffRecord> nearest_gene(std::string_view seqid, int64_t start, int64_t end) const;
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
-    std::optional<InputFormat> source_format() const;
+    InputFormat source_format() const;
 };
 
 struct GeneModel {
@@ -91,6 +97,8 @@ struct GeneModel {
 ```
 
 `find_gene` searches gene-type records by ID, gene_id, Name, locus_tag, Alias, Dbxref. `find_all_by_id` returns every line sharing an ID (multi-line CDS).
+
+`from_data` borrows the caller's records: the `GffData` must outlive the index and keep its record order. Returned records hold views into that storage. `from_owned` takes the data by value when no caller-owned copy exists. `parents_of_record` resolves the parents of one record, including a record without an ID.
 
 ## Query
 
@@ -105,7 +113,7 @@ struct QueryParams {
     bool include_children = false;
     bool include_parents = false;
     bool include_model = false;
-    std::string feature_type;
+    std::string type;
     bool apply_type_filter = true;
 };
 
@@ -142,7 +150,7 @@ struct SubsetParams {
     std::optional<std::optional<double>> score_filter;
     std::optional<char> strand_filter;
     std::optional<char> phase_filter;
-    std::string feature;
+    std::string type;
     bool longest = false;
     size_t threads = 1;
     std::vector<GrepFilter> grep_filters;
@@ -160,7 +168,7 @@ void subset(GffData& data, const SubsetParams& params);
 // src/filter.hpp
 void filter_by_region(GffData& data, const Region& region);
 void filter_by_regions_from_file(GffData& data, const std::string& bed_file);
-void filter_by_feature(GffData& data, const std::unordered_set<std::string>& types, bool exclude);
+void filter_by_type(GffData& data, const std::unordered_set<std::string>& types, bool exclude);
 void filter_by_seqid(GffData& data, const std::unordered_set<std::string>& seqids, bool exclude);
 void filter_by_source(GffData& data, const std::unordered_set<std::string>& sources, bool exclude);
 void filter_by_score(GffData& data, std::optional<double> score);
@@ -308,5 +316,5 @@ int main() {
 Compile and link:
 
 ```bash
-g++ -std=c++17 -Isrc main.cpp -L. -lgffsub_core -pthread -o example
+g++ -std=c++17 -Isrc main.cpp -L. -lgffsub_core -lz -pthread -o example
 ```

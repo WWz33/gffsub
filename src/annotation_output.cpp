@@ -133,7 +133,8 @@ void print_gff3(std::ostream& out, const GffData& data,
 
 static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val,
                                    bool is_gene, const GffRecord& rec,
-                                   const std::vector<std::string>& out_attrs) {
+                                   const std::vector<std::string>& out_attrs,
+                                   bool drop_parent = false) {
     // GTF2.2: gene_id required on every line, transcript_id on non-gene
     // features; other attributes may follow (spec: "Any other attributes or
     // comments must appear after these two"). Preserve them like AGAT does
@@ -165,10 +166,17 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
     // GTF-source col9 is `key "value";`, which parse_attributes (tag=value)
     // cannot read — it would drop or corrupt every attribute. Use the GTF
     // pair parser for GTF-source records.
+    //
+    // drop_parent drops Parent from a child row that expansion split under
+    // several parents. Each such row names its own transcript, and repeating
+    // the original parent list makes a re-read expand the row again (two
+    // parents double the child row count per pass). A single-parent row keeps
+    // Parent: it names the same parent transcript_id already carries.
     std::unordered_set<std::string> keep;
     if (!out_attrs.empty()) keep.insert(out_attrs.begin(), out_attrs.end());
     const auto wanted = [&](std::string_view key) {
         if (key == "gene_id" || key == "transcript_id") return false;
+        if (key == "Parent" && drop_parent) return false;
         if (keep.empty()) return true;
         return keep.count(std::string{key}) > 0;
     };
@@ -249,19 +257,26 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             gene_ids.insert(*rec.id);
             gene_label[*rec.id] = rec.gene_id ? *rec.gene_id : *rec.id;
         }
-        if (rec.feat_class == FeatureClass::Unknown && rec.parent_id &&
+        if (rec.feat_class == FeatureClass::Unknown &&
             to_lower(rec.type) == "stop_codon") {
-            stop_codons[*rec.parent_id].emplace_back(rec.start, rec.end);
+            // Key by every Parent: a shared stop codon trims each parent's
+            // terminal CDS, the same way a shared exon expands to every parent.
+            for (const auto& pid : parent_ids(rec)) {
+                stop_codons[pid].emplace_back(rec.start, rec.end);
+            }
         }
     }
 
     // Resolve the emitted gene_id / transcript_id for one parent link. The
-    // source's own gene_id/transcript_id attribute wins; otherwise the parent
-    // chain decides, so the IDs match the parent transcript/gene rows.
+    // parent chain decides, so the IDs match the parent transcript/gene rows.
+    // A child that also carries its own transcript_id keeps that value only
+    // when the row is not an expanded multi-parent row: on expansion the
+    // current parent names the row, otherwise every row would name the same
+    // transcript.
     const auto resolve_child = [&](const std::string& pid, const GffRecord& rec,
-                                   std::string& gene_id_val, std::string& transcript_id_val) {
+                                   bool expanded, std::string& gene_id_val, std::string& transcript_id_val) {
         if (rec.gene_id) gene_id_val = *rec.gene_id;
-        if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
+        if (rec.transcript_id && !expanded) transcript_id_val = *rec.transcript_id;
         const auto tx = tx_label.find(pid);
         if (tx != tx_label.end()) {
             if (transcript_id_val.empty()) transcript_id_val = tx->second;
@@ -302,15 +317,16 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
         const std::string score_str = rec.score_raw.empty() ? std::string{"."} : std::string{rec.score_raw};
 
         // One output row. parent_id selects the stop_codon used to trim the
-        // terminal CDS (empty for gene and transcript rows).
+        // terminal CDS (empty for gene and transcript rows). drop_parent is set
+        // when expansion split one source row under several parents.
         const auto emit_row = [&](const std::string& gene_id_val, const std::string& transcript_id_val,
-                                  const std::string& parent_id) {
+                                  const std::string& parent_id, bool drop_parent) {
             // GTF2.2: gene_id required on every feature line. When it cannot
             // be resolved, emit an empty value (gene_id "";) per the
             // inter/inter_CNS convention rather than dropping the feature.
             std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
                                                 rec.feat_class == FeatureClass::Gene, rec,
-                                                out_attrs);
+                                                out_attrs, drop_parent);
 
             // GTF excludes the stop codon from the terminal CDS. Trim only
             // when the stop_codon sits hard against the CDS 3' end of the same
@@ -347,7 +363,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
-            emit_row(gene_id_val, std::string{}, std::string{});
+            emit_row(gene_id_val, std::string{}, std::string{}, true);
             continue;
         }
 
@@ -366,7 +382,7 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
-            emit_row(gene_id_val, transcript_id_val, std::string{});
+            emit_row(gene_id_val, transcript_id_val, std::string{}, false);
             continue;
         }
 
@@ -380,15 +396,15 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             std::string transcript_id_val;
             if (rec.gene_id) gene_id_val = *rec.gene_id;
             if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
-            emit_row(gene_id_val, transcript_id_val, std::string{});
+            emit_row(gene_id_val, transcript_id_val, std::string{}, false);
             continue;
         }
 
         for (const auto& pid : parents) {
             std::string gene_id_val;
             std::string transcript_id_val;
-            resolve_child(pid, rec, gene_id_val, transcript_id_val);
-            emit_row(gene_id_val, transcript_id_val, pid);
+            resolve_child(pid, rec, parents.size() > 1, gene_id_val, transcript_id_val);
+            emit_row(gene_id_val, transcript_id_val, pid, parents.size() > 1);
         }
     }
 }
@@ -404,17 +420,23 @@ void print_bed(std::ostream& out, const GffData& data) {
     for (const auto& rec : data) {
         if (!rec.kept) continue;
 
+        // A parsed record always has start >= 1; a library-built record can
+        // start at 0, where start - 1 would print -1. Clamp to the first base
+        // instead of writing an invalid coordinate.
+        const int64_t bed_start = rec.start > 1 ? rec.start - 1 : 0;
+
         std::string name = rec.id ? *rec.id : std::string{rec.type};
+        // BED score is an integer from 0 to 1000. Out-of-range, fractional,
+        // unparseable, and non-finite scores have no BED representation, so
+        // they fall back to 0.
         std::string score_str = "0";
-        if (!rec.score_raw.empty() && rec.score_raw != ".") {
-            score_str = std::string{rec.score_raw};
-            // BED score is an integer 0..1000. A GFF score like inf/nan has
-            // no BED representation, so fall back to 0.
-            if (rec.score && !std::isfinite(*rec.score)) score_str = "0";
+        if (rec.score && std::isfinite(*rec.score)) {
+            const double rounded = *rec.score < 0 ? 0 : (*rec.score > 1000 ? 1000 : *rec.score);
+            score_str = std::to_string(static_cast<int64_t>(rounded));
         }
 
         out << rec.seqid << '\t'
-            << (rec.start - 1) << '\t'
+            << bed_start << '\t'
             << rec.end << '\t'
             << name << '\t'
             << score_str << '\t'

@@ -281,8 +281,24 @@ static void cleanup_outputs() {
         "reg_bed_sum.tsv", "reg_bed_q.out", "reg_bed_q.err",
         "reg_bed_w.out", "reg_bed_w.err",
         "reg_gtf_multiparent.gtf", "reg_mp_where.gff3",
-        "reg_mp_drop.gff3", "reg_mp_out.gtf",
-        "reg_idparent.gff3", "reg_idparent.gtf", "reg_idparent.bed"};
+        "reg_mp_drop.gff3", "reg_mp_out.gtf", "reg_mp_out2.gtf",
+        "reg_mp_count1.txt", "reg_mp_count2.txt",
+        "reg_idparent.gff3", "reg_idparent.gtf", "reg_idparent.bed",
+        "reg_def_gene_link.gtf", "reg_def_gene_link.out", "reg_def_gene_link.gtf.out",
+        "reg_def_child_tx.gtf", "reg_def_child_tx.gtf.out",
+        "reg_def_stop.gff3", "reg_def_stop.out",
+        "reg_def_noid.gff3", "reg_def_noid_p.out", "reg_def_noid_m.out",
+        "reg_def_empty.bed", "reg_def_empty.out", "reg_def_empty.err",
+        "reg_def_empty_q.out", "reg_def_empty_q.err",
+        "reg_def_nostdin.out", "reg_def_nostdin.err",
+        "reg_def_extra.gff3", "reg_def_extra.out", "reg_def_extra.err",
+        "reg_def_strand.gff3", "reg_def_strand.out", "reg_def_strand.err",
+        "reg_def_orphan.gff3", "reg_def_orphan.out", "reg_def_orphan.err",
+        "reg_def_big.gff3", "reg_def_big.tsv", "reg_def_big.err",
+        "reg_def_types.gff3", "reg_def_types.out",
+        "reg_def_operand.out", "reg_def_operand.err",
+        "reg_def_attach_q.out", "reg_def_attach_w.out",
+        "reg_def_threads.out", "reg_def_threads.err"};
     std::system("rmdir reg_dir_input 2>/dev/null");
     for (const char* f : files) std::remove(f);
 }
@@ -882,22 +898,39 @@ static int test_gtf_quoted_multi_parent(const std::string& exe) {
         return 1;
     }
     if (run_command(exe + " reg_gtf_multiparent.gtf -f gtf > reg_mp_out.gtf") != 0 ||
-        require_contains("reg_mp_out.gtf", "transcript_id \"t1\"; Parent \"t1,t2\";") != 0 ||
-        require_contains("reg_mp_out.gtf", "transcript_id \"t2\"; Parent \"t1,t2\";") != 0) {
+        require_contains("reg_mp_out.gtf", "transcript_id \"t1\";") != 0 ||
+        require_contains("reg_mp_out.gtf", "transcript_id \"t2\";") != 0) {
+        return 1;
+    }
+    // One row per parent, each naming its own transcript. Re-reading the
+    // output must not expand again: a repeated Parent list doubled the exon
+    // row count on every pass.
+    if (run_command("grep -c \"exon\" reg_mp_out.gtf > reg_mp_count1.txt") != 0 ||
+        require_contains("reg_mp_count1.txt", "2") != 0 ||
+        require_not_contains("reg_mp_out.gtf", "Parent \"t1,t2\"") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_mp_out.gtf -f gtf > reg_mp_out2.gtf") != 0 ||
+        run_command("grep -c \"exon\" reg_mp_out2.gtf > reg_mp_count2.txt") != 0 ||
+        require_contains("reg_mp_count2.txt", "2") != 0) {
         return 1;
     }
     return 0;
 }
 
-// GTF output keeps ID/Parent from GFF3 input (AGAT does the same) and drops
-// non-finite scores that BED cannot represent.
+// GTF output keeps ID/Parent from GFF3 input (AGAT does the same). BED output
+// writes an integer score in 0..1000: non-finite, fractional, negative, and
+// out-of-range source scores all fall back to 0 or the range edge.
 static int test_gtf_attrs_and_bed_score(const std::string& exe) {
     {
         std::ofstream gff{"reg_idparent.gff3"};
         if (!gff.is_open()) return 1;
         gff << "##gff-version 3\n"
             << "chr1\tx\tgene\t1\t100\tinf\t+\t.\tID=g1\n"
-            << "chr1\tx\tmRNA\t1\t100\t0.5\t+\t.\tID=t1;Parent=g1\n";
+            << "chr1\tx\tmRNA\t1\t100\t0.5\t+\t.\tID=t1;Parent=g1\n"
+            << "chr1\tx\texon\t1\t100\t-2\t+\t.\tID=e1;Parent=t1\n"
+            << "chr1\tx\texon\t1\t100\t1001\t+\t.\tID=e2;Parent=t1\n"
+            << "chr1\tx\texon\t1\t100\tabc\t+\t.\tID=e3;Parent=t1\n";
     }
     if (run_command(exe + " reg_idparent.gff3 -f gtf > reg_idparent.gtf") != 0 ||
         require_contains("reg_idparent.gtf", "transcript_id \"t1\"; Parent \"g1\"; ID \"t1\";") != 0) {
@@ -905,7 +938,10 @@ static int test_gtf_attrs_and_bed_score(const std::string& exe) {
     }
     if (run_command(exe + " reg_idparent.gff3 -f bed > reg_idparent.bed") != 0 ||
         require_contains("reg_idparent.bed", "chr1\t0\t100\tg1\t0\t+") != 0 ||
-        require_contains("reg_idparent.bed", "chr1\t0\t100\tt1\t0.5\t+") != 0) {
+        require_contains("reg_idparent.bed", "chr1\t0\t100\tt1\t0\t+") != 0 ||
+        require_contains("reg_idparent.bed", "chr1\t0\t100\te1\t0\t+") != 0 ||
+        require_contains("reg_idparent.bed", "chr1\t0\t100\te2\t1000\t+") != 0 ||
+        require_contains("reg_idparent.bed", "chr1\t0\t100\te3\t0\t+") != 0) {
         return 1;
     }
     return 0;
@@ -916,6 +952,265 @@ static int test_spec_conformance(const std::string& exe) {
            spec_gtf_escape_roundtrip(exe) || spec_comma_scope(exe) ||
            spec_version_header(exe) || spec_cds_phase_warning(exe) ||
            spec_multi_parent_gtf(exe) || spec_parent_cycle(exe);
+}
+
+// --- defects recorded in docs/defect-review.md ----------------------------
+
+// A GTF transcript carrying a non-standard Parent attribute still links to
+// its gene: --longest must keep the gene and compete the transcripts under it.
+// A converter that writes `Parent "gene:g1"` on transcript rows produces this
+// shape, so the attribute must not displace the gene_id link.
+static int test_gtf_transcript_parent_keeps_gene(const std::string& exe) {
+    {
+        std::ofstream gtf{"reg_def_gene_link.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tgene\t1\t100\t.\t+\t.\tgene_id \"g1\";\n"
+            << "chr1\tx\ttranscript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; Parent \"g1\";\n"
+            << "chr1\tx\ttranscript\t1\t200\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t2\"; Parent \"g1\";\n"
+            << "chr1\tx\texon\t1\t50\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";\n"
+            << "chr1\tx\texon\t1\t200\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t2\";\n";
+    }
+    if (run_command(exe + " reg_def_gene_link.gtf --longest > reg_def_gene_link.out") != 0) {
+        return 1;
+    }
+    // g1 kept, the longer transcript survives, the shorter one does not.
+    if (require_contains("reg_def_gene_link.out", "ID=g1") != 0 ||
+        require_contains("reg_def_gene_link.out", "ID=t2;Parent=g1") != 0 ||
+        require_not_contains("reg_def_gene_link.out", "ID=t1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_def_gene_link.gtf -f gtf > reg_def_gene_link.gtf.out") != 0 ||
+        require_contains("reg_def_gene_link.gtf.out", "transcript_id \"t1\"; Parent \"g1\";") != 0 ||
+        require_contains("reg_def_gene_link.gtf.out", "transcript_id \"t2\"; Parent \"g1\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A child row that declares its own transcript_id and a Parent list names a
+// distinct transcript on each expanded row.
+static int test_gtf_child_transcript_id_follows_parent(const std::string& exe) {
+    {
+        std::ofstream gtf{"reg_def_child_tx.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\ttranscript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"txA\";\n"
+            << "chr1\tx\ttranscript\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"txB\";\n"
+            << "chr1\tx\texon\t1\t100\t.\t+\t.\tgene_id \"g1\"; transcript_id \"tx1\"; Parent \"txA,txB\";\n";
+    }
+    if (run_command(exe + " reg_def_child_tx.gtf -f gtf > reg_def_child_tx.gtf.out") != 0) {
+        return 1;
+    }
+    if (require_contains("reg_def_child_tx.gtf.out", "transcript_id \"txA\";") != 0 ||
+        require_contains("reg_def_child_tx.gtf.out", "transcript_id \"txB\";") != 0 ||
+        require_not_contains("reg_def_child_tx.gtf.out", "transcript_id \"tx1\";") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A stop_codon line shared by two transcripts trims the terminal CDS of both.
+static int test_shared_stop_codon(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_stop.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\ts\tgene\t1\t200\t.\t+\t.\tID=g\n"
+            << "chr1\ts\tmRNA\t1\t103\t.\t+\t.\tID=t1;Parent=g\n"
+            << "chr1\ts\tmRNA\t1\t103\t.\t+\t.\tID=t2;Parent=g\n"
+            << "chr1\ts\tCDS\t1\t103\t.\t+\t0\tID=c1;Parent=t1\n"
+            << "chr1\ts\tCDS\t1\t103\t.\t+\t0\tID=c2;Parent=t2\n"
+            << "chr1\ts\tstop_codon\t101\t103\t.\t+\t0\tParent=t1,t2\n";
+    }
+    if (run_command(exe + " reg_def_stop.gff3 -f gtf > reg_def_stop.out") != 0) {
+        return 1;
+    }
+    if (require_contains("reg_def_stop.out", "CDS\t1\t100\t.\t+\t0\tgene_id \"g\"; transcript_id \"t1\"") != 0 ||
+        require_contains("reg_def_stop.out", "CDS\t1\t100\t.\t+\t0\tgene_id \"g\"; transcript_id \"t2\"") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// An exon without an ID still reaches its ancestors and its gene model because
+// its Parent links supply the anchor.
+static int test_parent_expansion_without_id(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_noid.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\ts\tgene\t1\t900\t.\t+\t.\tID=g\n"
+            << "chr1\ts\tmRNA\t1\t400\t.\t+\t.\tID=t1;Parent=g\n"
+            << "chr1\ts\tmRNA\t500\t900\t.\t+\t.\tID=t2;Parent=g\n"
+            << "chr1\ts\texon\t1\t100\t.\t+\t.\tParent=t1,t2\n";
+    }
+    if (run_command(exe + " query reg_def_noid.gff3 -w Parent=t2 -p > reg_def_noid_p.out") != 0 ||
+        require_contains("reg_def_noid_p.out", "ID=g") != 0 ||
+        require_contains("reg_def_noid_p.out", "ID=t1") != 0 ||
+        require_contains("reg_def_noid_p.out", "ID=t2") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query reg_def_noid.gff3 -w Parent=t2 -m > reg_def_noid_m.out") != 0 ||
+        require_contains("reg_def_noid_m.out", "ID=g") != 0 ||
+        require_contains("reg_def_noid_m.out", "ID=t1") != 0 ||
+        require_contains("reg_def_noid_m.out", "ID=t2") != 0 ||
+        require_contains("reg_def_noid_m.out", "Parent=t1,t2") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// An empty BED file is still BED: the conversion guard fires on the format the
+// input was read as, not on the presence of records.
+static int test_empty_bed_rejected(const std::string& exe) {
+    { std::ofstream empty{"reg_def_empty.bed"}; }
+    if (expect_command_failure(exe + " reg_def_empty.bed > reg_def_empty.out 2> reg_def_empty.err") != 0 ||
+        require_contains("reg_def_empty.err", "not converted") != 0) {
+        return 1;
+    }
+    if (expect_command_failure(exe + " query reg_def_empty.bed -i x > reg_def_empty_q.out 2> reg_def_empty_q.err") != 0 ||
+        require_contains("reg_def_empty_q.err", "not converted") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A closed stdin is an input error, not an empty annotation.
+static int test_closed_stdin_rejected(const std::string& exe) {
+    if (expect_command_failure(exe + " - <&- > reg_def_nostdin.out 2> reg_def_nostdin.err") != 0 ||
+        require_contains("reg_def_nostdin.err", "cannot parse stdin") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A row with more than nine columns is reported and skipped, not silently
+// truncated to nine.
+static int test_extra_columns_rejected(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_extra.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "chr1\ts\tgene\t1\t9\t.\t+\t.\tID=g1\tjunk\n";
+    }
+    if (run_command(exe + " reg_def_extra.gff3 > reg_def_extra.out 2> reg_def_extra.err") != 0 ||
+        require_contains("reg_def_extra.err", "too many columns") != 0 ||
+        require_not_contains("reg_def_extra.out", "ID=g1") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A multi-character strand or phase is invalid; the row is skipped, and the
+// value is not truncated to one character.
+static int test_bad_strand_phase_skipped(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_strand.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "chr1\ts\tgene\t1\t9\t.\t++\t.\tID=g1\n";
+    }
+    if (run_command(exe + " reg_def_strand.gff3 > reg_def_strand.out 2> reg_def_strand.err") != 0 ||
+        require_contains("reg_def_strand.err", "invalid strand") != 0 ||
+        require_not_contains("reg_def_strand.out", "ID=g1") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A Parent naming no record in the file is reported once.
+static int test_missing_parent_warned(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_orphan.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\ts\texon\t10\t20\t.\t+\t.\tParent=missing\n";
+    }
+    if (run_command(exe + " query reg_def_orphan.gff3 -w Parent=missing -p > reg_def_orphan.out 2> reg_def_orphan.err") != 0 ||
+        require_contains("reg_def_orphan.err", "has no record in the input") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Summary output saturates on coordinates near the int64 limit instead of
+// printing negative lengths.
+static int test_summary_no_overflow(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_big.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "chr1\tt\texon\t1\t9223372036854775807\t.\t+\t.\tID=r1\n"
+            << "chr1\tt\texon\t9223372036854775806\t9223372036854775807\t.\t+\t.\tID=r2\n";
+    }
+    if (run_command(exe + " reg_def_big.gff3 -s > reg_def_big.tsv 2> reg_def_big.err") != 0 ||
+        require_not_contains("reg_def_big.tsv", "-922337203685477") != 0 ||
+        require_contains("reg_def_big.tsv", "9223372036854775807") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A comma list is split after trimming, so `-t "mRNA, exon"` keeps both types.
+static int test_type_list_trims_spaces(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_def_types.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\ts\tgene\t1\t9\t.\t+\t.\tID=g\n"
+            << "chr1\ts\tmRNA\t1\t9\t.\t+\t.\tID=t;Parent=g\n"
+            << "chr1\ts\texon\t1\t9\t.\t+\t.\tParent=t\n";
+    }
+    if (run_command(exe + " reg_def_types.gff3 -t \"mRNA, exon\" > reg_def_types.out") != 0 ||
+        require_contains("reg_def_types.out", "mRNA") != 0 ||
+        require_contains("reg_def_types.out", "exon") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A second positional operand is a usage error, not a silently ignored file.
+static int test_extra_operand_rejected(const std::string& exe) {
+    if (expect_command_failure(exe + " reg_def_types.gff3 typo.gff3 > reg_def_operand.out 2> reg_def_operand.err") != 0 ||
+        require_contains("reg_def_operand.err", "unexpected argument") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// Subcommands accept --flag=value the same way the default CLI does.
+static int test_subcommand_attached_value(const std::string& exe) {
+    if (run_command(exe + " query reg_def_types.gff3 --id=g > reg_def_attach_q.out") != 0 ||
+        require_contains("reg_def_attach_q.out", "ID=g") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " window reg_def_types.gff3 -i t --up=5 > reg_def_attach_w.out") != 0 ||
+        require_contains("reg_def_attach_w.out", "ID=t") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// A whitespace-prefixed negative thread count is rejected like an unspaced one.
+static int test_threads_rejects_space_negative(const std::string& exe) {
+    if (expect_command_failure(exe + " reg_def_types.gff3 --longest --threads ' -1' > reg_def_threads.out 2> reg_def_threads.err") != 0 ||
+        require_contains("reg_def_threads.err", "non-negative") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_defect_regressions(const std::string& exe) {
+    return test_gtf_transcript_parent_keeps_gene(exe) ||
+           test_gtf_child_transcript_id_follows_parent(exe) ||
+           test_shared_stop_codon(exe) ||
+           test_parent_expansion_without_id(exe) ||
+           test_empty_bed_rejected(exe) ||
+           test_closed_stdin_rejected(exe) ||
+           test_extra_columns_rejected(exe) ||
+           test_bad_strand_phase_skipped(exe) ||
+           test_missing_parent_warned(exe) ||
+           test_summary_no_overflow(exe) ||
+           test_type_list_trims_spaces(exe) ||
+           test_extra_operand_rejected(exe) ||
+           test_subcommand_attached_value(exe) ||
+           test_threads_rejects_space_negative(exe);
 }
 
 // ---------------------------------------------------------------------------
@@ -1059,6 +1354,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_spec_conformance(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_defect_regressions(exe) != 0) {
         cleanup_outputs();
         return 1;
     }

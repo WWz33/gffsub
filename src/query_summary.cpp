@@ -1,6 +1,7 @@
 #include "query_summary.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <string>
 #include <unordered_set>
@@ -35,7 +36,10 @@ double median_of(const std::vector<int64_t>& sorted, size_t lo, size_t hi) {
     const size_t n = hi - lo;
     if (n == 0) return 0;
     if (n % 2 == 1) return static_cast<double>(sorted[lo + n / 2]);
-    return (sorted[lo + n / 2 - 1] + sorted[lo + n / 2]) / 2.0;
+    // Average in double space: int64 addition of two values near the limit
+    // would overflow before the division.
+    return (static_cast<double>(sorted[lo + n / 2 - 1]) +
+            static_cast<double>(sorted[lo + n / 2])) / 2.0;
 }
 
 // Tukey hinges, as used by seqkit stats: Q1/Q3 are medians of the
@@ -50,25 +54,34 @@ double quantile_tukey(const std::vector<int64_t>& sorted, double p) {
 }
 
 // Union bp: sort intervals by start, merge overlapping or book-ended
-// runs (next.start <= cur.end), sum each merged span (bedtools merge).
+// runs, sum each merged span (bedtools merge).
 int64_t union_bp(const std::vector<std::pair<int64_t, int64_t>>& intervals) {
     if (intervals.empty()) return 0;
     std::vector<std::pair<int64_t, int64_t>> sorted{intervals};
     std::sort(sorted.begin(), sorted.end());
+    // Coordinates are int64 and a legal record may sit at INT64_MAX, so every
+    // sum saturates instead of wrapping negative.
+    constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
+    const auto add = [](int64_t a, int64_t b) {
+        return (b > kMax - a) ? kMax : a + b;
+    };
     int64_t total = 0;
     int64_t cur_start = sorted.front().first;
     int64_t cur_end = sorted.front().second;
     for (size_t i = 1; i < sorted.size(); ++i) {
-        if (sorted[i].first <= cur_end + 1) {
+        // Book-ended runs merge; compare directly instead of cur_end + 1,
+        // which overflows at the coordinate limit.
+        if (sorted[i].first <= cur_end || sorted[i].first - 1 == cur_end) {
             if (sorted[i].second > cur_end) cur_end = sorted[i].second;
         } else {
-            total += cur_end - cur_start + 1;
+            const int64_t span = (cur_end < kMax) ? cur_end - cur_start + 1 : kMax;
+            total = add(total, span);
             cur_start = sorted[i].first;
             cur_end = sorted[i].second;
         }
     }
-    total += cur_end - cur_start + 1;
-    return total;
+    const int64_t span = (cur_end < kMax) ? cur_end - cur_start + 1 : kMax;
+    return add(total, span);
 }
 
 struct Stats {
@@ -83,11 +96,14 @@ struct Stats {
     std::vector<std::pair<int64_t, int64_t>> intervals;
 
     void add(int64_t start, int64_t end) {
-        const int64_t len = end - start + 1;
+        // Length and the running sum saturate: a record at the coordinate
+        // limit must not wrap a signed total negative.
+        constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
+        const int64_t len = (end < kMax) ? end - start + 1 : kMax - start + 1;
         if (count == 0 || len < min_len) min_len = len;
         if (len > max_len) max_len = len;
         ++count;
-        sum_len += len;
+        sum_len = (len > kMax - sum_len) ? kMax : sum_len + len;
         lens.push_back(len);
         intervals.push_back({start, end});
     }
@@ -139,15 +155,18 @@ void print_summary(std::ostream& out, const std::vector<GffRecord>& records) {
 
     if (has_all) {
         std::map<std::string, Stats> by_type;
+        constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
         for (auto& [key, s] : agg) {
             auto& e = by_type[key.second];
             e.count += s.count;
-            e.sum_len += s.sum_len;
+            e.sum_len = (s.sum_len > kMax - e.sum_len) ? kMax : e.sum_len + s.sum_len;
             if (e.count == s.count || s.min_len < e.min_len) e.min_len = s.min_len;
             if (s.max_len > e.max_len) e.max_len = s.max_len;
             e.lens.insert(e.lens.end(), s.lens.begin(), s.lens.end());
             // cross-seqid coverage = sum of per-seqid unions
-            e.coverage = (e.coverage < 0 ? 0 : e.coverage) + std::max<int64_t>(s.coverage, 0);
+            const int64_t part = std::max<int64_t>(s.coverage, 0);
+            const int64_t base = (e.coverage < 0) ? 0 : e.coverage;
+            e.coverage = (part > kMax - base) ? kMax : base + part;
         }
         for (auto& [type, s] : by_type) {
             print_stats_row(out, "all", type, s);

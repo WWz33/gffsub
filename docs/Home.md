@@ -20,3 +20,4 @@ Subset GFF3 and GTF annotation files by region, feature ID, attribute, or gene m
 - [Summary Output](summary-output.md): `-s`, `--summary`
 - [GTF Input Handling](gtf-input.md)
 - [Library API](library-api.md)
+- [Defect Review Record](defect-review.md): verified defects at `f2e171b`

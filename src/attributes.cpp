@@ -75,13 +75,15 @@ std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::
 
 namespace {
 
-// Split a raw Parent value on commas, trimming each part and keeping order.
+// Split a raw Parent value on commas, trimming and URL-decoding each part.
+// A GTF value may carry the same %2C escape a GFF3 value does, so both
+// formats resolve an encoded comma to one ID.
 void append_parent_ids(std::vector<std::string>& out, std::string_view raw) {
     size_t start = 0;
     while (start <= raw.size()) {
         const size_t comma = raw.find(',', start);
         const size_t end = (comma == std::string_view::npos) ? raw.size() : comma;
-        std::string part{trim_view(raw.substr(start, end - start))};
+        std::string part{url_decode(trim_view(raw.substr(start, end - start)))};
         if (!part.empty() &&
             std::find(out.begin(), out.end(), part) == out.end()) {
             out.push_back(std::move(part));
@@ -95,7 +97,6 @@ void append_parent_ids(std::vector<std::string>& out, std::string_view raw) {
 
 std::vector<std::string> parent_ids(const GffRecord& rec) {
     std::vector<std::string> out;
-    bool from_parent_attr = false;
     if (rec.src_fmt == InputFormat::GTF) {
         // GTF uses `key "value";`; parse_attributes cannot read it. A quoted
         // comma list is split here so the index, --drop-orphans, --longest,
@@ -104,7 +105,6 @@ std::vector<std::string> parent_ids(const GffRecord& rec) {
         if (rec.attr_raw.find("Parent") != std::string_view::npos) {
             for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
                 if (key == "Parent") {
-                    from_parent_attr = true;
                     append_parent_ids(out, value);
                 }
             }
@@ -113,7 +113,6 @@ std::vector<std::string> parent_ids(const GffRecord& rec) {
         const auto attrs = parse_attributes(rec.attr_raw);
         const auto it = attrs.find("Parent");
         if (it != attrs.end()) {
-            from_parent_attr = true;
             // parse_attributes already split raw commas; a %2C comma is part
             // of one value, so do not split again.
             for (const auto& value : it->second) {
@@ -123,13 +122,19 @@ std::vector<std::string> parent_ids(const GffRecord& rec) {
             }
         }
     }
-    const bool parents_from_gtf_attr =
-        from_parent_attr && rec.src_fmt == InputFormat::GTF && !out.empty();
-    if (rec.parent_id && !parents_from_gtf_attr &&
-        std::find(out.begin(), out.end(), *rec.parent_id) == out.end()) {
+    if (rec.parent_id && std::find(out.begin(), out.end(), *rec.parent_id) == out.end()) {
         // GTF without a Parent attribute: the parser synthesizes parent_id
-        // from transcript_id/gene_id. GFF3: first Parent value.
+        // from transcript_id/gene_id. GFF3: first Parent value. A GTF
+        // transcript's synthesized parent is its gene_id, which stays a parent
+        // even when a non-standard Parent attribute is present.
         append_parent_ids(out, *rec.parent_id);
+    }
+    if (rec.src_fmt == InputFormat::GTF &&
+        rec.feat_class == FeatureClass::Transcript && rec.id) {
+        // A transcript is never its own parent. A non-standard Parent attribute
+        // that lists sibling transcripts would otherwise link the transcript
+        // into a cycle.
+        out.erase(std::remove(out.begin(), out.end(), *rec.id), out.end());
     }
     return out;
 }

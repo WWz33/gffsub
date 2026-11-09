@@ -1,4 +1,5 @@
 #include "gtf_parser.hpp"
+#include "parser.hpp"
 
 #include <optional>
 #include <string>
@@ -180,8 +181,18 @@ std::string gtf_attrs_to_gff3(const GffRecord& rec) {
     if (rec.id) {
         parts.push_back("ID=" + url_escape(*rec.id));
     }
-    if (rec.parent_id) {
-        parts.push_back("Parent=" + url_escape(*rec.parent_id));
+    {
+        // Build Parent from the full parent list, not just the scalar first
+        // value: a GTF `Parent "t1,t2"` row must keep both links in GFF3.
+        const auto parents = parent_ids(rec);
+        if (!parents.empty()) {
+            std::string parent_part = "Parent=";
+            for (size_t i = 0; i < parents.size(); ++i) {
+                if (i > 0) parent_part += ',';
+                parent_part += url_escape(parents[i]);
+            }
+            parts.push_back(std::move(parent_part));
+        }
     }
 
     // Convert the remaining `key "value";` pairs to key=value.

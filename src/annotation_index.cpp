@@ -60,11 +60,13 @@ AnnotationIndex AnnotationIndex::from_data(const GffData& data) {
     // Valid while the caller's GffData lives and keeps its record order.
     AnnotationIndex index{GffData{}};
     index.recs_ = &data.records;
+    index.source_format_ = data.source_format;
     index.build_maps(data.records);
     return index;
 }
 
-AnnotationIndex::AnnotationIndex(GffData data) : data_(std::move(data)) {
+AnnotationIndex::AnnotationIndex(GffData data)
+    : data_(std::move(data)), source_format_(data_.source_format) {
     build_maps(data_.records);
 }
 
@@ -73,7 +75,8 @@ AnnotationIndex::AnnotationIndex(const AnnotationIndex& other)
       id_to_records_(other.id_to_records_),
       gene_lookup_(other.gene_lookup_),
       parents_by_child_id_(other.parents_by_child_id_),
-      children_by_parent_id_(other.children_by_parent_id_) {
+      children_by_parent_id_(other.children_by_parent_id_),
+      source_format_(other.source_format_) {
     data_.copy_storage_from(other.data_);
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
@@ -88,7 +91,8 @@ AnnotationIndex::AnnotationIndex(AnnotationIndex&& other) noexcept
       id_to_records_(std::move(other.id_to_records_)),
       gene_lookup_(std::move(other.gene_lookup_)),
       parents_by_child_id_(std::move(other.parents_by_child_id_)),
-      children_by_parent_id_(std::move(other.children_by_parent_id_)) {
+      children_by_parent_id_(std::move(other.children_by_parent_id_)),
+      source_format_(other.source_format_) {
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
     } else {
@@ -104,6 +108,7 @@ AnnotationIndex& AnnotationIndex::operator=(const AnnotationIndex& other) {
     gene_lookup_ = other.gene_lookup_;
     parents_by_child_id_ = other.parents_by_child_id_;
     children_by_parent_id_ = other.children_by_parent_id_;
+    source_format_ = other.source_format_;
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
     } else {
@@ -120,6 +125,7 @@ AnnotationIndex& AnnotationIndex::operator=(AnnotationIndex&& other) noexcept {
     gene_lookup_ = std::move(other.gene_lookup_);
     parents_by_child_id_ = std::move(other.parents_by_child_id_);
     children_by_parent_id_ = std::move(other.children_by_parent_id_);
+    source_format_ = other.source_format_;
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
     } else {
@@ -136,6 +142,7 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
     // is nothing to anchor hierarchy expansion on). window/gene_model on a
     // flat file anchor on the first line's span, not a synthesized gene span.
     bool saw_gene = false;
+    std::unordered_set<std::string> parent_record_missing;
 
     for (int i = 0; i < static_cast<int>(records.size()); ++i) {
         const auto& rec = records[i];
@@ -213,10 +220,26 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
                 children.push_back(i);
             }
             const auto parent_record = id_to_record_.find(parent_id);
-            if (rec.id && parent_record != id_to_record_.end()) {
-                auto& parents = parents_by_child_id_[*rec.id];
-                if (std::find(parents.begin(), parents.end(), parent_record->second) == parents.end()) {
-                    parents.push_back(parent_record->second);
+            if (parent_record != id_to_record_.end()) {
+                if (rec.id) {
+                    auto& parents = parents_by_child_id_[*rec.id];
+                    if (std::find(parents.begin(), parents.end(), parent_record->second) == parents.end()) {
+                        parents.push_back(parent_record->second);
+                    }
+                }
+            } else if (rec.src_fmt != InputFormat::GTF &&
+                       !parent_record_missing.count(parent_id)) {
+                // A Parent that names no record in the file: the child links to
+                // nothing. Report it once per ID rather than silently emitting
+                // a hierarchy with a hole in it. GTF is exempt: a flat GTF has
+                // exon/CDS rows whose transcript_id names no transcript row,
+                // which is legal there.
+                parent_record_missing.insert(parent_id);
+                if (parent_record_missing.size() <= 5) {
+                    std::cerr << "Warning: Parent '" << parent_id
+                              << "' has no record in the input\n";
+                } else if (parent_record_missing.size() == 6) {
+                    std::cerr << "Warning: further missing-Parent warnings suppressed\n";
                 }
             }
         }
@@ -224,41 +247,68 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
 
     // GFF3 spec: Parent links that form a cycle are invalid. Every traversal
     // here is visited-guarded, so a cycle cannot hang the tool, but the
-    // hierarchy it reports would be nonsense. Walk each identified feature up
-    // its parent chain and warn once per cycle head.
+    // hierarchy it reports would be nonsense. Walk the parent graph with
+    // three-colour marking (unvisited / on stack / done) over every Parent of
+    // every line, so a cycle reachable only through a non-first Parent is
+    // found too. No depth cutoff: a long chain is still a chain.
     {
-        std::unordered_map<std::string, std::string> parent_of;
+        std::unordered_map<std::string, std::vector<std::string>> parents_of_id;
         for (const auto& [id, lines] : id_to_records_) {
-            const auto& rec = records[lines.front()];
-            if (rec.parent_id && !rec.parent_id->empty()) {
-                parent_of.emplace(id, *rec.parent_id);
+            for (const int line : lines) {
+                for (const auto& pid : parent_ids(records[line])) {
+                    auto& list = parents_of_id[id];
+                    if (std::find(list.begin(), list.end(), pid) == list.end()) {
+                        list.push_back(pid);
+                    }
+                }
             }
         }
+        // 0 = unvisited, 1 = on the current walk, 2 = fully explored.
+        std::unordered_map<std::string, int> state;
+        std::unordered_set<std::string> reported_cycles;
         int reported = 0;
-        for (const auto& [id, parent] : parent_of) {
-            std::string cur = parent;
-            for (int step = 0; step < 64 && !cur.empty(); ++step) {
-                if (cur == id) {
-                    if (reported < 5) {
-                        std::cerr << "Warning: Parent cycle involving ID '" << id << "'\n";
+        // Explicit stack: a flat file can chain thousands of levels, and the
+        // recursion would run out of stack on real input.
+        struct Frame {
+            std::string id;
+            size_t next_parent = 0;
+        };
+        for (const auto& entry : parents_of_id) {
+            if (state.count(entry.first) != 0) continue;
+            const std::string root = entry.first;
+            std::vector<Frame> stack{{root, 0}};
+            state[root] = 1;
+            while (!stack.empty()) {
+                Frame& frame = stack.back();
+                const auto it = parents_of_id.find(frame.id);
+                const size_t n = (it == parents_of_id.end()) ? 0 : it->second.size();
+                if (frame.next_parent < n) {
+                    const std::string& parent = it->second[frame.next_parent++];
+                    const auto seen = state.find(parent);
+                    if (seen != state.end() && seen->second == 1) {
+                        if (reported_cycles.insert(root).second) {
+                            if (reported < 5) {
+                                std::cerr << "Warning: Parent cycle involving ID '"
+                                          << frame.id << "'\n";
+                            }
+                            ++reported;
+                        }
+                        continue;
                     }
-                    ++reported;
-                    break;
+                    if (seen == state.end()) {
+                        state[parent] = 1;
+                        stack.push_back(Frame{parent, 0});
+                    }
+                    continue;
                 }
-                const auto next = parent_of.find(cur);
-                if (next == parent_of.end()) break;
-                cur = next->second;
+                state[frame.id] = 2;
+                stack.pop_back();
             }
         }
         if (reported > 5) {
             std::cerr << "Warning: " << (reported - 5) << " further Parent cycle warning(s) suppressed\n";
         }
     }
-}
-
-std::optional<InputFormat> AnnotationIndex::source_format() const {
-    if (recs_->empty()) return std::nullopt;
-    return recs_->front().src_fmt;
 }
 
 std::optional<GffRecord> AnnotationIndex::find_by_id(std::string_view id) const {
@@ -326,6 +376,17 @@ std::vector<GffRecord> AnnotationIndex::children_of(std::string_view parent_id) 
         children.push_back((*recs_)[idx]);
     }
     return children;
+}
+
+std::vector<GffRecord> AnnotationIndex::parents_of_record(const GffRecord& rec) const {
+    std::vector<GffRecord> parents;
+    for (const auto& pid : parent_ids(rec)) {
+        const auto it = id_to_record_.find(pid);
+        if (it != id_to_record_.end()) {
+            parents.push_back((*recs_)[it->second]);
+        }
+    }
+    return parents;
 }
 
 std::vector<GffRecord> AnnotationIndex::descendants_of(std::string_view parent_id) const {

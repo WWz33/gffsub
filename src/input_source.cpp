@@ -7,6 +7,7 @@
 #include <cctype>
 #include <fcntl.h>
 #include <fstream>
+#include <iostream>
 #include <istream>
 #include <optional>
 #include <sys/mman.h>
@@ -102,9 +103,11 @@ bool inflate_memory(std::string_view in, std::string& out) {
 }
 
 // istreambuf_iterator reads byte-by-byte through virtual calls; chunked reads
-// are ~10x faster on 100MB+ streams.
-std::string read_stream_chunked(std::istream& in) {
-    std::string out;
+// are ~10x faster on 100MB+ streams. Returns false when the stream failed for
+// a reason other than end-of-file: a closed or broken sink must not look like
+// an empty annotation.
+bool read_stream_chunked(std::istream& in, std::string& out) {
+    out.clear();
     constexpr size_t kChunk = 1u << 20;
     while (in) {
         const auto old = out.size();
@@ -112,7 +115,9 @@ std::string read_stream_chunked(std::istream& in) {
         in.read(out.data() + old, kChunk);
         out.resize(old + static_cast<size_t>(in.gcount()));
     }
-    return out;
+    if (in.bad()) return false;
+    if (in.fail() && !in.eof()) return false;
+    return true;
 }
 
 // Detect the input format by sniffing the first non-comment feature line.
@@ -259,7 +264,19 @@ InputFormat sniff_format(const std::string& path) {
         f.seekg(pos);
     }
     std::string line;
+    bool first_line = true;
     while (std::getline(f, line)) {
+        if (first_line) {
+            // Drop a UTF-8 BOM so a BOM-prefixed first feature line is read as
+            // written rather than becoming part of the seqid.
+            first_line = false;
+            if (line.size() >= 3 &&
+                static_cast<unsigned char>(line[0]) == 0xEF &&
+                static_cast<unsigned char>(line[1]) == 0xBB &&
+                static_cast<unsigned char>(line[2]) == 0xBF) {
+                line.erase(0, 3);
+            }
+        }
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
         if (line.rfind("##FASTA", 0) == 0) break;
@@ -307,7 +324,7 @@ int load_input(const std::string& filename, GffData& data, InputFormat& format) 
             // Failed mapping: read normally.
             std::ifstream file(filename, std::ios::binary);
             if (!file.is_open()) return -1;
-            data.buffer = read_stream_chunked(file);
+            if (!read_stream_chunked(file, data.buffer)) return -1;
         }
     } else {
         // FIFO/device: a second open() would block waiting for a new writer,
@@ -321,7 +338,11 @@ int load_input(const std::string& filename, GffData& data, InputFormat& format) 
 }
 
 int load_stream(std::istream& in, GffData& data) {
-    data.buffer = read_stream_chunked(in);
+    // A closed or redirected-away descriptor fails every read while still
+    // reporting end-of-file, so it would look like an empty annotation. Check
+    // the descriptor itself when the stream is stdin.
+    if (&in == &std::cin && ::fcntl(STDIN_FILENO, F_GETFD) == -1) return -1;
+    if (!read_stream_chunked(in, data.buffer)) return -1;
     // Transparent gzip: `zcat file.gff3.gz | gffsub -` gets the same result
     // as passing the .gz path directly.
     if (data.buffer.size() >= 2) {
@@ -339,10 +360,32 @@ int load_stream(std::istream& in, GffData& data) {
 }
 
 InputFormat infer_input_format(const std::string& path) {
-    return sniff_format(path);
+    // Content decides; an empty file has no content to sniff, so the
+    // extension is the only evidence left. Without this an empty .bed is
+    // treated as GFF3 and skips the BED conversion guard.
+    const auto fmt = sniff_format(path);
+    struct stat st{};
+    if (::stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > 0) {
+        return fmt;
+    }
+    const auto ends_with_ci = [&](std::string_view suffix) {
+        if (path.size() < suffix.size()) return false;
+        return to_lower(std::string_view{path}.substr(path.size() - suffix.size())) == suffix;
+    };
+    if (ends_with_ci(".bed")) return InputFormat::BED;
+    if (ends_with_ci(".gtf")) return InputFormat::GTF;
+    return fmt;
 }
 
 InputFormat infer_format_from_content(std::string_view content) {
+    // A UTF-8 byte-order mark belongs to the encoding, not to the first field;
+    // drop it so the first line is examined as written.
+    if (content.size() >= 3 &&
+        static_cast<unsigned char>(content[0]) == 0xEF &&
+        static_cast<unsigned char>(content[1]) == 0xBB &&
+        static_cast<unsigned char>(content[2]) == 0xBF) {
+        content.remove_prefix(3);
+    }
     size_t pos = 0;
     while (pos < content.size()) {
         size_t eol = content.find('\n', pos);

@@ -44,16 +44,18 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     // Build gene -> [isoform indices] index once.
     // parent_ids keeps ALL Parent values so a multi-parent isoform
     // (Parent=geneA,geneB, or a quoted GTF list) is registered under every
-    // gene it belongs to.
+    // gene it belongs to. The set mirrors the vector for an O(1) duplicate
+    // check: a gene with tens of thousands of isoforms made the vector
+    // std::find quadratic.
     std::unordered_map<std::string, std::vector<int>> gene_to_isoforms;
+    std::unordered_map<std::string, std::unordered_set<int>> gene_to_isoforms_seen;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
         if (rec.type != isoform_type) continue;
         for (const auto& parent_id : parent_ids(rec)) {
-            auto& vec = gene_to_isoforms[parent_id];
-            if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                vec.push_back(i);
+            if (gene_to_isoforms_seen[parent_id].insert(i).second) {
+                gene_to_isoforms[parent_id].push_back(i);
             }
         }
     }
@@ -62,13 +64,13 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
     // (parent_ids splits Parent=a,b and quoted GTF lists) so shared children
     // link to all parents.
     std::unordered_map<std::string, std::vector<int>> isoform_to_children;
+    std::unordered_map<std::string, std::unordered_set<int>> isoform_to_children_seen;
     for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
         for (const auto& parent_id : parent_ids(rec)) {
-            auto& vec = isoform_to_children[parent_id];
-            if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                vec.push_back(i);
+            if (isoform_to_children_seen[parent_id].insert(i).second) {
+                isoform_to_children[parent_id].push_back(i);
             }
         }
     }
@@ -247,9 +249,11 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         // have thousands of chromosomes, one future each would exhaust
         // thread limits. Batch: launch up to num_threads, then wait.
         std::vector<std::future<std::vector<GenePlan>>> futures;
-        for (auto& kv : chrom_to_genes) {
-            ChromGroup group = kv.second;
-            futures.push_back(std::async(std::launch::async, [&, group]() {
+        for (const auto& kv : chrom_to_genes) {
+            // chrom_to_genes is written before this loop and read-only while
+            // the workers run, so capturing the entry by reference is safe and
+            // avoids copying both vectors per chromosome.
+            futures.push_back(std::async(std::launch::async, [&, &group = kv.second]() {
                 return plan_chromosome(group);
             }));
             if (futures.size() >= num_threads) {

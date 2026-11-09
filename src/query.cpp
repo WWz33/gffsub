@@ -39,7 +39,17 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
             return type_exclude ? !found : found;
         };
         if (params.include_model) {
-            const auto model = index.gene_model(record_id(rec));
+            // A record without an ID still has Parent links: resolve its
+            // parents first, then take the model of the first identified one.
+            // This keeps an ID-less shared exon inside its gene model.
+            std::optional<GffRecord> anchor;
+            if (rec.id) {
+                anchor = rec;
+            } else {
+                const auto parents = index.parents_of_record(rec);
+                if (!parents.empty()) anchor = parents.front();
+            }
+            const auto model = anchor ? index.gene_model(record_id(*anchor)) : std::nullopt;
             if (model) {
                 for (const auto& model_rec : model->records) {
                     if (type_ok(model_rec)) {
@@ -52,8 +62,11 @@ QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
         if (type_ok(rec)) {
             append_unique(result.records, seen, rec);
         }
-        if (params.include_parents && rec.id) {
-            std::vector<GffRecord> stack = index.parents_of(*rec.id);
+        if (params.include_parents) {
+            // Start from the record's own Parent links, so an ID-less child
+            // still reaches its ancestors.
+            std::vector<GffRecord> stack = rec.id ? index.parents_of(*rec.id)
+                                                  : index.parents_of_record(rec);
             std::unordered_set<int> visited_parents;
             while (!stack.empty()) {
                 const auto parent = stack.back();

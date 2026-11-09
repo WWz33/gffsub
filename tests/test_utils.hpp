@@ -8,11 +8,19 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <sys/wait.h>
 
 namespace test_utils {
 
+// An unreadable path yields an empty string, which makes every
+// require_not_contains() pass. Missing-file assertions are common enough
+// that a silent empty read hides real failures; warn on stderr instead.
 inline std::string read_file(const std::string& path) {
     std::ifstream in{path};
+    if (!in.is_open()) {
+        std::cerr << "warning: cannot open " << path << " for reading\n";
+        return {};
+    }
     std::ostringstream buffer;
     buffer << in.rdbuf();
     return buffer.str();
@@ -27,11 +35,17 @@ inline int run_command(const std::string& command) {
 }
 
 // Expect a command to FAIL (non-zero exit). Returns 0 on success of the
-// expectation, 1 if the command unexpectedly succeeded.
+// expectation, 1 if the command unexpectedly succeeded. A signal death
+// counts as a failure, but is reported: a crash is not a clean rejection.
 inline int expect_command_failure(const std::string& command) {
     const int status = std::system(command.c_str());
     if (status == 0) {
         std::cerr << "command unexpectedly succeeded: " << command << '\n';
+        return 1;
+    }
+    if (WIFSIGNALED(status)) {
+        std::cerr << "command died from signal " << WTERMSIG(status) << ": "
+                  << command << '\n';
         return 1;
     }
     return 0;

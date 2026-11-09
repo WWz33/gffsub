@@ -443,16 +443,17 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 break;
             case '@': {
                 args.threads_set = true;
-                // stoul accepts a leading '-' and wraps, so reject it explicitly.
-                if (optarg[0] == '-') {
+                // Accept digits only: stoul skips leading whitespace and wraps
+                // a leading '-', so a value like " -1" must be rejected here.
+                const std::string value{optarg};
+                if (value.empty() ||
+                    value.find_first_not_of("0123456789") != std::string::npos) {
                     std::cerr << "Error: --threads must be a non-negative integer\n";
                     return std::nullopt;
                 }
                 size_t t = 0;
                 try {
-                    size_t pos = 0;
-                    t = std::stoul(optarg, &pos);
-                    if (pos != std::strlen(optarg)) throw std::invalid_argument{""};
+                    t = std::stoul(value);
                 } catch (const std::exception&) {
                     std::cerr << "Error: --threads must be a non-negative integer\n";
                     return std::nullopt;
@@ -509,6 +510,13 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
     }
 
     args.input_file = argv[optind];
+    // A second operand is a typo the user expects to hear about, not a file to
+    // silently ignore.
+    if (optind + 1 < argc) {
+        std::cerr << "Error: unexpected argument " << argv[optind + 1] << '\n';
+        usage(argv[0]);
+        return std::nullopt;
+    }
 
     // --- post-parse validation ---
 
