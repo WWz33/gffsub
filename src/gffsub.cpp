@@ -4,6 +4,7 @@
 #include "parser.hpp"
 #include "query.hpp"
 #include "query_summary.hpp"
+#include "string_utils.hpp"
 #include "subset.hpp"
 #include "window.hpp"
 
@@ -46,15 +47,6 @@ std::string describe_path_error(const std::string& path) {
     return {};
 }
 
-// Flush and report a failed write. A full disk or a closed descriptor used to
-// exit 0 with a truncated or empty file.
-bool finish_output(std::ostream& out, const std::string& path) {
-    out.flush();
-    if (out.good()) return true;
-    std::cerr << "Error: cannot write " << (path.empty() ? "stdout" : path) << '\n';
-    return false;
-}
-
 // Split `--flag=value` into the flag and its attached value. A `-`/`--`
 // argument without '=' returns the argument unchanged with no attached value.
 std::pair<std::string, std::optional<std::string>> split_long_option(const std::string& arg) {
@@ -67,17 +59,143 @@ std::pair<std::string, std::optional<std::string>> split_long_option(const std::
     return {arg, std::nullopt};
 }
 
+std::optional<OutputFormat> parse_output_format(const std::string& value) {
+    if (value == "gff3") return OutputFormat::GFF3;
+    if (value == "gtf" || value == "gtf3") return OutputFormat::GTF3;
+    if (value == "gtf25") return OutputFormat::GTF25;
+    if (value == "gtf22") return OutputFormat::GTF22;
+    if (value == "bed") return OutputFormat::BED;
+    return std::nullopt;
+}
+
+struct OutputOptions {
+    std::string input;
+    std::string output;  // empty or "-" = stdout
+    OutputFormat format = OutputFormat::GFF3;
+    std::vector<std::string> out_attrs;
+    bool summary = false;
+    // Built from the full annotation when the printed data is a subset.
+    // Null means build it from the data being printed.
+    const GtfModel* gtf_model = nullptr;
+};
+
+// Owns the output stream: opens the file, refuses to truncate the input,
+// flushes, closes, and reports a failed write. Every command writes through
+// this one path.
+class OutputSink {
+public:
+    OutputSink(const std::string& input, const std::string& path) : path_(path) {
+        if (path.empty() || path == "-") return;
+        // Input gzip is transparent; output gzip is not implemented. Reject
+        // the suffix instead of writing plain text into a .gz name.
+        if (path.size() > 3 && path.compare(path.size() - 3, 3, ".gz") == 0) {
+            error_ = "gzip output is not supported; write plain text and compress separately: " + path;
+            return;
+        }
+        // Opening the output truncates it. If it is the same file as a plain
+        // (mmap'd) input, reading pages past the new EOF faults. Same dev/ino
+        // covers symlinks and hard links.
+        if (!input.empty() && input != "-") {
+            struct stat in_st{};
+            struct stat out_st{};
+            if (::stat(input.c_str(), &in_st) == 0 &&
+                ::stat(path.c_str(), &out_st) == 0 &&
+                in_st.st_dev == out_st.st_dev && in_st.st_ino == out_st.st_ino) {
+                error_ = "input and output are the same file: " + input;
+                return;
+            }
+        }
+        file_.open(path);
+        if (!file_.is_open()) {
+            error_ = "cannot open " + path + ": " + std::strerror(errno);
+            return;
+        }
+        out_ = &file_;
+    }
+
+    bool ok() const { return error_.empty(); }
+    const std::string& error() const { return error_; }
+    std::ostream& stream() { return *out_; }
+
+    bool finish() {
+        if (!ok()) return false;
+        out_->flush();
+        if (!out_->good()) {
+            error_ = "cannot write " + display_path();
+            return false;
+        }
+        if (file_.is_open()) {
+            file_.close();
+            if (file_.fail()) {
+                error_ = "cannot write " + path_;
+                return false;
+            }
+        }
+        return true;
+    }
+
+private:
+    std::string display_path() const {
+        return (path_.empty() || path_ == "-") ? std::string{"stdout"} : path_;
+    }
+
+    std::ofstream file_;
+    std::ostream* out_ = &std::cout;
+    std::string path_;
+    std::string error_;
+};
+
+int write_output(const GffData& data, const OutputOptions& opts) {
+    OutputSink sink(opts.input, opts.output);
+    if (!sink.ok()) {
+        std::cerr << "Error: " << sink.error() << '\n';
+        return 1;
+    }
+    std::ostream& out = sink.stream();
+    if (opts.summary) {
+        std::vector<GffRecord> kept_records;
+        for (const auto& rec : data) {
+            if (rec.kept) kept_records.push_back(rec);
+        }
+        print_summary(out, kept_records);
+    } else {
+        switch (opts.format) {
+            case OutputFormat::GFF3: print_gff3(out, data, opts.out_attrs); break;
+            case OutputFormat::GTF3:
+            case OutputFormat::GTF25:
+            case OutputFormat::GTF22: {
+                // Build the gene/transcript/stop-codon model from the whole
+                // annotation, then print only the kept rows.
+                const GtfModel model = opts.gtf_model ? *opts.gtf_model
+                                                      : build_gtf_model(data);
+                print_gtf(out, data, model, opts.format, opts.out_attrs);
+                break;
+            }
+            case OutputFormat::BED: print_bed(out, data); break;
+        }
+    }
+    if (!sink.finish()) {
+        std::cerr << "Error: " << sink.error() << '\n';
+        return 1;
+    }
+    return 0;
+}
+
 }  // namespace
 
 // --- query subcommand (gffsub query <file> [opts]) ---
 
 static int run_query_subcommand(int argc, char* argv[], const char* prog) {
-    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
-        query_usage(prog);
+    if (argc >= 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        query_usage(std::cout, prog);
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--version") {
+        std::cout << "gffsub " << kVersion << '\n';
         return 0;
     }
     if (argc < 2) {
-        query_usage(prog);
+        query_usage(std::cerr, prog);
         return 1;
     }
 
@@ -85,6 +203,8 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     QueryParams params;
     std::vector<std::string> id_list_files;
     bool summary = false;
+    OutputOptions out_opts;
+    out_opts.input = input_file;
 
     for (int i = 2; i < argc; ++i) {
         const auto option = split_long_option(argv[i]);
@@ -163,12 +283,31 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
             params.include_parents = true;
         } else if (arg == "-m" || arg == "--model" || arg == "--gene-model") {
             params.include_model = true;
+        } else if (arg == "-o" || arg == "--output") {
+            auto value = require_value("-o");
+            if (!value) return 1;
+            out_opts.output = *value;
+        } else if (arg == "-f" || arg == "--format") {
+            auto value = require_value("-f");
+            if (!value) return 1;
+            const auto fmt = parse_output_format(*value);
+            if (!fmt) {
+                std::cerr << "Error: unknown output format " << *value << '\n';
+                return 1;
+            }
+            out_opts.format = *fmt;
+        } else if (arg == "--out-attrs") {
+            auto value = require_value("--out-attrs");
+            if (!value) return 1;
+            for (const auto tag : split_line(*value, ',')) {
+                if (!tag.empty()) out_opts.out_attrs.emplace_back(tag);
+            }
         } else if (arg == "-h" || arg == "--help") {
-            query_usage(prog);
+            query_usage(std::cout, prog);
             return 0;
         } else {
             std::cerr << "Error: unknown query option " << arg << '\n';
-            query_usage(prog);
+            query_usage(std::cerr, prog);
             return 1;
         }
     }
@@ -183,7 +322,7 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
     if (params.ids.empty() && id_list_files.empty() && params.name.empty() &&
         params.attr_filters.empty() && !params.nearest_region && !params.region) {
         std::cerr << "Error: query requires a selector: --id, --ids, --name, --where, --region, or --nearest\n";
-        query_usage(prog);
+        query_usage(std::cerr, prog);
         return 1;
     }
 
@@ -193,38 +332,50 @@ static int run_query_subcommand(int argc, char* argv[], const char* prog) {
             std::cerr << "Error: cannot open " << path << '\n';
             return 1;
         }
+        if (ids->empty()) {
+            std::cerr << "Error: no IDs in " << path << '\n';
+            return 1;
+        }
         params.ids.insert(params.ids.end(), std::make_move_iterator(ids->begin()), std::make_move_iterator(ids->end()));
     }
 
     const auto index = try_load_index(input_file);
     if (!index) return 1;
-    if (!summary && index->source_format() == InputFormat::BED) {
+    if (!summary && out_opts.format != OutputFormat::BED && index->source_format() == InputFormat::BED) {
         std::cerr << "Error: BED input is not converted to GFF3; use --summary or convert elsewhere\n";
         return 1;
     }
     const auto result = query(*index, params);
-    if (summary) {
-        print_summary(std::cout, result.records.records);
-    } else {
-        print_gff3(std::cout, result.records);
+    out_opts.summary = summary;
+    GtfModel gtf_model;
+    if (!summary && out_opts.format != OutputFormat::GFF3 &&
+        out_opts.format != OutputFormat::BED) {
+        gtf_model = build_gtf_model(index->records());
+        out_opts.gtf_model = &gtf_model;
     }
-    return finish_output(std::cout, {}) ? 0 : 1;
+    return write_output(result.records, out_opts);
 }
 
 // --- window subcommand (gffsub window <file> [opts]) ---
 
 static int run_window_subcommand(int argc, char* argv[], const char* prog) {
-    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
-        window_usage(prog);
+    if (argc >= 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        window_usage(std::cout, prog);
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--version") {
+        std::cout << "gffsub " << kVersion << '\n';
         return 0;
     }
     if (argc < 2) {
-        window_usage(prog);
+        window_usage(std::cerr, prog);
         return 1;
     }
 
     const std::string input_file = argv[1];
     WindowParams params;
+    OutputOptions out_opts;
+    out_opts.input = input_file;
 
     for (int i = 2; i < argc; ++i) {
         const auto option = split_long_option(argv[i]);
@@ -292,12 +443,31 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
             }
         } else if (arg == "--strand-aware" || arg == "-a") {
             params.strand_aware = true;
+        } else if (arg == "-o" || arg == "--output") {
+            auto value = require_value("-o");
+            if (!value) return 1;
+            out_opts.output = *value;
+        } else if (arg == "-f" || arg == "--format") {
+            auto value = require_value("-f");
+            if (!value) return 1;
+            const auto fmt = parse_output_format(*value);
+            if (!fmt) {
+                std::cerr << "Error: unknown output format " << *value << '\n';
+                return 1;
+            }
+            out_opts.format = *fmt;
+        } else if (arg == "--out-attrs") {
+            auto value = require_value("--out-attrs");
+            if (!value) return 1;
+            for (const auto tag : split_line(*value, ',')) {
+                if (!tag.empty()) out_opts.out_attrs.emplace_back(tag);
+            }
         } else if (arg == "-h" || arg == "--help") {
-            window_usage(prog);
+            window_usage(std::cout, prog);
             return 0;
         } else {
             std::cerr << "Error: unknown window option " << arg << '\n';
-            window_usage(prog);
+            window_usage(std::cerr, prog);
             return 1;
         }
     }
@@ -309,18 +479,22 @@ static int run_window_subcommand(int argc, char* argv[], const char* prog) {
 
     const auto index = try_load_index(input_file);
     if (!index) return 1;
-    if (index->source_format() == InputFormat::BED) {
-        std::cerr << "Error: BED input is not converted to GFF3\n";
+    if (out_opts.format != OutputFormat::BED && index->source_format() == InputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3; use -f bed\n";
         return 1;
     }
     try {
         const auto result = window(*index, params);
-        print_gff3(std::cout, result);
+        GtfModel gtf_model;
+        if (out_opts.format != OutputFormat::GFF3 && out_opts.format != OutputFormat::BED) {
+            gtf_model = build_gtf_model(index->records());
+            out_opts.gtf_model = &gtf_model;
+        }
+        return write_output(result, out_opts);
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
-    return finish_output(std::cout, {}) ? 0 : 1;
 }
 
 // --- main ---
@@ -362,18 +536,27 @@ int run_window_from_args(const CliArgs& a) {
 
     const auto index = try_load_index(a.input_file);
     if (!index) return 1;
-    if (index->source_format() == InputFormat::BED) {
-        std::cerr << "Error: BED input is not converted to GFF3\n";
+    if (a.format != OutputFormat::BED && index->source_format() == InputFormat::BED) {
+        std::cerr << "Error: BED input is not converted to GFF3; use -f bed\n";
         return 1;
     }
     try {
         const auto result = window(*index, wparams);
-        print_gff3(std::cout, result);
+        OutputOptions out_opts;
+        out_opts.input = a.input_file;
+        out_opts.output = a.output_file;
+        out_opts.format = a.format;
+        out_opts.out_attrs = a.out_attrs;
+        GtfModel gtf_model;
+        if (a.format != OutputFormat::GFF3 && a.format != OutputFormat::BED) {
+            gtf_model = build_gtf_model(index->records());
+            out_opts.gtf_model = &gtf_model;
+        }
+        return write_output(result, out_opts);
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
-    return finish_output(std::cout, {}) ? 0 : 1;
 }
 
 // True when CliArgs has no subset filters (only query-style selectors are set).
@@ -476,8 +659,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         const auto result = query(*index, *qparams);
-        print_gff3(std::cout, result.records, a.out_attrs);
-        return finish_output(std::cout, {}) ? 0 : 1;
+        OutputOptions out_opts;
+        out_opts.input = a.input_file;
+        return write_output(result.records, out_opts);
     }
 
     // --- main subset path ---
@@ -553,57 +737,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Output
-    // Opening the output truncates it. If it is the same file as a plain
-    // (mmap'd) input, Linux faults on pages past the new EOF before anything
-    // is printed. Reject the aliasing case: same dev/ino covers symlinks and
-    // hard links.
-    if (!a.output_file.empty() && a.input_file != "-") {
-        struct stat in_st{};
-        struct stat out_st{};
-        if (::stat(a.input_file.c_str(), &in_st) == 0 &&
-            ::stat(a.output_file.c_str(), &out_st) == 0 &&
-            in_st.st_dev == out_st.st_dev && in_st.st_ino == out_st.st_ino) {
-            std::cerr << "Error: input and output are the same file: " << a.input_file << '\n';
-            return 1;
-        }
-    }
-    std::ofstream out_file;
-    std::ostream* out = &std::cout;
-    if (!a.output_file.empty()) {
-        out_file.open(a.output_file);
-        if (!out_file.is_open()) {
-            std::cerr << "Error: cannot open " << a.output_file << '\n';
-            return 1;
-        }
-        out = &out_file;
-    }
-
-    if (a.summary) {
-        std::vector<GffRecord> kept_records;
-        for (const auto& rec : data.records) {
-            if (rec.kept) kept_records.push_back(rec);
-        }
-        print_summary(*out, kept_records);
-    } else {
-        switch (a.format) {
-            case OutputFormat::GFF3: print_gff3(*out, data, a.out_attrs); break;
-            case OutputFormat::GTF3:
-            case OutputFormat::GTF25:
-            case OutputFormat::GTF22: print_gtf(*out, data, a.format, a.out_attrs); break;
-            case OutputFormat::BED:  print_bed(*out, data); break;
-        }
-    }
-    if (!finish_output(*out, a.output_file)) {
-        if (out == &out_file) out_file.close();
-        return 1;
-    }
-    if (out == &out_file) {
-        out_file.close();
-        if (out_file.fail()) {
-            std::cerr << "Error: cannot write " << a.output_file << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    OutputOptions out_opts;
+    out_opts.input = a.input_file;
+    out_opts.output = a.output_file;
+    out_opts.format = a.format;
+    out_opts.out_attrs = a.out_attrs;
+    out_opts.summary = a.summary;
+    return write_output(data, out_opts);
 }

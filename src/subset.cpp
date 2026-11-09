@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -14,31 +15,53 @@ namespace gffsub {
 namespace {
 
 // Remove records all of whose Parent references point outside the kept set.
-// Runs to a fixpoint because dropping a transcript orphans its exons in
-// turn. Records without parents are never orphans.
+// Dropping a transcript orphans its exons in turn, so the pass walks from
+// the children of each dropped ID instead of rescanning every record per
+// round. Records without parents are never orphans.
 void drop_orphans(GffData& data) {
+    const auto children = build_children_index(data.records, /*kept_only=*/true);
+
+    std::unordered_map<std::string, int> kept_id_count;
     std::vector<std::vector<std::string>> parents(data.records.size());
     for (size_t i = 0; i < data.records.size(); ++i) {
         const auto& rec = data.records[i];
         if (!rec.kept) continue;
+        if (rec.id) ++kept_id_count[*rec.id];
         parents[i] = parent_ids(rec);
     }
 
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        std::unordered_set<std::string> kept_ids;
-        for (const auto& rec : data.records) {
-            if (rec.kept && rec.id) kept_ids.insert(std::string{*rec.id});
+    const auto is_orphan = [&](size_t i) {
+        if (parents[i].empty()) return false;
+        return std::none_of(parents[i].begin(), parents[i].end(),
+                            [&](const std::string& p) {
+                                const auto it = kept_id_count.find(p);
+                                return it != kept_id_count.end() && it->second > 0;
+                            });
+    };
+
+    std::vector<int> queue;
+    for (size_t i = 0; i < data.records.size(); ++i) {
+        if (data.records[i].kept && is_orphan(i)) {
+            queue.push_back(static_cast<int>(i));
         }
-        for (size_t i = 0; i < data.records.size(); ++i) {
-            if (!data.records[i].kept || parents[i].empty()) continue;
-            const bool has_kept_parent =
-                std::any_of(parents[i].begin(), parents[i].end(),
-                            [&](const std::string& p) { return kept_ids.count(p) > 0; });
-            if (!has_kept_parent) {
-                data.records[i].kept = false;
-                changed = true;
+    }
+
+    while (!queue.empty()) {
+        const int idx = queue.back();
+        queue.pop_back();
+        auto& rec = data.records[idx];
+        if (!rec.kept) continue;
+        rec.kept = false;
+        if (!rec.id) continue;
+        auto& count = kept_id_count[*rec.id];
+        if (--count > 0) continue;
+        // The ID no longer names any kept record: its children may have lost
+        // their last kept parent.
+        const auto it = children.find(*rec.id);
+        if (it == children.end()) continue;
+        for (const int child_idx : it->second) {
+            if (data.records[child_idx].kept && is_orphan(child_idx)) {
+                queue.push_back(child_idx);
             }
         }
     }

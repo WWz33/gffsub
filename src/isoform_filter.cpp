@@ -1,3 +1,4 @@
+#include "annotation.hpp"
 #include "filter.hpp"
 #include "parser.hpp"
 #include "record.hpp"
@@ -41,36 +42,15 @@ void filter_longest_isoform(GffData& data, std::string_view longest_type_sv, siz
         }
     }
 
-    // Build gene -> [isoform indices] index once.
-    // parent_ids keeps ALL Parent values so a multi-parent isoform
-    // (Parent=geneA,geneB, or a quoted GTF list) is registered under every
-    // gene it belongs to. The set mirrors the vector for an O(1) duplicate
-    // check: a gene with tens of thousands of isoforms made the vector
-    // std::find quadratic.
+    // One hierarchy pass. The same map answers both questions: which records
+    // are children of a parent, and which of those are competing isoforms.
+    std::unordered_map<std::string, std::vector<int>> isoform_to_children =
+        build_children_index(data.records, /*kept_only=*/true);
     std::unordered_map<std::string, std::vector<int>> gene_to_isoforms;
-    std::unordered_map<std::string, std::unordered_set<int>> gene_to_isoforms_seen;
-    for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
-        const auto& rec = data.records[i];
-        if (!rec.kept) continue;
-        if (rec.type != isoform_type) continue;
-        for (const auto& parent_id : parent_ids(rec)) {
-            if (gene_to_isoforms_seen[parent_id].insert(i).second) {
-                gene_to_isoforms[parent_id].push_back(i);
-            }
-        }
-    }
-
-    // Build isoform -> [child indices] index once, using the full Parent list
-    // (parent_ids splits Parent=a,b and quoted GTF lists) so shared children
-    // link to all parents.
-    std::unordered_map<std::string, std::vector<int>> isoform_to_children;
-    std::unordered_map<std::string, std::unordered_set<int>> isoform_to_children_seen;
-    for (int i = 0; i < static_cast<int>(data.records.size()); ++i) {
-        const auto& rec = data.records[i];
-        if (!rec.kept) continue;
-        for (const auto& parent_id : parent_ids(rec)) {
-            if (isoform_to_children_seen[parent_id].insert(i).second) {
-                isoform_to_children[parent_id].push_back(i);
+    for (const auto& [parent_id, children] : isoform_to_children) {
+        for (const int child_idx : children) {
+            if (data.records[child_idx].type == isoform_type) {
+                gene_to_isoforms[parent_id].push_back(child_idx);
             }
         }
     }

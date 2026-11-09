@@ -18,6 +18,7 @@ Keep one transcript per gene. Length metric:
 - Isoforms compete within the detected type: records of another transcript-class type are left unchanged, even when they are longer.
 - Genes with one isoform are left unchanged.
 - Isoforms are grouped by their parent ID attribute, so the filter also applies to files without gene records (flat GTF, GFF3 with transcript rows only).
+- `--longest` runs after the other filters. Its length metric and the auto-detected isoform type use only the records that survived them, so adding `-r`, `-t`, `-b`, `-S`, or an expression filter can change which transcript wins. Use `--longest-type` to pin the competing type when the output is compared across runs.
 
 Sample data (demo.gff3):
 

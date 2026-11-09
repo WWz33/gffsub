@@ -87,14 +87,12 @@ std::unordered_set<std::string> collect_kept_seqids(const GffData& data) {
     return seqids;
 }
 
-}  // namespace
-
-void print_gff3(std::ostream& out, const GffData& data,
-                const std::vector<std::string>& out_attrs) {
-    // ##gff-version must be the topmost line and names version 3 (GFF3 spec).
-    // An input line claiming an older version is not reproduced: the rows
-    // below are GFF3 whatever the source said.
-    out << "##gff-version 3\n";
+// Format header plus the input's ## directives, minus the version lines the
+// header already declares and minus landmarks the kept rows no longer cover.
+void emit_prologue(std::ostream& out, const GffData& data, std::string_view version_line) {
+    if (!version_line.empty()) {
+        out << version_line << '\n';
+    }
     const auto kept_seqids = collect_kept_seqids(data);
     for (const auto& d : data.directives) {
         if (d.rfind("##gff-version", 0) == 0) continue;
@@ -102,9 +100,22 @@ void print_gff3(std::ostream& out, const GffData& data,
         if (!directive_survives(d, kept_seqids)) continue;
         out << d << '\n';
     }
+}
+
+}  // namespace
+
+void print_gff3(std::ostream& out, const GffData& data,
+                const std::vector<std::string>& out_attrs) {
+    // ##gff-version must be the topmost line and names version 3 (GFF3 spec).
+    // An input line claiming an older version is not reproduced: the rows
+    // below are GFF3 whatever the source said.
+    emit_prologue(out, data, "##gff-version 3");
     for (const auto& rec : data) {
         if (!rec.kept) continue;
         const std::string_view score_str = rec.score_raw.empty() ? std::string_view{"."} : rec.score_raw;
+        // GTF spellings such as 5UTR are not SO terms; GFF3 column 3 must be
+        // a Sequence Ontology name.
+        const std::string_view type_label = gff3_type_label(rec.type);
         std::string col9_storage;  // only used when col9 must be synthesized
         std::string_view col9;
         if (rec.src_fmt == InputFormat::GTF) {
@@ -125,7 +136,7 @@ void print_gff3(std::ostream& out, const GffData& data,
             col9_projected = project_col9(col9, out_attrs);
             col9 = col9_projected;
         }
-        out << rec.seqid << '\t' << rec.source << '\t' << rec.type << '\t'
+        out << rec.seqid << '\t' << rec.source << '\t' << type_label << '\t'
             << rec.start << '\t' << rec.end << '\t' << score_str << '\t'
             << rec.strand << '\t' << rec.phase << '\t' << col9 << '\n';
     }
@@ -134,7 +145,8 @@ void print_gff3(std::ostream& out, const GffData& data,
 static std::string build_gtf_attrs(const std::string& gene_id_val, const std::string& transcript_id_val,
                                    bool is_gene, const GffRecord& rec,
                                    const std::vector<std::string>& out_attrs,
-                                   bool drop_parent = false) {
+                                   bool drop_parent = false,
+                                   std::string_view id_override = {}) {
     // GTF2.2: gene_id required on every line, transcript_id on non-gene
     // features; other attributes may follow (spec: "Any other attributes or
     // comments must appear after these two"). Preserve them like AGAT does
@@ -163,9 +175,7 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
         result += "\";";
     }
     // Pass through the remaining attributes. Skip keys already emitted above.
-    // GTF-source col9 is `key "value";`, which parse_attributes (tag=value)
-    // cannot read — it would drop or corrupt every attribute. Use the GTF
-    // pair parser for GTF-source records.
+    // One decoder handles both source formats.
     //
     // drop_parent drops Parent from a child row that expansion split under
     // several parents. Each such row names its own transcript, and repeating
@@ -176,54 +186,28 @@ static std::string build_gtf_attrs(const std::string& gene_id_val, const std::st
     if (!out_attrs.empty()) keep.insert(out_attrs.begin(), out_attrs.end());
     const auto wanted = [&](std::string_view key) {
         if (key == "gene_id" || key == "transcript_id") return false;
-        if (key == "Parent" && drop_parent) return false;
+        // ID and Parent carry the feature tree, so --out-attrs never drops
+        // them. Both output formats follow the same rule.
+        if (key == "ID") return true;
+        if (key == "Parent") return !drop_parent;
         if (keep.empty()) return true;
         return keep.count(std::string{key}) > 0;
     };
-    if (rec.src_fmt == InputFormat::GTF) {
-        for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-            if (!wanted(key)) continue;
-            result += ' ';
-            result += key;
-            result += " \"";
-            result += gtf_escape(value);
-            result += "\";";
-        }
-    } else {
-        for (const auto& [key, values] : parse_attributes(rec.attr_raw)) {
-            if (!wanted(key)) continue;
-            for (const auto& v : values) {
-                result += ' ';
-                result += key;
-                result += " \"";
-                result += gtf_escape(v);
-                result += "\";";
-            }
-        }
+    for (const auto& [key, value] : decode_attributes(rec.attr_raw, rec.src_fmt)) {
+        if (!wanted(key)) continue;
+        const std::string_view out_value =
+            (key == "ID" && !id_override.empty()) ? id_override : std::string_view{value};
+        result += ' ';
+        result += key;
+        result += " \"";
+        result += gtf_escape(std::string{out_value});
+        result += "\";";
     }
     return result;
 }
 
-void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
-               const std::vector<std::string>& out_attrs) {
-    // Header names the GTF flavor whose vocabulary the rows below use.
-    switch (fmt) {
-        case OutputFormat::GTF3:  out << "##gtf-version 3\n"; break;
-        case OutputFormat::GTF25: out << "##gtf-version 2.5\n"; break;
-        case OutputFormat::GTF22: out << "##gtf-version 2.2\n"; break;
-        default: break;
-    }
-    // Preserve ## directives from input (##sequence-region, ##species, etc.)
-    // but skip ##gff-version / ##gtf-version — the header line above already
-    // declares the output format version.
-    const auto kept_seqids = collect_kept_seqids(data);
-    for (const auto& d : data.directives) {
-        if (d.rfind("##gff-version", 0) == 0) continue;
-        if (d.rfind("##gtf-version", 0) == 0) continue;
-        if (!directive_survives(d, kept_seqids)) continue;
-        out << d << '\n';
-    }
-
+GtfModel build_gtf_model(const std::vector<GffRecord>& records) {
+    GtfModel model;
     // Build mappings from ALL records (not just kept) so parent mRNAs
     // filtered out by subset still resolve gene_id for surviving children.
     // A transcript ID defined twice with different parents is invalid input
@@ -234,38 +218,49 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
     // attribute over its ID/Parent. Ensembl GFF3 labels genes `gene:gene-X`
     // and carries the canonical `gene_id=gene-X` alongside, and GTF consumers
     // expect the unprefixed form.
-    std::unordered_map<std::string, std::string> tx_label;   // transcript ID -> emitted transcript_id
-    std::unordered_map<std::string, std::string> gene_label; // gene ID -> emitted gene_id
-    std::unordered_map<std::string, std::string> tx_parent;  // transcript ID -> gene ID
-    std::unordered_set<std::string> gene_ids;
     // stop_codon intervals per transcript, used to trim the terminal CDS
     // (GTF2.2: "the stop codon is not included in the CDS for the terminal
     // exon"). Keyed by the Parent value as written on the stop_codon line.
-    std::unordered_map<std::string, std::vector<std::pair<int64_t, int64_t>>> stop_codons;
-    for (const auto& rec : data) {
+    // seqid and strand travel with the interval: a stop codon on another
+    // chromosome or the opposite strand does not trim this CDS.
+    for (const auto& rec : records) {
         if (rec.feat_class == FeatureClass::Transcript && rec.id) {
             if (rec.parent_id) {
-                const auto existing = tx_parent.find(*rec.id);
-                if (existing != tx_parent.end() && existing->second != *rec.parent_id) {
+                const auto existing = model.tx_parent.find(*rec.id);
+                if (existing != model.tx_parent.end() && existing->second != *rec.parent_id) {
                     warn_duplicate_transcript_id(*rec.id);
                 }
-                tx_parent[*rec.id] = *rec.parent_id;
+                model.tx_parent[*rec.id] = *rec.parent_id;
             }
-            tx_label[*rec.id] = rec.transcript_id ? *rec.transcript_id : *rec.id;
+            model.tx_label[*rec.id] = rec.transcript_id ? *rec.transcript_id : *rec.id;
         }
         if (rec.feat_class == FeatureClass::Gene && rec.id) {
-            gene_ids.insert(*rec.id);
-            gene_label[*rec.id] = rec.gene_id ? *rec.gene_id : *rec.id;
+            model.gene_label[*rec.id] = rec.gene_id ? *rec.gene_id : *rec.id;
         }
         if (rec.feat_class == FeatureClass::Unknown &&
             to_lower(rec.type) == "stop_codon") {
             // Key by every Parent: a shared stop codon trims each parent's
             // terminal CDS, the same way a shared exon expands to every parent.
             for (const auto& pid : parent_ids(rec)) {
-                stop_codons[pid].emplace_back(rec.start, rec.end);
+                model.stop_codons[pid].push_back(GtfStopCodon{
+                    rec.start, rec.end, std::string{rec.seqid}, rec.strand});
             }
         }
     }
+    return model;
+}
+
+void print_gtf(std::ostream& out, const GffData& data, const GtfModel& model,
+               OutputFormat fmt, const std::vector<std::string>& out_attrs) {
+    // Header names the GTF flavor whose vocabulary the rows below use.
+    std::string_view version_line;
+    switch (fmt) {
+        case OutputFormat::GTF3:  version_line = "##gtf-version 3"; break;
+        case OutputFormat::GTF25: version_line = "##gtf-version 2.5"; break;
+        case OutputFormat::GTF22: version_line = "##gtf-version 2.2"; break;
+        default: break;
+    }
+    emit_prologue(out, data, version_line);
 
     // Resolve the emitted gene_id / transcript_id for one parent link. The
     // parent chain decides, so the IDs match the parent transcript/gene rows.
@@ -277,23 +272,23 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
                                    bool expanded, std::string& gene_id_val, std::string& transcript_id_val) {
         if (rec.gene_id) gene_id_val = *rec.gene_id;
         if (rec.transcript_id && !expanded) transcript_id_val = *rec.transcript_id;
-        const auto tx = tx_label.find(pid);
-        if (tx != tx_label.end()) {
+        const auto tx = model.tx_label.find(pid);
+        if (tx != model.tx_label.end()) {
             if (transcript_id_val.empty()) transcript_id_val = tx->second;
             if (gene_id_val.empty()) {
-                const auto tp = tx_parent.find(pid);
-                if (tp != tx_parent.end()) {
-                    const auto g = gene_label.find(tp->second);
-                    gene_id_val = (g != gene_label.end()) ? g->second : tp->second;
+                const auto tp = model.tx_parent.find(pid);
+                if (tp != model.tx_parent.end()) {
+                    const auto g = model.gene_label.find(tp->second);
+                    gene_id_val = (g != model.gene_label.end()) ? g->second : tp->second;
                 }
             }
-        } else if (gene_label.count(pid) || gene_ids.count(pid)) {
+        } else if (model.gene_label.count(pid) > 0) {
             // Parent is a gene (e.g. TF_binding_site): no transcript to
             // reference — leave transcript_id empty per the inter/inter_CNS
             // convention instead of inventing one.
             if (gene_id_val.empty()) {
-                const auto g = gene_label.find(pid);
-                gene_id_val = (g != gene_label.end()) ? g->second : pid;
+                const auto g = model.gene_label.find(pid);
+                gene_id_val = (g != model.gene_label.end()) ? g->second : pid;
             }
         } else {
             // Parent unresolvable to a gene/transcript record in this file
@@ -301,6 +296,12 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             // transcript.
             if (transcript_id_val.empty()) transcript_id_val = pid;
             if (gene_id_val.empty()) gene_id_val = pid;
+        }
+        // A transcript with no gene row leaves gene_id unresolved. GTF2.2
+        // requires the attribute, so use the transcript identity rather than
+        // emitting `gene_id "";`.
+        if (gene_id_val.empty()) {
+            gene_id_val = transcript_id_val.empty() ? pid : transcript_id_val;
         }
     };
 
@@ -318,15 +319,17 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
 
         // One output row. parent_id selects the stop_codon used to trim the
         // terminal CDS (empty for gene and transcript rows). drop_parent is set
-        // when expansion split one source row under several parents.
+        // when expansion split one source row under several parents;
+        // id_override gives each expanded row a unique ID.
         const auto emit_row = [&](const std::string& gene_id_val, const std::string& transcript_id_val,
-                                  const std::string& parent_id, bool drop_parent) {
+                                  const std::string& parent_id, bool drop_parent,
+                                  std::string_view id_override = {}) {
             // GTF2.2: gene_id required on every feature line. When it cannot
             // be resolved, emit an empty value (gene_id "";) per the
             // inter/inter_CNS convention rather than dropping the feature.
             std::string attrs = build_gtf_attrs(gene_id_val, transcript_id_val,
                                                 rec.feat_class == FeatureClass::Gene, rec,
-                                                out_attrs, drop_parent);
+                                                out_attrs, drop_parent, id_override);
 
             // GTF excludes the stop codon from the terminal CDS. Trim only
             // when the stop_codon sits hard against the CDS 3' end of the same
@@ -335,15 +338,20 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             int64_t start = rec.start;
             int64_t end = rec.end;
             if (rec.feat_class == FeatureClass::CDS && !parent_id.empty()) {
-                const auto it = stop_codons.find(parent_id);
-                if (it != stop_codons.end()) {
-                    for (const auto& [stop_start, stop_end] : it->second) {
-                        if (rec.strand == '+' && stop_end == rec.end && stop_start > rec.start) {
-                            end = stop_start - 1;
+                const auto it = model.stop_codons.find(parent_id);
+                if (it != model.stop_codons.end()) {
+                    for (const auto& stop : it->second) {
+                        // A stop codon on another seqid or strand is a
+                        // different feature with a colliding Parent value.
+                        if (stop.seqid != rec.seqid || stop.strand != rec.strand) {
+                            continue;
+                        }
+                        if (rec.strand == '+' && stop.end == rec.end && stop.start > rec.start) {
+                            end = stop.start - 1;
                             break;
                         }
-                        if (rec.strand == '-' && stop_start == rec.start && stop_end < rec.end) {
-                            start = stop_end + 1;
+                        if (rec.strand == '-' && stop.start == rec.start && stop.end < rec.end) {
+                            start = stop.end + 1;
                             break;
                         }
                     }
@@ -358,8 +366,8 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
         if (rec.feat_class == FeatureClass::Gene) {
             std::string gene_id_val;
             if (rec.id) {
-                const auto it = gene_label.find(*rec.id);
-                gene_id_val = (it != gene_label.end()) ? it->second : *rec.id;
+                const auto it = model.gene_label.find(*rec.id);
+                gene_id_val = (it != model.gene_label.end()) ? it->second : *rec.id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
@@ -371,17 +379,21 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             std::string gene_id_val;
             std::string transcript_id_val;
             if (rec.id) {
-                const auto it = tx_label.find(*rec.id);
-                transcript_id_val = (it != tx_label.end()) ? it->second : *rec.id;
+                const auto it = model.tx_label.find(*rec.id);
+                transcript_id_val = (it != model.tx_label.end()) ? it->second : *rec.id;
             } else if (rec.transcript_id) {
                 transcript_id_val = *rec.transcript_id;
             }
             if (rec.parent_id) {
-                const auto it = gene_label.find(*rec.parent_id);
-                gene_id_val = (it != gene_label.end()) ? it->second : *rec.parent_id;
+                const auto it = model.gene_label.find(*rec.parent_id);
+                gene_id_val = (it != model.gene_label.end()) ? it->second : *rec.parent_id;
             } else if (rec.gene_id) {
                 gene_id_val = *rec.gene_id;
             }
+            // GTF2.2 requires gene_id on every line. A transcript with no
+            // gene row and no gene_id falls back to its own transcript_id
+            // instead of emitting the invalid `gene_id "";`.
+            if (gene_id_val.empty()) gene_id_val = transcript_id_val;
             emit_row(gene_id_val, transcript_id_val, std::string{}, false);
             continue;
         }
@@ -396,22 +408,28 @@ void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt,
             std::string transcript_id_val;
             if (rec.gene_id) gene_id_val = *rec.gene_id;
             if (rec.transcript_id) transcript_id_val = *rec.transcript_id;
+            // A top-level feature with no parent still needs both mandatory
+            // GTF attributes; the record's own ID is the only identity left.
+            if (transcript_id_val.empty() && rec.id) transcript_id_val = *rec.id;
+            if (gene_id_val.empty()) gene_id_val = transcript_id_val;
             emit_row(gene_id_val, transcript_id_val, std::string{}, false);
             continue;
         }
 
+        const bool expanded = parents.size() > 1;
         for (const auto& pid : parents) {
             std::string gene_id_val;
             std::string transcript_id_val;
-            resolve_child(pid, rec, parents.size() > 1, gene_id_val, transcript_id_val);
-            emit_row(gene_id_val, transcript_id_val, pid, parents.size() > 1);
+            resolve_child(pid, rec, expanded, gene_id_val, transcript_id_val);
+            // One row per parent is a distinct feature: AGAT gives each
+            // expanded row a unique ID (agat_how_does_it_work.md:26).
+            std::string expanded_id;
+            if (expanded && rec.id) {
+                expanded_id = *rec.id + "." + pid;
+            }
+            emit_row(gene_id_val, transcript_id_val, pid, expanded, expanded_id);
         }
     }
-}
-
-void print_gtf3(std::ostream& out, const GffData& data,
-                const std::vector<std::string>& out_attrs) {
-    print_gtf(out, data, OutputFormat::GTF3, out_attrs);
 }
 
 void print_bed(std::ostream& out, const GffData& data) {
@@ -426,6 +444,12 @@ void print_bed(std::ostream& out, const GffData& data) {
         const int64_t bed_start = rec.start > 1 ? rec.start - 1 : 0;
 
         std::string name = rec.id ? *rec.id : std::string{rec.type};
+        // A GFF3 ID may decode %09/%0A into a real tab or newline. BED has
+        // no escape syntax, so a control character would add a column or a
+        // line. Replace them with a space.
+        for (char& ch : name) {
+            if (ch == '\t' || ch == '\n' || ch == '\r') ch = ' ';
+        }
         // BED score is an integer from 0 to 1000. Out-of-range, fractional,
         // unparseable, and non-finite scores have no BED representation, so
         // they fall back to 0.

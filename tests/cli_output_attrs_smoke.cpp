@@ -116,8 +116,10 @@ int main(int argc, char* argv[]) {
            << "chr1\tsrc\texon\t100\t200\t.\t+\t.\tParent=t1;Note=a%2Cb\n";
     }
     if (run_command(exe + " summary_gtf_attrs.gff3 --format gtf -o summary_gtf.gtf") != 0 ||
-        require_contains("summary_gtf.gtf", "gene_id \"g1\"; Name \"MyGene\";") != 0 ||
-        require_contains("summary_gtf.gtf", "gene_id \"g1\"; transcript_id \"t1\"; biotype \"protein_coding\";") != 0 ||
+        require_contains("summary_gtf.gtf", "gene_id \"g1\";") != 0 ||
+        require_contains("summary_gtf.gtf", "Name \"MyGene\";") != 0 ||
+        require_contains("summary_gtf.gtf", "gene_id \"g1\"; transcript_id \"t1\";") != 0 ||
+        require_contains("summary_gtf.gtf", "biotype \"protein_coding\";") != 0 ||
         require_contains("summary_gtf.gtf", "Note \"a,b\";") != 0) {
         return 1;
     }

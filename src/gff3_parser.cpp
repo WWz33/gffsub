@@ -3,7 +3,6 @@
 #include "parser.hpp"
 #include "record.hpp"
 #include "region.hpp"
-#include "gtf_parser.hpp"
 #include "input_source.hpp"
 #include "string_utils.hpp"
 #include <iostream>
@@ -55,50 +54,6 @@ void report_issues() {
 }
 
 }  // namespace
-
-static std::optional<std::string> extract_attr_value(std::string_view attrs, std::string_view key) {
-    size_t pos = 0;
-    while (pos < attrs.size()) {
-        // Find the end of the current tag=value pair (next ';').
-        size_t pair_end = attrs.find(';', pos);
-        if (pair_end == std::string_view::npos) {
-            pair_end = attrs.size();
-        }
-        const auto pair = attrs.substr(pos, pair_end - pos);
-        pos = (pair_end < attrs.size()) ? pair_end + 1 : attrs.size();
-
-        // Skip empty fragments (e.g. from ";;").
-        if (pair.empty()) {
-            continue;
-        }
-
-        const size_t eq = pair.find('=');
-        if (eq == std::string_view::npos || eq == 0) {
-            continue;
-        }
-        // Trim around the key so `ID=x; Parent=y` resolves: the attribute
-        // indexer and --out-attrs trim the same way (attributes.cpp).
-        if (trim_view(pair.substr(0, eq)) == key) {
-            const auto value = pair.substr(eq + 1);
-            if (value.empty()) {
-                return std::nullopt;
-            }
-            // Split the RAW value on ',' before decoding: a literal comma in a
-            // single value must stay escaped as %2C (GFF3 spec). Single-value
-            // fields take the first part; the index builds full lists from
-            // parse_attributes.
-            const size_t comma = value.find(',');
-            const auto first_part = (comma == std::string_view::npos)
-                                        ? value
-                                        : value.substr(0, comma);
-            if (first_part.empty()) {
-                return std::nullopt;
-            }
-            return url_decode(first_part);
-        }
-    }
-    return std::nullopt;
-}
 
 int parse_file(const std::string& filename, GffData& data, InputFormat format) {
     // Bytes and gzip decoding live in input_source; record fields are views
@@ -213,38 +168,21 @@ int parse_content(GffData& data, InputFormat format) {
                     }
                 rec.attr_raw = cols[8];
 
-                // The `;`/`=` scan is GFF3-only: it is not quote-aware, so on
-                // GTF a quoted value containing "; Parent=..." would be read
-                // as a real Parent key. GTF col9 goes through the quote-aware
-                // GTF parser instead, which accepts both `key "value";` and
-                // bare `key=value` fragments (mixed-format files).
-                if (format == InputFormat::GTF) {
-                    rec.gene_id = extract_quoted_value(rec.attr_raw, "gene_id");
-                    rec.transcript_id = extract_quoted_value(rec.attr_raw, "transcript_id");
-                    rec.id = extract_quoted_value(rec.attr_raw, "ID");
-                    rec.parent_id = extract_quoted_value(rec.attr_raw, "Parent");
-                    // A quoted GTF Parent may carry a comma list. The scalar
-                    // parent_id holds one ID, the way the GFF3 scalar holds the
-                    // first Parent value; parent_ids() expands the full list.
-                    if (rec.parent_id) {
-                        const auto comma = rec.parent_id->find(',');
-                        if (comma != std::string::npos) {
-                            rec.parent_id = trim_copy(rec.parent_id->substr(0, comma));
-                        }
+                // One decoder for both formats. GTF col9 is quote-aware;
+                // GFF3 col9 is `tag=value`. The first value of an identity
+                // key becomes the scalar cached field; parent_ids() expands
+                // the full Parent list.
+                const auto attrs = decode_attributes(rec.attr_raw, format);
+                const auto first = [&](std::string_view key) -> std::optional<std::string> {
+                    for (const auto& [k, value] : attrs) {
+                        if (k == key) return value;
                     }
-                } else {
-                    rec.id = extract_attr_value(rec.attr_raw, "ID");
-                    rec.parent_id = extract_attr_value(rec.attr_raw, "Parent");
-                    if (rec.attr_raw.find("gene_id=") != std::string::npos) {
-                        rec.gene_id = extract_attr_value(rec.attr_raw, "gene_id");
-                    }
-                    if (rec.attr_raw.find("transcript_id=") != std::string::npos) {
-                        rec.transcript_id = extract_attr_value(rec.attr_raw, "transcript_id");
-                    }
-                    // Multi-parent Parent=tx1,tx2: extract_attr_value already keeps
-                    // only the first raw comma part; the index builds the full list
-                    // from parse_attributes.
-                }
+                    return std::nullopt;
+                };
+                rec.id = first("ID");
+                rec.parent_id = first("Parent");
+                rec.gene_id = first("gene_id");
+                rec.transcript_id = first("transcript_id");
 
                 if (format == InputFormat::GTF) {
                     // GTF has no ID=/Parent= attributes; synthesize from

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <unordered_set>
+#include <utility>
 
 namespace gffsub {
 
@@ -14,7 +15,12 @@ bool append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord&
     if (!seen.insert(rec.line_idx).second) {
         return false;
     }
-    out.append(rec);
+    // A result is a fresh selection, not a continuation of a previous
+    // subset(): clear the membership flag so a prior filter cannot make the
+    // matched record invisible to the printer.
+    GffRecord copy = rec;
+    copy.kept = true;
+    out.append(std::move(copy));
     return true;
 }
 
@@ -22,6 +28,9 @@ bool append_unique(GffData& out, std::unordered_set<int>& seen, const GffRecord&
 
 QueryResult query(const AnnotationIndex& index, const QueryParams& params) {
     QueryResult result;
+    // A query result is an output document: keep the input's ## directives so
+    // `gffsub x -i ID` and `gffsub x -i ID -@ 2` produce the same header.
+    result.records.directives = index.directives();
     std::unordered_set<int> seen;
 
     // Parse -t value once: comma list with optional ^ exclusion.

@@ -55,7 +55,10 @@ public:
 ```cpp
 // src/parser.hpp
 int parse_file(const std::string& filename, GffData& data, InputFormat format);
+std::vector<std::pair<std::string, std::string>> decode_attributes(
+    std::string_view column9, InputFormat format);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
+std::vector<std::string> attr_values(const GffRecord& rec, std::string_view key);
 std::vector<std::string> parent_ids(const GffRecord& rec);
 
 // src/input_source.hpp
@@ -63,6 +66,8 @@ InputFormat infer_input_format(const std::string& path);
 ```
 
 `infer_input_format` sniffs file content: column 9 with `=` and `;` is GFF3, with `"` is GTF, 3-12 integer columns is BED, default GFF3.
+
+`decode_attributes` is the one column-9 decoder. It returns ordered `(key, value)` pairs, keeps repeated keys, splits the five GFF3 comma-list tags, and decodes `%XX`. For GTF it uses the quote-aware lexer, unescapes backslash sequences, splits `Parent` on commas, and decodes `%XX` on the four identity keys (`ID`, `Parent`, `gene_id`, `transcript_id`). `attr_values` returns every value of one key and falls back to the record's synthesized identity fields. `parse_attributes` is the GFF3 map-shaped wrapper.
 
 ## AnnotationIndex
 
@@ -88,6 +93,7 @@ public:
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
     InputFormat source_format() const;
+    const std::vector<std::string>& directives() const;
 };
 
 struct GeneModel {
@@ -98,7 +104,7 @@ struct GeneModel {
 
 `find_gene` searches gene-type records by ID, gene_id, Name, locus_tag, Alias, Dbxref. `find_all_by_id` returns every line sharing an ID (multi-line CDS).
 
-`from_data` borrows the caller's records: the `GffData` must outlive the index and keep its record order. Returned records hold views into that storage. `from_owned` takes the data by value when no caller-owned copy exists. `parents_of_record` resolves the parents of one record, including a record without an ID.
+`from_data` borrows the caller's records: the `GffData` must outlive the index and keep its record order. The rvalue overload is deleted, so `from_data(make_data())` does not compile. Returned records hold views into that storage. `from_owned` takes the data by value when no caller-owned copy exists. `parents_of_record` resolves the parents of one record, including a record without an ID. `query()` and `window()` results also hold views into the index's storage, so keep the index alive while printing the result.
 
 ## Query
 
@@ -214,9 +220,12 @@ See [Expression Filtering](expression-filtering.md) for field names and operator
 ```cpp
 // src/output.hpp
 void print_gff3(std::ostream& out, const GffData& data);
-void print_gtf3(std::ostream& out, const GffData& data);
-void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);  // GTF3, GTF25 or GTF22
 void print_bed(std::ostream& out, const GffData& data);
+
+struct GtfModel { /* gene/transcript labels and stop_codon intervals */ };
+GtfModel build_gtf_model(const GffData& data);
+void print_gtf(std::ostream& out, const GffData& data, const GtfModel& model,
+               OutputFormat fmt);  // GTF3, GTF25 or GTF22
 ```
 
 ## Summary
@@ -244,9 +253,8 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
 
 ```cpp
 // src/gtf_parser.hpp
-std::optional<std::string> extract_quoted_value(const std::string& attrs, const std::string& key);
+std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs);
 std::string gtf_attrs_to_gff3(const GffRecord& rec);
-void apply_gtf_attributes(GffRecord& rec);
 ```
 
 ## Examples
@@ -259,14 +267,18 @@ Query by gene name with children, output GTF:
 #include "output.hpp"
 
 int main() {
-    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_gff3("ann.gff3");
+    gffsub::GffData data;
+    gffsub::parse_file("ann.gff3", data, gffsub::InputFormat::GFF3);
+    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_data(data);
 
     gffsub::QueryParams qp;
     qp.name = "BRCA1";
     qp.include_children = true;
     gffsub::QueryResult res = gffsub::query(idx, qp);
 
-    gffsub::print_gtf(std::cout, res.records, gffsub::OutputFormat::GTF3);
+    // The model comes from the whole annotation, not from the query result.
+    const auto model = gffsub::build_gtf_model(data);
+    gffsub::print_gtf(std::cout, res.records, model, gffsub::OutputFormat::GTF3);
 }
 ```
 
@@ -300,7 +312,7 @@ Window around a feature:
 #include "output.hpp"
 
 int main() {
-    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_gff3("ann.gff3");
+    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_file("ann.gff3");
 
     gffsub::WindowParams wp;
     wp.id = "gene01";

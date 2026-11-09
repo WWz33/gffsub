@@ -91,6 +91,7 @@ public:
         if (this == &other) return;
         release_mapping();
         directives = other.directives;
+        source_format = other.source_format;
 
         const char* old_base = nullptr;
         size_t old_size = 0;
@@ -119,6 +120,7 @@ public:
         records.clear();
         directives.clear();
         buffer.clear();
+        source_format = InputFormat::GFF3;
         release_mapping();
     }
     void reserve(size_t n) { records.reserve(n); }

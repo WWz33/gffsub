@@ -35,12 +35,13 @@ All three GTF flavors share these rules:
 - `gene_id` on every line, `transcript_id` on every non-gene line, both first in column 9.
 - `gene_id` and `transcript_id` are taken from the column-9 attribute of that name when the record has one, otherwise from `ID` / `Parent`. Ensembl GFF3 labels a gene `gene:gene-X` and carries `gene_id=gene-X`; the GTF output uses `gene-X`.
 - Remaining attributes follow the mandatory pair, URL-decoded from GFF3 and quoted.
-- `ID` and `Parent` are kept as extra quoted attributes unless `--out-attrs` excludes them.
+- `ID` and `Parent` are kept as extra quoted attributes; `--out-attrs` never drops them, in either output format.
 - Values are escaped: `"`, `\`, tab, newline, CR.
-- The terminal CDS ends before its `stop_codon` when the codon abuts the CDS 3' end of the same transcript.
+- The terminal CDS ends before its `stop_codon` when the codon abuts the CDS 3' end of the same transcript, on the same seqid and strand.
 - Types outside the selected vocabulary are dropped.
 - `mRNA` is renamed to `transcript` for GTF3 and GTF2.5.
-- A feature with several parents becomes one row per parent: GTF has no multi-parent feature.
+- A feature with several parents becomes one row per parent: GTF has no multi-parent feature. Each expanded row gets a unique `ID`, `<id>.<parent>`, so reading the output back does not merge the rows.
+- A transcript with no gene record falls back to `gene_id` = its `transcript_id`; an attribute is never emitted as an empty string.
 
 Header written per flavor: `##gtf-version 3`, `##gtf-version 2.5`, `##gtf-version 2.2`.
 
@@ -48,14 +49,15 @@ Header written per flavor: `##gtf-version 3`, `##gtf-version 2.5`, `##gtf-versio
 
 - Header: `##gff-version 3`, always. An input line claiming another version is not reproduced.
 - Column 9 preserved from input.
-- GTF input: column 9 rewritten as `tag=value` with `ID=`/`Parent=` and URL escaping.
+- GTF input: column 9 rewritten as `tag=value` with `ID=`/`Parent=` and URL escaping. A `gene_id` on a child row stays as a `gene_id=` attribute; on a gene or transcript row it becomes `ID=`/`Parent=`.
+- GTF type spellings are mapped to Sequence Ontology names: `5UTR` becomes `five_prime_UTR`, `3UTR` becomes `three_prime_UTR`.
 
 ## BED
 
 - 6 columns: chrom, start (0-based), end, name, score, strand.
 - `start` = record start - 1.
 - `score` from column 6, written as an integer: rounded toward zero and clamped to 0..1000. A missing, `.`, unparseable, or non-finite (`inf`, `nan`) score writes `0`.
-- `name` from `ID`, or the type when `ID` is missing.
+- `name` from `ID`, or the type when `ID` is missing. Tab, newline, and CR in the name are replaced with a space: BED has no escape syntax, and an unescaped control character would add a column or a line.
 - BED input requires `-f bed` or `-s`; BED is not converted to GFF3 or GTF.
 
 ## Example

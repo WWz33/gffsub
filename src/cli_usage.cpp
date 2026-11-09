@@ -5,8 +5,8 @@
 
 namespace gffsub {
 
-void usage(const char* prog) {
-    std::cerr
+void usage(std::ostream& out, const char* prog) {
+    out
         << "Program: gffsub (subset GFF3/GTF annotations)\n"
         << "Version: " << kVersion << "\n"
         << "\n"
@@ -73,8 +73,8 @@ void usage(const char* prog) {
         << "  " << prog << " window ann.gff3 -i GeneA -u 2000 -D 500 -a\n";
 }
 
-void query_usage(const char* prog) {
-    std::cerr
+void query_usage(std::ostream& out, const char* prog) {
+    out
         << "About:   query records by ID, name, region, or attributes\n"
         << "Usage: " << prog << " query <input> [options]\n"
         << "\n"
@@ -90,14 +90,17 @@ void query_usage(const char* prog) {
         << "  -m, --model              full gene model\n"
         << "  -N, --nearest REGION     nearest gene\n"
         << "  -s, --summary            output TSV stats by seqid x type\n"
+        << "  -f, --format FMT         output: gff3|gtf|gtf25|gtf22|bed [gff3]\n"
+        << "      --out-attrs LIST     emit only these column-9 tags (ID/Parent always kept)\n"
+        << "  -o, --output FILE        write to FILE [stdout]; - is stdout\n"
         << "  -h, --help               show this help\n"
         << "\n"
         << "Example:\n"
         << "  " << prog << " query ann.gff3 -i GeneA -s\n";
 }
 
-void window_usage(const char* prog) {
-    std::cerr
+void window_usage(std::ostream& out, const char* prog) {
+    out
         << "About:   records overlapping a window around one record\n"
         << "Usage: " << prog << " window <input> -i ID [options]\n"
         << "\n"
@@ -106,6 +109,9 @@ void window_usage(const char* prog) {
         << "  -u, --up N               bases upstream [0]\n"
         << "  -D, --down N             bases downstream [0]\n"
         << "  -a, --strand-aware       window follows record strand\n"
+        << "  -f, --format FMT         output: gff3|gtf|gtf25|gtf22|bed [gff3]\n"
+        << "      --out-attrs LIST     emit only these column-9 tags (ID/Parent always kept)\n"
+        << "  -o, --output FILE        write to FILE [stdout]; - is stdout\n"
         << "  -h, --help               show this help\n"
         << "\n"
         << "Example:\n"

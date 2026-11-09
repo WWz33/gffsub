@@ -109,6 +109,7 @@ void filter_by_regions_from_file(GffData& data, const std::string& bed_file,
                                  bool exclude, char strand_mode) {
     auto regions = load_regions(bed_file, true);
     if (strand_mode != 0) {
+        const bool had_rows = !regions.empty();
         // Without a strand column a BED row cannot participate in a
         // same/opposite-strand comparison.
         regions.erase(std::remove_if(regions.begin(), regions.end(),
@@ -116,6 +117,13 @@ void filter_by_regions_from_file(GffData& data, const std::string& bed_file,
                                          return r.strand != '+' && r.strand != '-';
                                      }),
                       regions.end());
+        if (had_rows && regions.empty()) {
+            // Dropping every row would silently turn an include filter into
+            // "keep nothing" and an exclude filter into "keep everything".
+            throw std::runtime_error(
+                "no BED row has a strand column; --same-strand/"
+                "--opposite-strand cannot be applied");
+        }
     }
 
     struct SeqIndex {

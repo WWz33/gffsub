@@ -85,6 +85,10 @@ std::optional<QueryParams> build_query_params(const CliArgs& a) {
             std::cerr << "Error: cannot open " << path << '\n';
             return std::nullopt;
         }
+        if (ids->empty()) {
+            std::cerr << "Error: no IDs in " << path << '\n';
+            return std::nullopt;
+        }
         q.ids.insert(q.ids.end(), std::make_move_iterator(ids->begin()), std::make_move_iterator(ids->end()));
     }
     q.name = a.name;
@@ -115,6 +119,26 @@ std::optional<QueryParams> build_query_params(const CliArgs& a) {
 std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_requested) {
     CliArgs args;
     help_requested = false;
+
+    // Accept `-i=ID` the way `--id=ID` is accepted. getopt_long leaves the
+    // '=' in the value for a short option, so `-i=g1` selected the ID "=g1"
+    // and printed nothing. Rewrite the pair into two arguments.
+    std::vector<std::string> normalized_argv;
+    normalized_argv.reserve(static_cast<size_t>(argc) * 2);
+    for (int i = 0; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (i > 0 && arg.size() > 3 && arg[0] == '-' && arg[1] != '-' && arg[2] == '=') {
+            normalized_argv.push_back(arg.substr(0, 2));
+            normalized_argv.push_back(arg.substr(3));
+        } else {
+            normalized_argv.push_back(std::move(arg));
+        }
+    }
+    std::vector<char*> nargv;
+    nargv.reserve(normalized_argv.size());
+    for (auto& s : normalized_argv) nargv.push_back(s.data());
+    const int nargc = static_cast<int>(nargv.size());
+    optind = 1;
 
     enum {
         OPT_ID_LIST,
@@ -195,7 +219,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:c:f:k:Ry", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(nargc, nargv.data(), "r:b:t:CL@:o:hI:E:vi:n:w:spmN:u:D:aS:c:f:k:Ry", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'i':
                 if (optarg[0] == '\0') {
@@ -495,26 +519,26 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
                 }
                 args.output_file = optarg;
                 break;
-            case 'h': usage(argv[0]); help_requested = true; return std::nullopt;
+            case 'h': usage(std::cout, argv[0]); help_requested = true; return std::nullopt;
             case OPT_VERSION:
                 std::cout << "gffsub " << kVersion << '\n';
                 help_requested = true;
                 return std::nullopt;
-            default: usage(argv[0]); return std::nullopt;
+            default: usage(std::cerr, argv[0]); return std::nullopt;
         }
     }
 
-    if (optind >= argc) {
-        usage(argv[0]);
+    if (optind >= nargc) {
+        usage(std::cerr, argv[0]);
         return std::nullopt;
     }
 
-    args.input_file = argv[optind];
+    args.input_file = nargv[optind];
     // A second operand is a typo the user expects to hear about, not a file to
     // silently ignore.
-    if (optind + 1 < argc) {
-        std::cerr << "Error: unexpected argument " << argv[optind + 1] << '\n';
-        usage(argv[0]);
+    if (optind + 1 < nargc) {
+        std::cerr << "Error: unexpected argument " << nargv[optind + 1] << '\n';
+        usage(std::cerr, argv[0]);
         return std::nullopt;
     }
 
@@ -525,7 +549,7 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
         return std::nullopt;
     }
 
-    if (args.format == OutputFormat::BED && !args.out_attrs.empty()) {
+    if (args.format == OutputFormat::BED && !args.out_attrs.empty() && !args.summary) {
         std::cerr << "Error: --out-attrs cannot be used with BED output\n";
         return std::nullopt;
     }
@@ -552,6 +576,12 @@ std::optional<CliArgs> parse_cli_args(int argc, char* argv[], bool& help_request
             filter.pattern = pattern;
             filter.use_regex = args.grep_file_regex;
             args.grep_filters.push_back(std::move(filter));
+        }
+        if (args.grep_filters.empty()) {
+            // An empty file or a directory would otherwise disable the
+            // filter and print every record.
+            std::cerr << "Error: no patterns in " << args.grep_file << '\n';
+            return std::nullopt;
         }
     } else if (!args.grep_field.empty() || args.grep_file_regex) {
         std::cerr << "Error: --grep-field and --grep-file-regex require --grep-file\n";

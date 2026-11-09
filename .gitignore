@@ -42,3 +42,6 @@ CLAUDE.md
 
 .zcodeignore
 annotation_index_smoke.gff3
+
+# Internal change documents (not tracked)
+change_doc/

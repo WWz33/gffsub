@@ -1,5 +1,4 @@
 #include "annotation.hpp"
-#include "gtf_parser.hpp"
 #include "parser.hpp"
 #include "region.hpp"
 
@@ -61,12 +60,14 @@ AnnotationIndex AnnotationIndex::from_data(const GffData& data) {
     AnnotationIndex index{GffData{}};
     index.recs_ = &data.records;
     index.source_format_ = data.source_format;
+    index.directives_ = data.directives;
     index.build_maps(data.records);
     return index;
 }
 
 AnnotationIndex::AnnotationIndex(GffData data)
-    : data_(std::move(data)), source_format_(data_.source_format) {
+    : data_(std::move(data)), directives_(data_.directives),
+      source_format_(data_.source_format) {
     build_maps(data_.records);
 }
 
@@ -76,6 +77,7 @@ AnnotationIndex::AnnotationIndex(const AnnotationIndex& other)
       gene_lookup_(other.gene_lookup_),
       parents_by_child_id_(other.parents_by_child_id_),
       children_by_parent_id_(other.children_by_parent_id_),
+      directives_(other.directives_),
       source_format_(other.source_format_) {
     data_.copy_storage_from(other.data_);
     if (other.recs_ == &other.data_.records) {
@@ -92,6 +94,7 @@ AnnotationIndex::AnnotationIndex(AnnotationIndex&& other) noexcept
       gene_lookup_(std::move(other.gene_lookup_)),
       parents_by_child_id_(std::move(other.parents_by_child_id_)),
       children_by_parent_id_(std::move(other.children_by_parent_id_)),
+      directives_(std::move(other.directives_)),
       source_format_(other.source_format_) {
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
@@ -108,6 +111,7 @@ AnnotationIndex& AnnotationIndex::operator=(const AnnotationIndex& other) {
     gene_lookup_ = other.gene_lookup_;
     parents_by_child_id_ = other.parents_by_child_id_;
     children_by_parent_id_ = other.children_by_parent_id_;
+    directives_ = other.directives_;
     source_format_ = other.source_format_;
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
@@ -125,6 +129,7 @@ AnnotationIndex& AnnotationIndex::operator=(AnnotationIndex&& other) noexcept {
     gene_lookup_ = std::move(other.gene_lookup_);
     parents_by_child_id_ = std::move(other.parents_by_child_id_);
     children_by_parent_id_ = std::move(other.children_by_parent_id_);
+    directives_ = std::move(other.directives_);
     source_format_ = other.source_format_;
     if (other.recs_ == &other.data_.records) {
         recs_ = &data_.records;
@@ -132,6 +137,21 @@ AnnotationIndex& AnnotationIndex::operator=(AnnotationIndex&& other) noexcept {
         recs_ = other.recs_;
     }
     return *this;
+}
+
+std::unordered_map<std::string, std::vector<int>> build_children_index(
+    const std::vector<GffRecord>& records, bool kept_only) {
+    std::unordered_map<std::string, std::vector<int>> children;
+    for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+        const auto& rec = records[i];
+        if (kept_only && !rec.kept) continue;
+        // parent_ids() returns each parent once per record, so a plain push
+        // cannot duplicate an index under the same parent.
+        for (const auto& parent_id : parent_ids(rec)) {
+            children[parent_id].push_back(i);
+        }
+    }
+    return children;
 }
 
 void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
@@ -166,11 +186,13 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
         if (rec.feat_class == FeatureClass::Gene) {
             saw_gene = true;
 
+            // One gene may carry the same value under several keys (ID and
+            // gene_id, Name equal to ID); add each key once.
+            std::unordered_set<std::string> added;
             auto add_gene_key = [&](const std::string& key) {
                 if (key.empty()) return;
-                auto& vec = gene_lookup_[key];
-                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                    vec.push_back(i);
+                if (added.insert(key).second) {
+                    gene_lookup_[key].push_back(i);
                 }
             };
 
@@ -181,14 +203,12 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
                 add_gene_key(*rec.gene_id);
             }
 
-            const auto attrs = parse_attributes(rec.attr_raw);
+            const auto attrs = decode_attributes(rec.attr_raw, rec.src_fmt);
             for (const char* key : {"Name", "gene_id", "locus_tag", "Alias", "Dbxref"}) {
-                const auto it = attrs.find(key);
-                if (it == attrs.end()) {
-                    continue;
-                }
-                for (const auto& value : it->second) {
-                    add_gene_key(value);
+                for (const auto& [k, value] : attrs) {
+                    if (k == key) {
+                        add_gene_key(value);
+                    }
                 }
             }
         }
@@ -196,53 +216,52 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
 
     if (!saw_gene) {
         // Flat file: group every record by its gene_id attribute. Only files
-        // without gene records pay this extra pass.
+        // without gene records pay this extra pass. Each record index is
+        // visited once, so no duplicate check is needed.
         for (int i = 0; i < static_cast<int>(records.size()); ++i) {
             const auto& rec = records[i];
             if (rec.gene_id && !rec.gene_id->empty()) {
-                auto& vec = gene_lookup_[*rec.gene_id];
-                if (std::find(vec.begin(), vec.end(), i) == vec.end()) {
-                    vec.push_back(i);
-                }
+                gene_lookup_[*rec.gene_id].push_back(i);
             }
         }
     }
 
-    for (int i = 0; i < static_cast<int>(records.size()); ++i) {
-        const auto& rec = records[i];
-        // GFF3 Parent= values and a quoted GTF Parent "a,b" list resolve the
-        // same way; rec.parent_id covers GTF without a Parent attribute.
-        const auto parents = parent_ids(rec);
-
-        for (const auto& parent_id : parents) {
-            auto& children = children_by_parent_id_[parent_id];
-            if (std::find(children.begin(), children.end(), i) == children.end()) {
-                children.push_back(i);
+    // Hierarchy maps. One builder produces parent -> children; the reverse
+    // map and the missing-Parent diagnostics derive from it, so column 9 is
+    // scanned once.
+    children_by_parent_id_ = build_children_index(records, /*kept_only=*/false);
+    for (const auto& [parent_id, children] : children_by_parent_id_) {
+        const auto parent_record = id_to_record_.find(parent_id);
+        if (parent_record != id_to_record_.end()) {
+            for (const int child_idx : children) {
+                const auto& child = records[child_idx];
+                if (child.id) {
+                    parents_by_child_id_[*child.id].push_back(parent_record->second);
+                }
             }
-            const auto parent_record = id_to_record_.find(parent_id);
-            if (parent_record != id_to_record_.end()) {
-                if (rec.id) {
-                    auto& parents = parents_by_child_id_[*rec.id];
-                    if (std::find(parents.begin(), parents.end(), parent_record->second) == parents.end()) {
-                        parents.push_back(parent_record->second);
-                    }
-                }
-            } else if (rec.src_fmt != InputFormat::GTF &&
-                       !parent_record_missing.count(parent_id)) {
-                // A Parent that names no record in the file: the child links to
-                // nothing. Report it once per ID rather than silently emitting
-                // a hierarchy with a hole in it. GTF is exempt: a flat GTF has
-                // exon/CDS rows whose transcript_id names no transcript row,
-                // which is legal there.
-                parent_record_missing.insert(parent_id);
-                if (parent_record_missing.size() <= 5) {
-                    std::cerr << "Warning: Parent '" << parent_id
-                              << "' has no record in the input\n";
-                } else if (parent_record_missing.size() == 6) {
-                    std::cerr << "Warning: further missing-Parent warnings suppressed\n";
-                }
+            continue;
+        }
+        // A Parent that names no record in the file: the child links to
+        // nothing. Report it once per ID rather than silently emitting a
+        // hierarchy with a hole in it. GTF is exempt: a flat GTF has
+        // exon/CDS rows whose transcript_id names no transcript row, which
+        // is legal there.
+        if (!children.empty() &&
+            records[children.front()].src_fmt != InputFormat::GTF &&
+            !parent_record_missing.count(parent_id)) {
+            parent_record_missing.insert(parent_id);
+            if (parent_record_missing.size() <= 5) {
+                std::cerr << "Warning: Parent '" << parent_id
+                          << "' has no record in the input\n";
+            } else if (parent_record_missing.size() == 6) {
+                std::cerr << "Warning: further missing-Parent warnings suppressed\n";
             }
         }
+    }
+    for (auto& [child_id, parent_lines] : parents_by_child_id_) {
+        std::sort(parent_lines.begin(), parent_lines.end());
+        parent_lines.erase(std::unique(parent_lines.begin(), parent_lines.end()),
+                           parent_lines.end());
     }
 
     // GFF3 spec: Parent links that form a cycle are invalid. Every traversal
@@ -253,13 +272,13 @@ void AnnotationIndex::build_maps(const std::vector<GffRecord>& records) {
     // found too. No depth cutoff: a long chain is still a chain.
     {
         std::unordered_map<std::string, std::vector<std::string>> parents_of_id;
-        for (const auto& [id, lines] : id_to_records_) {
-            for (const int line : lines) {
-                for (const auto& pid : parent_ids(records[line])) {
-                    auto& list = parents_of_id[id];
-                    if (std::find(list.begin(), list.end(), pid) == list.end()) {
-                        list.push_back(pid);
-                    }
+        for (const auto& [parent_id, children] : children_by_parent_id_) {
+            for (const int child_idx : children) {
+                const auto& child = records[child_idx];
+                if (!child.id) continue;
+                auto& list = parents_of_id[*child.id];
+                if (std::find(list.begin(), list.end(), parent_id) == list.end()) {
+                    list.push_back(parent_id);
                 }
             }
         }
@@ -480,44 +499,14 @@ std::vector<GffRecord> AnnotationIndex::with_attribute(std::string_view key, std
     }
     const std::string svalue{value};
     for (const auto& rec : *recs_) {
-        // Check synthesized rec fields first (needed for GTF where attr_raw
-        // uses key "value"; format that parse_attributes cannot parse).
-        if (skey == "gene_id" && rec.gene_id && *rec.gene_id == svalue) {
-            matches.push_back(rec);
-            continue;
-        }
-        if (skey == "transcript_id" && rec.transcript_id && *rec.transcript_id == svalue) {
-            matches.push_back(rec);
-            continue;
-        }
-        if (skey == "ID" && rec.id && *rec.id == svalue) {
-            matches.push_back(rec);
-            continue;
-        }
-        if (skey == "Parent") {
-            for (const auto& pid : parent_ids(rec)) {
-                if (pid == svalue) {
-                    matches.push_back(rec);
-                    break;
-                }
+        // One format-aware value list per key; Parent carries the synthesized
+        // fallback and drops a self-link.
+        const auto values = (skey == "Parent") ? parent_ids(rec) : attr_values(rec, skey);
+        for (const auto& attr_value : values) {
+            if (attr_value == svalue) {
+                matches.push_back(rec);
+                break;
             }
-            continue;
-        }
-
-        const auto attrs = parse_attributes(rec.attr_raw);
-        const auto it = attrs.find(skey);
-        if (it != attrs.end()) {
-            for (const auto& attr_value : it->second) {
-                if (attr_value == svalue) {
-                    matches.push_back(rec);
-                    break;
-                }
-            }
-            continue;
-        }
-        // GTF fallback: `key "value";` attributes (same as the selector path).
-        if (extract_quoted_value(rec.attr_raw, skey) == std::optional<std::string>{svalue}) {
-            matches.push_back(rec);
         }
     }
     return matches;

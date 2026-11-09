@@ -289,6 +289,10 @@ InputFormat sniff_format(const std::string& path) {
 }  // namespace
 
 int load_input(const std::string& filename, GffData& data, InputFormat& format) {
+    // Parsing appends to data.records and reads data.content(); a leftover
+    // mapping or buffer from an earlier parse would answer for the new file
+    // and keep the old record views alive. Start from empty.
+    data.clear();
     // Probe for gzip only on regular files: reading a FIFO/pipe here would
     // consume bytes the later streaming read cannot recover. A directory
     // would open and read zero bytes, which looks like an empty annotation.
@@ -338,6 +342,7 @@ int load_input(const std::string& filename, GffData& data, InputFormat& format) 
 }
 
 int load_stream(std::istream& in, GffData& data) {
+    data.clear();
     // A closed or redirected-away descriptor fails every read while still
     // reporting end-of-file, so it would look like an empty annotation. Check
     // the descriptor itself when the stream is stdin.

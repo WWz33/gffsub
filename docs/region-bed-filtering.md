@@ -44,7 +44,7 @@ Syntax: `-b FILE.bed`
 
 - BED is 0-based half-open (start included, end excluded)
 - Tab-separated, at least 3 columns (chrom, start, end)
-- Optional columns 4-6 (name, score, strand); column 6 (strand) is used by `--same-strand`/`--opposite-strand`
+- Optional columns 4-6 (name, score, strand); column 6 (strand) is used by `--same-strand`/`--opposite-strand`. If the file has rows but none carries a `+` or `-` strand, the command stops with an error instead of silently keeping or dropping every record.
 - Zero-length intervals (`start == end`) are accepted as insertion points
 - Keeps records overlapping any BED interval
 

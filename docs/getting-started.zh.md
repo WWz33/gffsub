@@ -116,6 +116,12 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 ```
 
+## 输出
+
+- `-o FILE` 写入文件；不写 `-o` 或写 `-o -` 时写 stdout。
+- gzip 输入透明读取（`.gz` 路径或 gzip 压缩的 stdin）。gzip 输出未实现：`-o out.gz` 会报错，请写纯文本后另行压缩。
+- `query` 与 `window` 同样接受 `-o`、`-f`、`--out-attrs`。
+
 ## 命令结构
 
 ```

@@ -15,13 +15,22 @@ struct GeneModel {
     std::vector<GffRecord> records;
 };
 
+// parent ID -> record indices whose Parent list names it. The one hierarchy
+// builder: the index, --longest and --drop-orphans all use it. kept_only
+// skips records already cleared by a filter. A record appears once per
+// distinct parent; parent_ids() already deduplicates its own list.
+std::unordered_map<std::string, std::vector<int>> build_children_index(
+    const std::vector<GffRecord>& records, bool kept_only);
+
 class AnnotationIndex {
 public:
     static AnnotationIndex from_file(const std::string& path);
     static AnnotationIndex from_gff3(const std::string& path);
     // Borrow the caller's records (no copy). The caller's GffData must
-    // outlive the index and keep its record order.
+    // outlive the index and keep its record order. An rvalue would be
+    // destroyed at the end of the full expression, leaving recs_ dangling.
     static AnnotationIndex from_data(const GffData& data);
+    static AnnotationIndex from_data(GffData&& data) = delete;
     // Take ownership of the records (used by load_index for stdin, where
     // there is no long-lived caller GffData).
     static AnnotationIndex from_owned(GffData data);
@@ -44,6 +53,13 @@ public:
     // Format of the input the index was built from. Known even when the file
     // held no records, so an empty BED file is still recognized as BED.
     InputFormat source_format() const { return source_format_; }
+    // ## directives from the input. A query result carries them so its output
+    // matches the subset path, which prints data.directives.
+    const std::vector<std::string>& directives() const { return directives_; }
+    // Every record the index was built over. Used to build an output model
+    // (GTF labels, stop codons) from the full annotation when printing a
+    // subset returned by query() or window().
+    const std::vector<GffRecord>& records() const { return *recs_; }
 
     // Re-point recs_ after a move/copy: owned mode follows data_ into the
     // new object; borrowed mode keeps pointing at the external vector.
@@ -63,6 +79,7 @@ private:
     std::unordered_map<std::string, std::vector<int>> gene_lookup_;
     std::unordered_map<std::string, std::vector<int>> parents_by_child_id_;
     std::unordered_map<std::string, std::vector<int>> children_by_parent_id_;
+    std::vector<std::string> directives_;
     InputFormat source_format_ = InputFormat::GFF3;
 
     explicit AnnotationIndex(GffData data);

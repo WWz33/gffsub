@@ -59,6 +59,27 @@ std::string_view gtf_type_label(std::string_view type, OutputFormat fmt) {
         return "3UTR";
     }
 
+    // GTF2.2 requires exact capitalization for the accepted types. A GFF3
+    // file that spells them differently is normalized here.
+    if (lc == "gene")           return "gene";
+    if (lc == "exon")           return "exon";
+    if (lc == "transcript")     return "transcript";
+    if (lc == "cds")            return "CDS";
+    if (lc == "start_codon")    return "start_codon";
+    if (lc == "stop_codon")     return "stop_codon";
+    if (lc == "selenocysteine") return "Selenocysteine";
+
+    return type;
+}
+
+std::string_view gff3_type_label(std::string_view type) {
+    const std::string lc = to_lower(type);
+    if (lc == "5utr" || lc == "5'-utr" || lc == "five_prime_utr") {
+        return "five_prime_UTR";
+    }
+    if (lc == "3utr" || lc == "3'-utr" || lc == "three_prime_utr") {
+        return "three_prime_UTR";
+    }
     return type;
 }
 

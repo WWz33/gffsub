@@ -35,12 +35,13 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 - 每行都有 `gene_id`，非 gene 行还有 `transcript_id`，两者位于第 9 列最前。
 - `gene_id` 与 `transcript_id` 优先取同名的第 9 列属性，没有则取 `ID` / `Parent`。Ensembl GFF3 把基因标为 `gene:gene-X`，另带 `gene_id=gene-X`，GTF 输出用 `gene-X`。
 - 其余属性跟在必备两项之后，从 GFF3 做 URL 解码并加引号。
-- `ID` 与 `Parent` 作为额外引号属性保留，除非 `--out-attrs` 将其排除。
+- `ID` 与 `Parent` 作为额外引号属性保留；两种输出格式下 `--out-attrs` 都不会删除它们。
 - 值转义：`"`、`\`、tab、换行、CR。
-- 终止密码子紧贴同一转录本 CDS 的 3' 端时，末端 CDS 结束在密码子之前。
+- 终止密码子紧贴同一转录本 CDS 的 3' 端、且 seqid 与 strand 相同时，末端 CDS 结束在密码子之前。
 - 词表之外的类型丢弃。
 - GTF3 与 GTF2.5 把 `mRNA` 改名为 `transcript`。
-- 一个 feature 有多个父时，按父各输出一行：GTF 没有多父 feature。
+- 一个 feature 有多个父时，按父各输出一行：GTF 没有多父 feature。展开行各有唯一 `ID`，形式为 `<id>.<parent>`，回读时不会合并。
+- 没有 gene 记录的转录本，`gene_id` 回退为它的 `transcript_id`；不会写出空字符串属性。
 
 抬头按版本分别写 `##gtf-version 3`、`##gtf-version 2.5`、`##gtf-version 2.2`。
 
@@ -48,14 +49,15 @@ Ensembl 与 GENCODE 现在发布 GTF3，StringTie、featureCounts、ballgown 都
 
 - 头部：`##gff-version 3`，恒定。输入若声称其他版本，不照抄。
 - 第 9 列保留输入原样。
-- GTF 输入时：第 9 列重写为 `tag=value`，带 `ID=`/`Parent=`，并做 URL 转义。
+- GTF 输入时：第 9 列重写为 `tag=value`，带 `ID=`/`Parent=`，并做 URL 转义。子行上的 `gene_id` 保留为 `gene_id=` 属性；gene 与 transcript 行上的 `gene_id` 转为 `ID=`/`Parent=`。
+- GTF 的类型拼写映射为 Sequence Ontology 名称：`5UTR` 变 `five_prime_UTR`，`3UTR` 变 `three_prime_UTR`。
 
 ## BED
 
 - 6 列：chrom、start（0-based）、end、name、score、strand。
 - `start` = 记录起始 - 1。
 - `score` 取第 6 列，按整数写出：向零取整并限制在 0..1000。缺失、`.`、无法解析或非有限值（`inf`、`nan`）写 `0`。
-- `name` 取 `ID`，缺失时取 type。
+- `name` 取 `ID`，缺失时取 type。名称中的 tab、换行、CR 替换为空格：BED 没有转义语法，未转义的控制字符会多出一列或一行。
 - BED 输入必须配 `-f bed` 或 `-s`；BED 不转换为 GFF3 或 GTF。
 
 ## 示例

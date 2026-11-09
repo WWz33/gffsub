@@ -8,34 +8,6 @@
 
 namespace gffsub {
 
-std::optional<std::string> extract_quoted_value(std::string_view attrs, std::string_view key) {
-    // Whole-token match over the parsed pairs: avoids matching a key that
-    // only appears as a substring of a longer one (`ref_gene_id`) or inside
-    // another attribute's value, and accepts bare (unquoted) values.
-    for (const auto& [k, v] : parse_gtf_attributes(attrs)) {
-        if (k == key) {
-            return v;
-        }
-    }
-    return std::nullopt;
-}
-
-void apply_gtf_attributes(GffRecord& rec) {
-    // Callers that already extracted gene_id/transcript_id have nothing to
-    // fill here; kept as a public helper for library users that call it on a
-    // bare record. The parser does not call it (it would re-scan column 9).
-    if (!rec.gene_id || !rec.transcript_id) {
-        for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-            if (!rec.gene_id && key == "gene_id") {
-                rec.gene_id = value;
-            } else if (!rec.transcript_id && key == "transcript_id") {
-                rec.transcript_id = value;
-            }
-            if (rec.gene_id && rec.transcript_id) break;
-        }
-    }
-}
-
 namespace {
 
 std::string gtf_unescape(const std::string& s) {
@@ -196,13 +168,18 @@ std::string gtf_attrs_to_gff3(const GffRecord& rec) {
     }
 
     // Convert the remaining `key "value";` pairs to key=value.
-    // Skip gene_id and transcript_id — they were synthesized into ID=/Parent=
-    // above and must not be re-emitted (AGAT replaces them with Parent=).
-    // Skip a bare ID/Parent fragment too: it produced the synthesized value,
-    // and re-emitting it duplicates the pair above.
-    for (const auto& [key, value] : parse_gtf_attributes(rec.attr_raw)) {
-        if (key == "gene_id" || key == "transcript_id" ||
-            key == "ID" || key == "Parent") {
+    // transcript_id becomes Parent= and is never re-emitted. gene_id becomes
+    // ID= on a gene row and Parent= on a transcript row, but on an exon/CDS
+    // row it is the only gene reference, so it stays as a gene_id attribute.
+    // A bare ID/Parent fragment produced the synthesized pair above and is
+    // skipped.
+    for (const auto& [key, value] : decode_attributes(rec.attr_raw, InputFormat::GTF)) {
+        if (key == "transcript_id" || key == "ID" || key == "Parent") {
+            continue;
+        }
+        if (key == "gene_id" &&
+            (rec.feat_class == FeatureClass::Gene ||
+             rec.feat_class == FeatureClass::Transcript)) {
             continue;
         }
         parts.push_back(url_escape(key) + "=" + url_escape(value));

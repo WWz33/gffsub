@@ -55,7 +55,10 @@ public:
 ```cpp
 // src/parser.hpp
 int parse_file(const std::string& filename, GffData& data, InputFormat format);
+std::vector<std::pair<std::string, std::string>> decode_attributes(
+    std::string_view column9, InputFormat format);
 std::unordered_map<std::string, std::vector<std::string>> parse_attributes(std::string_view attrs);
+std::vector<std::string> attr_values(const GffRecord& rec, std::string_view key);
 std::vector<std::string> parent_ids(const GffRecord& rec);
 
 // src/input_source.hpp
@@ -63,6 +66,8 @@ InputFormat infer_input_format(const std::string& path);
 ```
 
 `infer_input_format` 嗅探文件内容：第 9 列含 `=` 和 `;` 判为 GFF3，含 `"` 判为 GTF，3-12 列且 start/end 为整数判为 BED，默认 GFF3。
+
+`decode_attributes` 是唯一的第 9 列解码器。返回有序 `(key, value)` 对，保留重复键，拆分 GFF3 的五个逗号列表标签，解码 `%XX`。GTF 走引号感知的词法器，解码反斜杠转义，按逗号拆分 `Parent`，并对四个身份键（`ID`、`Parent`、`gene_id`、`transcript_id`）解码 `%XX`。`attr_values` 返回一个键的全部值，并在需要时回退到记录里合成的身份字段。`parse_attributes` 是 GFF3 的 map 形态包装。
 
 ## AnnotationIndex
 
@@ -88,6 +93,7 @@ public:
     std::vector<GffRecord> with_attribute(std::string_view key, std::string_view value) const;
     std::optional<GeneModel> gene_model(std::string_view id) const;
     InputFormat source_format() const;
+    const std::vector<std::string>& directives() const;
 };
 
 struct GeneModel {
@@ -212,9 +218,12 @@ bool compile_filter_regexes(std::vector<GrepFilter>& grep_filters,
 ```cpp
 // src/output.hpp
 void print_gff3(std::ostream& out, const GffData& data);
-void print_gtf3(std::ostream& out, const GffData& data);
-void print_gtf(std::ostream& out, const GffData& data, OutputFormat fmt);  // GTF3, GTF25 or GTF22
 void print_bed(std::ostream& out, const GffData& data);
+
+struct GtfModel { /* gene/transcript 标签与 stop_codon 区间 */ };
+GtfModel build_gtf_model(const GffData& data);
+void print_gtf(std::ostream& out, const GffData& data, const GtfModel& model,
+               OutputFormat fmt);  // GTF3, GTF25 or GTF22
 ```
 
 ## Summary
@@ -242,9 +251,8 @@ Region window_region(const GffRecord& rec, int64_t upstream, int64_t downstream,
 
 ```cpp
 // src/gtf_parser.hpp
-std::optional<std::string> extract_quoted_value(const std::string& attrs, const std::string& key);
+std::vector<std::pair<std::string, std::string>> parse_gtf_attributes(std::string_view attrs);
 std::string gtf_attrs_to_gff3(const GffRecord& rec);
-void apply_gtf_attributes(GffRecord& rec);
 ```
 
 ## 示例
@@ -257,14 +265,18 @@ void apply_gtf_attributes(GffRecord& rec);
 #include "output.hpp"
 
 int main() {
-    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_gff3("ann.gff3");
+    gffsub::GffData data;
+    gffsub::parse_file("ann.gff3", data, gffsub::InputFormat::GFF3);
+    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_data(data);
 
     gffsub::QueryParams qp;
     qp.name = "BRCA1";
     qp.include_children = true;
     gffsub::QueryResult res = gffsub::query(idx, qp);
 
-    gffsub::print_gtf(std::cout, res.records, gffsub::OutputFormat::GTF3);
+    // model 从完整注释构建，不是从查询结果构建。
+    const auto model = gffsub::build_gtf_model(data);
+    gffsub::print_gtf(std::cout, res.records, model, gffsub::OutputFormat::GTF3);
 }
 ```
 
@@ -298,7 +310,7 @@ feature 周围窗口：
 #include "output.hpp"
 
 int main() {
-    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_gff3("ann.gff3");
+    gffsub::AnnotationIndex idx = gffsub::AnnotationIndex::from_file("ann.gff3");
 
     gffsub::WindowParams wp;
     wp.id = "gene01";

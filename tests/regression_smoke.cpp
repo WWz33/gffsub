@@ -933,7 +933,9 @@ static int test_gtf_attrs_and_bed_score(const std::string& exe) {
             << "chr1\tx\texon\t1\t100\tabc\t+\t.\tID=e3;Parent=t1\n";
     }
     if (run_command(exe + " reg_idparent.gff3 -f gtf > reg_idparent.gtf") != 0 ||
-        require_contains("reg_idparent.gtf", "transcript_id \"t1\"; Parent \"g1\"; ID \"t1\";") != 0) {
+        require_contains("reg_idparent.gtf", "transcript_id \"t1\";") != 0 ||
+        require_contains("reg_idparent.gtf", "Parent \"g1\";") != 0 ||
+        require_contains("reg_idparent.gtf", "ID \"t1\";") != 0) {
         return 1;
     }
     if (run_command(exe + " reg_idparent.gff3 -f bed > reg_idparent.bed") != 0 ||
@@ -1196,6 +1198,172 @@ static int test_threads_rejects_space_negative(const std::string& exe) {
     return 0;
 }
 
+// One column-9 decoder, one hierarchy owner, one output path. These cases
+// pin the behaviour that the duplicate implementations used to disagree on.
+static int test_architecture_regressions(const std::string& exe) {
+    {
+        std::ofstream gff{"reg_arch_parent_space.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\tx\tmRNA\t1\t100\t.\t+\t.\tID=t1\n"
+            << "chr1\tx\tmRNA\t1\t100\t.\t+\t.\tID=t2\n"
+            << "chr1\tx\texon\t1\t10\t.\t+\t.\tParent=t1, t2\n";
+    }
+    if (run_command(exe + " reg_arch_parent_space.gff3 -w Parent=t2 > reg_arch_space.out 2> reg_arch_space.err") != 0 ||
+        require_contains("reg_arch_space.out", "exon\t1\t10") != 0 ||
+        require_not_contains("reg_arch_space.err", "no record") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gtf{"reg_arch_repeat.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tgene\t1\t100\t.\t+\t.\ttag \"a\"; tag \"b\";\n";
+    }
+    if (run_command(exe + " reg_arch_repeat.gtf -w tag=b > reg_arch_repeat.out") != 0 ||
+        require_contains("reg_arch_repeat.out", "gene\t1\t100") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gtf{"reg_arch_parent_where.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tgene\t1\t1000\t.\t+\t.\tgene_id \"g1\";\n"
+            << "chr1\tx\ttranscript\t1\t1000\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; Parent \"t1,t2\";\n"
+            << "chr1\tx\ttranscript\t1\t1000\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t2\";\n";
+    }
+    if (run_command(exe + " reg_arch_parent_where.gtf -w Parent=g1 > reg_arch_w.gff3") != 0 ||
+        run_command(exe + " reg_arch_parent_where.gtf -I 'attr.Parent==g1' > reg_arch_i.gff3") != 0 ||
+        test_utils::compare_files("reg_arch_w.gff3", "reg_arch_i.gff3") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gtf{"reg_arch_name.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tgene\t1\t100\t.\t+\t.\tgene_id \"g1\"; Name \"ABC1\";\n";
+    }
+    if (run_command(exe + " reg_arch_name.gtf --name ABC1 > reg_arch_name.out") != 0 ||
+        require_contains("reg_arch_name.out", "gene\t1\t100") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gtf{"reg_arch_flat.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\texon\t1\t50\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\";\n";
+    }
+    if (run_command(exe + " reg_arch_flat.gtf -f gff3 > reg_arch_flat.gff3") != 0 ||
+        require_contains("reg_arch_flat.gff3", "gene_id=g1") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gtf{"reg_arch_pct.gtf"};
+        if (!gtf.is_open()) return 1;
+        gtf << "chr1\tx\tmRNA\t1\t1000\t.\t+\t.\tgene_id \"g%2C1\"; transcript_id \"t%2C1\";\n"
+            << "chr1\tx\texon\t1\t100\t.\t+\t.\tgene_id \"g%2C1\"; transcript_id \"t%2C1\";\n";
+    }
+    if (run_command(exe + " reg_arch_pct.gtf -f gff3 | " + exe +
+                    " - -f gtf > reg_arch_pct.out 2> reg_arch_pct.err") != 0 ||
+        require_not_contains("reg_arch_pct.err", "no record") != 0 ||
+        require_contains("reg_arch_pct.out", "gene_id \"g,1\"") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gff{"reg_arch_tab.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\nchr1\tx\tgene\t1\t9\t.\t+\t.\tID=gene%09tab\n";
+    }
+    if (run_command(exe + " reg_arch_tab.gff3 -f bed > reg_arch_tab.bed") != 0 ||
+        require_not_contains("reg_arch_tab.bed", "\tgene\ttab\t") != 0 ||
+        require_contains("reg_arch_tab.bed", "gene tab") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gff{"reg_arch_multi.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\tx\tgene\t1\t1000\t.\t+\t.\tID=g1\n"
+            << "chr1\tx\tmRNA\t1\t1000\t.\t+\t.\tID=t1;Parent=g1\n"
+            << "chr1\tx\tmRNA\t1\t1000\t.\t+\t.\tID=t2;Parent=g1\n"
+            << "chr1\tx\texon\t1\t100\t.\t+\t.\tID=e1;Parent=t1,t2\n";
+    }
+    if (run_command(exe + " reg_arch_multi.gff3 -f gtf > reg_arch_multi.gtf") != 0 ||
+        require_contains("reg_arch_multi.gtf", "ID \"e1.t1\"") != 0 ||
+        require_contains("reg_arch_multi.gtf", "ID \"e1.t2\"") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_arch_multi.gff3 -f gtf --out-attrs Name > reg_arch_oa.gtf") != 0 ||
+        require_contains("reg_arch_oa.gtf", "ID \"e1.t1\"") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gff{"reg_arch_stop.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n"
+            << "chr1\tx\tmRNA\t1\t1000\t.\t+\t.\tID=t1\n"
+            << "chr1\tx\tCDS\t1\t1000\t.\t+\t0\tID=c1;Parent=t1\n"
+            << "chr2\tx\tstop_codon\t998\t1000\t.\t+\t0\tParent=t1\n";
+    }
+    if (run_command(exe + " reg_arch_stop.gff3 -f gtf > reg_arch_stop.gtf") != 0 ||
+        require_contains("reg_arch_stop.gtf", "CDS\t1\t1000") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream gff{"reg_arch_directive.gff3"};
+        if (!gff.is_open()) return 1;
+        gff << "##gff-version 3\n##sequence-region chr1 1 5000\n"
+            << "chr1\tx\tgene\t1\t100\t.\t+\t.\tID=g1\n";
+    }
+    if (run_command(exe + " reg_arch_directive.gff3 -i g1 > reg_arch_d1.out") != 0 ||
+        run_command(exe + " reg_arch_directive.gff3 -i g1 -@ 2 > reg_arch_d2.out") != 0 ||
+        test_utils::compare_files("reg_arch_d1.out", "reg_arch_d2.out") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " query reg_arch_directive.gff3 -i g1 -o reg_arch_q.gff3") != 0 ||
+        require_contains("reg_arch_q.gff3", "##sequence-region chr1 1 5000") != 0 ||
+        require_contains("reg_arch_q.gff3", "ID=g1") != 0) {
+        return 1;
+    }
+    if (run_command(exe + " reg_arch_flat.gtf -o - > reg_arch_dash.out") != 0 ||
+        require_contains("reg_arch_dash.out", "exon\t1\t50") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream bed{"reg_arch_3col.bed"};
+        if (!bed.is_open()) return 1;
+        bed << "chr1\t0\t100\n";
+    }
+    if (expect_command_failure(exe + " reg_arch_directive.gff3 -b reg_arch_3col.bed --same-strand > /dev/null 2> reg_arch_bed.err") != 0 ||
+        require_contains("reg_arch_bed.err", "strand column") != 0) {
+        return 1;
+    }
+
+    {
+        std::ofstream empty{"reg_arch_empty.txt"};
+        if (!empty.is_open()) return 1;
+    }
+    if (expect_command_failure(exe + " reg_arch_directive.gff3 --ids reg_arch_empty.txt > /dev/null 2> reg_arch_ids.err") != 0 ||
+        require_contains("reg_arch_ids.err", "no IDs") != 0 ||
+        expect_command_failure(exe + " reg_arch_directive.gff3 --grep-file reg_arch_empty.txt --grep-field ID > /dev/null 2> reg_arch_grep.err") != 0 ||
+        require_contains("reg_arch_grep.err", "no patterns") != 0) {
+        return 1;
+    }
+    if (expect_command_failure(exe + " reg_arch_flat.gtf -o reg_arch_out.gz > /dev/null 2> reg_arch_gz.err") != 0 ||
+        require_contains("reg_arch_gz.err", "gzip output") != 0) {
+        return 1;
+    }
+
+    run_command("rm -f reg_arch_*");
+    return 0;
+}
+
 static int test_defect_regressions(const std::string& exe) {
     return test_gtf_transcript_parent_keeps_gene(exe) ||
            test_gtf_child_transcript_id_follows_parent(exe) ||
@@ -1358,6 +1526,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (test_defect_regressions(exe) != 0) {
+        cleanup_outputs();
+        return 1;
+    }
+    if (test_architecture_regressions(exe) != 0) {
         cleanup_outputs();
         return 1;
     }

@@ -44,7 +44,7 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 
 - BED 为 0-based 半开区间（start 包含，end 不包含）
 - 制表符分隔，至少 3 列（chrom、start、end）
-- 可选列 4-6（name、score、strand）；列 6（strand）供 `--same-strand`/`--opposite-strand` 使用
+- 可选列 4-6（name、score、strand）；列 6（strand）供 `--same-strand`/`--opposite-strand` 使用。文件有行但没有任何行带 `+` 或 `-` 链时，命令报错退出，不会静默保留或删除全部记录。
 - 接受零长区间（`start == end`），视为插入位点
 - 保留与任一 BED interval 有重叠的记录
 

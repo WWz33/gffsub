@@ -116,6 +116,12 @@ chr1	src	exon	500	750	.	+	.	ID=ex02;Parent=tx01
 chr1	src	CDS	500	750	.	+	2	ID=cds02;Parent=tx01
 ```
 
+## Output
+
+- `-o FILE` writes to FILE; no `-o`, or `-o -`, writes to stdout.
+- gzip input is read transparently (`.gz` path or gzipped stdin). gzip output is not implemented: `-o out.gz` is rejected, so write plain text and compress separately.
+- `query` and `window` accept `-o`, `-f`, and `--out-attrs` as well.
+
 ## Command structure
 
 ```

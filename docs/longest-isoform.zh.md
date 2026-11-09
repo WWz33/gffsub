@@ -18,6 +18,7 @@
 - 只在检测到的类型内比较: 其他 transcript 类类型的记录原样保留，即使更长。
 - 单 isoform 的 gene 保持不变。
 - isoform 按其 Parent 属性分组，没有 gene 记录的文件 (扁平 GTF、只有 transcript 行的 GFF3) 同样生效。
+- `--longest` 在其它过滤器之后运行。长度度量和自动检测的 isoform 类型只看通过过滤器的记录，因此加 `-r`、`-t`、`-b`、`-S` 或表达式过滤可能改变胜出的转录本。需要跨运行比较时，用 `--longest-type` 固定参与比较的类型。
 
 示例数据 (demo.gff3):
 

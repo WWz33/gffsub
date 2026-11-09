@@ -49,6 +49,11 @@ bool is_spread_feature(std::string_view type);
 // transcript row. Every other type passes through unchanged.
 std::string_view gtf_type_label(std::string_view type, OutputFormat fmt);
 
+// Resolve the GFF3 column-3 label for a feature type. GTF spellings that are
+// not Sequence Ontology terms are mapped: 5UTR / 5'-utr to five_prime_UTR,
+// 3UTR / 3'-utr to three_prime_UTR. Everything else passes through.
+std::string_view gff3_type_label(std::string_view type);
+
 // Should this type survive into the given output format? Each GTF flavor has
 // its own whitelist (case-insensitive, so GFF3 "five_prime_UTR"/"CDS" match):
 //   GTF3  gene, transcript, exon, CDS, start_codon, stop_codon,

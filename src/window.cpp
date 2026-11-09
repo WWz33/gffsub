@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <stdexcept>
+#include <utility>
 
 namespace gffsub {
 
@@ -28,8 +29,13 @@ GffData window(const AnnotationIndex& index, const WindowParams& params) {
 
     const auto region = window_region(*target, params.upstream, params.downstream, params.strand_aware);
     GffData result;
+    result.directives = index.directives();
     for (const auto& rec : index.overlap(region.seqid, region.start, region.end)) {
-        result.append(rec);
+        // The window is a fresh selection: a record cleared by an earlier
+        // subset() must still print.
+        GffRecord copy = rec;
+        copy.kept = true;
+        result.append(std::move(copy));
     }
     return result;
 }

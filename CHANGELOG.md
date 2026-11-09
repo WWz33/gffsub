@@ -61,6 +61,48 @@ All notable changes to gffsub are documented in this file. The format follows
 - `CMakeLists.txt`; the Makefile is the only build
 
 ### Fixed
+
+#### Architecture review 2026-11-10
+- One column-9 decoder (`decode_attributes`) replaces six scanners. `-w`,
+  `-I`, `--grep`, `--name` and the GTF writer now agree on a value:
+  `Parent=t1, t2`, repeated GTF keys (`tag "a"; tag "b";`), and `%2C`
+  identities resolve the same way everywhere
+- A flat GTF keeps `gene_id` when converted to GFF3 (child rows carry
+  `gene_id=` instead of losing the gene)
+- `--name` reads a GTF `Name` attribute
+- A GFF3 value containing a comma outside the five list tags is no longer
+  truncated on GTF conversion
+- `query()` and `window()` results print every matched record: a `kept` flag
+  left by an earlier `subset()` no longer hides them
+- Parsing into a non-empty `GffData` clears the previous file first; record
+  views no longer point at the old mapping
+- `AnnotationIndex::from_data(GffData&&)` is deleted, so a temporary cannot
+  leave a dangling index
+- `copy_storage_from` copies `source_format`; `clear()` resets it
+- `-o -` writes to stdout instead of creating a file named `-`; `-o x.gz`
+  is rejected
+- `query` and `window` accept `-o`, `-f`, and `--out-attrs`
+- `query` output keeps the input's `##` directives, matching the subset path
+- `--help` writes to stdout; `query --version` and `window --version` work
+- `-i=ID`, `-t=type`, and `-o=FILE` are accepted like their `--long=value`
+  forms
+- An empty `--ids`/`--grep-file` file, or a directory passed to either,
+  is an error instead of silently disabling the filter
+- A 3-column BED with `--same-strand`/`--opposite-strand` is an error
+  instead of an empty or unfiltered result
+- BED output replaces tab, newline, and CR in the name with a space
+- A multi-parent GTF expansion writes a unique ID per row (`<id>.<parent>`)
+- `stop_codon` trimming requires the same seqid and strand
+- GTF output falls back to `transcript_id` when a transcript has no gene,
+  instead of writing `gene_id "";`
+- GFF3 output maps `5UTR`/`3UTR` to `five_prime_UTR`/`three_prime_UTR`
+- `--out-attrs` keeps `ID` and `Parent` in both output formats
+- GTF output uses canonical type capitalization (`CDS`, `Selenocysteine`)
+- `--longest` uses one shared child index; the index build is linear again
+  (80k flat records: 0.90s to 0.16s)
+- `print_gtf` takes a `GtfModel` built once from the full annotation, so a
+  library caller printing a query subset gets the same `gene_id` and CDS
+  trim as the CLI
 - Format detection reads the first column-9 fragment instead of searching the
   whole column: `ID=g1;Name="A"` stays GFF3 (`tag=value`) and
   `note "a=b"` stays GTF (`tag "value"`), so a quoted GFF3 value no longer
